@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Анализатор Изображений</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="background-animation">
+    <div class="shape shape-1"></div>
+    <div class="shape shape-2"></div>
+    <div class="shape shape-3"></div>
+  </div>
+  
+  <div class="container">
+    <div class="header">
+      <div class="icon-wrapper">
+        <svg class="ai-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="50" cy="50" r="45" fill="none" stroke="url(#gradient)" stroke-width="3"/>
+          <path d="M30 50 L45 35 L55 45 L70 30" fill="none" stroke="url(#gradient)" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="30" cy="50" r="4" fill="#6c63ff"/>
+          <circle cx="45" cy="35" r="4" fill="#6c63ff"/>
+          <circle cx="55" cy="45" r="4" fill="#6c63ff"/>
+          <circle cx="70" cy="30" r="4" fill="#6c63ff"/>
+          <defs>
+            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#6c63ff;stop-opacity:1" />
+              <stop offset="100%" style="stop-color:#00d4ff;stop-opacity:1" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <h1>Анализатор Изображений</h1>
+      <p class="subtitle">Загрузите изображение и получите детальный AI-анализ</p>
+    </div>
+
+    <div class="upload-section">
+      <label for="imageInput" class="upload-label" id="uploadLabel">
+        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M20 21H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="upload-text">Нажмите для выбора изображения</span>
+        <span class="upload-hint">или перетащите файл сюда</span>
+        <span class="file-name" id="fileName"></span>
+      </label>
+      <input type="file" id="imageInput" accept="image/*">
+      
+      <div class="preview-wrapper" id="previewWrapper">
+        <img id="imagePreview" alt="Preview">
+        <button class="remove-btn" id="removeBtn">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <button id="askBtn" class="analyze-btn" disabled>
+      <span class="btn-text">Анализировать</span>
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M13 5L20 12L13 19M4 12H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+
+    <div id="chatSection" class="chat-section">
+      <div id="ageIndicator" class="age-indicator"></div>
+      <div id="chatHistory" class="chat-history"></div>
+      
+      <div id="chatInput" class="chat-input-wrapper" style="display: none;">
+        <input type="text" id="messageInput" class="message-input" placeholder="Задайте вопрос о диагнозе...">
+        <button id="sendBtn" class="send-btn">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <button id="newAnalysisBtn" class="new-analysis-btn" style="display: none;">
+        Новый анализ
+      </button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
