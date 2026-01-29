@@ -75,6 +75,8 @@ async function generateMedicalAnalysis(imageData, mimeType, ageCategory, convers
         prompt = "Назовите только одно возможное заболевание, показанное на изображении. Напишите симптомы и как лечить очень кратко. Обязательно укажите, что нужна консультация врача.";
       }
 
+      prompt += " Если эта фотография не содержит никаких болезней/людей или симптомов, то ответь ТОЛЬКО одним предложением 'Арсен не мучай GEMINI'";
+
       const contents = [];
       
       conversationHistory.forEach(msg => {
