@@ -301,9 +301,9 @@ body.side-open .side-panel { pointer-events: auto; }
 .left-pulse {
   position: fixed;
   left: 0;
-  top: 0;
+  top: 40px;
   width: 100vw;
-  height: 100vh;
+  height: calc(100vh - 40px);
   pointer-events: none;
   display: block;
   z-index: 0;
@@ -311,7 +311,7 @@ body.side-open .side-panel { pointer-events: auto; }
 
 #pulseCanvas {
   width: 100vw;
-  height: 100vh;
+  height: 100%;
   display: block;
 }
 
