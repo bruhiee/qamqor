@@ -1,4 +1,4 @@
 node_modules/
 uploads/
 .env
-package-lock.jsom
+package-lock.json

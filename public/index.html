@@ -5,12 +5,46 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Анализатор Изображений</title>
   <link rel="stylesheet" href="style.css">
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
+  <nav class="top-nav">
+    <div class="top-nav-inner">
+      <button id="navHomeBtn" class="nav-tab active">
+        <svg class="nav-icon" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V9.5z"/></svg>
+        <span>Главная</span>
+      </button>
+      
+      <button id="navMapBtn" class="nav-tab">
+        <svg class="nav-icon" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 6-9 12-9 12S3 16 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span>Карта</span>
+      </button>
+      <button id="navPharmacyBtn" class="nav-tab">
+        <svg class="nav-icon" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/></svg>
+        <span>Умная аптека</span>
+      </button>
+    </div>
+  </nav>
+  <div id="sideChat" class="side-chat" aria-hidden="true">
+    <div class="side-handle">Чат</div>
+    <div class="side-panel">
+      <div class="side-header">Обсудить с ИИ</div>
+      <div id="sideChatHistory" class="side-chat-history"></div>
+      <div class="side-input-row">
+        <input id="sideMessageInput" class="side-message-input" placeholder="Задайте вопрос...">
+        <button id="sideSendBtn" class="side-send-btn">→</button>
+      </div>
+    </div>
+  </div>
   <div class="background-animation">
     <div class="shape shape-1"></div>
     <div class="shape shape-2"></div>
     <div class="shape shape-3"></div>
+  </div>
+
+  <div id="leftPulse" class="left-pulse" aria-hidden="true">
+    <canvas id="pulseCanvas"></canvas>
   </div>
   
   <div class="container">
@@ -31,8 +65,9 @@
           </defs>
         </svg>
       </div>
-      <h1>Анализатор Изображений</h1>
-      <p class="subtitle">Загрузите изображение и получите детальный AI-анализ</p>
+      <h1>Медицинский Анализатор Изображений</h1>
+      <p class="subtitle">Загрузите медицинское изображение и получите структурированный медицинский отчёт</p>
+      
     </div>
 
     <div class="upload-section">
@@ -56,6 +91,10 @@
           </svg>
         </button>
       </div>
+    </div>
+
+    <div id="medicalDisclaimer" style="margin-top:12px; text-align:left; background: rgba(255,255,255,0.02); padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.03);">
+      <strong>Важно:</strong> этот инструмент предоставляет ориентировочный медицинский анализ. Он не заменяет консультацию врача. При серьёзных симптомах обращайтесь в ближайшее медицинское учреждение.
     </div>
 
     <button id="askBtn" class="analyze-btn" disabled>
@@ -82,8 +121,65 @@
         Новый анализ
       </button>
     </div>
+
+    <div id="mapSection" class="map-section" style="display:none;">
+      <div id="map" style="width:100%;height:420px;border-radius:12px;overflow:hidden;"></div>
+      <p class="map-hint">Вкладка «Карта» показывает пример расположения. Замените токен Mapbox в `script.js`.</p>
+    </div>
+    
+    <div id="articlesSection" class="articles-section">
+      <h2 class="articles-title">Полезные статьи</h2>
+      <div class="articles-list">
+        <article class="article-card">
+          <h3><a href="https://ru.wikipedia.org/wiki/Компьютерное_зрение" target="_blank" rel="noopener">Введение в компьютерное зрение</a></h3>
+          <p>Краткое описание технологий распознавания изображений и примеры применения в медицине и промышленности.</p>
+        </article>
+        <article class="article-card">
+          <h3><a href="https://www.who.int/" target="_blank" rel="noopener">Рекомендации по безопасности при обработке медицинских изображений</a></h3>
+          <p>Официальные подходы к обработке персональных данных и медицинских изображений.</p>
+        </article>
+        <article class="article-card">
+          <h3><a href="https://developers.mapbox.com/" target="_blank" rel="noopener">Mapbox — документация разработчика</a></h3>
+          <p>Как быстро начать работу с картами, маркерами и стилями Mapbox.</p>
+        </article>
+        <article class="article-card">
+          <h3><a href="https://www.health.harvard.edu/" target="_blank" rel="noopener">Harvard Health Publishing</a></h3>
+          <p>Авторитетные материалы по медицинским темам, включая исследования по медицинской визуализации и диагностике.</p>
+        </article>
+        <article class="article-card">
+          <h3><a href="https://hms.harvard.edu/news" target="_blank" rel="noopener">Harvard Medical School — News</a></h3>
+          <p>Новости и публикации исследовательских подразделений Гарвардской медицинской школы.</p>
+        </article>
+        <article class="article-card">
+          <h3><a href="https://news.harvard.edu/gazette/" target="_blank" rel="noopener">Harvard Gazette — Research & AI</a></h3>
+          <p>Статьи о применении ИИ в медицине и исследованиях от Harvard Gazette.</p>
+        </article>
+      </div>
+    </div>
+    
+    <div id="pharmacySection" class="pharmacy-section" style="display:none;">
+      <h2 class="pharmacy-title">Умная аптека</h2>
+      <div class="pharmacy-cards">
+        <div class="pharmacy-card">
+          <h3>Поиск ближайшей аптеки</h3>
+          <p>Найдите ближайшие аптеки, сравните цены и наличие препаратов.</p>
+        </div>
+        <div class="pharmacy-card">
+          <h3>Совместимость лекарств</h3>
+          <p>Проверка взаимодействий между препаратами и предупреждения.</p>
+        </div>
+        <div class="pharmacy-card">
+          <h3>Напоминания о приёме</h3>
+          <p>Настройка уведомлений и расписания приёма лекарств.</p>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <script src="script.js"></script>
+  
+
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
