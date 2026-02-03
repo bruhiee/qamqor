@@ -19,18 +19,18 @@ import {
   Clock,
   User,
   AlertTriangle,
-  CheckCircle,
   Shield,
   Send,
   X,
+  Trash,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { DisclaimerBanner } from "@/components/layout/DisclaimerBanner";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/useLanguage";
+import { useAuth } from "@/contexts/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
-import { supabase } from "@/integrations/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -66,7 +66,7 @@ const TAGS = [
 export default function Forum() {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const { isDoctor } = useUserRoles();
+  const { isAdmin, isModerator } = useUserRoles();
   const { toast } = useToast();
 
   const [posts, setPosts] = useState<ForumPost[]>([]);
@@ -86,19 +86,52 @@ export default function Forum() {
   const [replyContent, setReplyContent] = useState("");
   const [replyAnonymously, setReplyAnonymously] = useState(false);
 
+  const canManagePost = (post: ForumPost) =>
+    Boolean(user && (isAdmin() || isModerator() || user.id === post.user_id));
+
+  const canManageReply = (reply: ForumReply) =>
+    Boolean(user && (isAdmin() || isModerator() || user.id === reply.user_id));
+
+  const handleDeletePost = async () => {
+    if (!selectedPost) return;
+    try {
+      await apiFetch(`/forum/posts/${selectedPost.id}`, {
+        method: "DELETE",
+      });
+      toast({
+        title: t.success,
+        description: "Post removed",
+      });
+      setSelectedPost(null);
+      setReplies([]);
+      fetchPosts();
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      toast({ title: t.error, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteReply = async (replyId: string) => {
+    try {
+      await apiFetch(`/forum/replies/${replyId}`, {
+        method: "DELETE",
+      });
+      toast({ title: t.success, description: "Reply removed" });
+      setReplies((prev) => prev.filter((reply) => reply.id !== replyId));
+    } catch (error) {
+      console.error("Error deleting reply:", error);
+      toast({ title: t.error, variant: "destructive" });
+    }
+  };
+
   useEffect(() => {
     fetchPosts();
   }, []);
 
   const fetchPosts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('forum_posts')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setPosts(data || []);
+    const { data } = await apiFetch<{ data: ForumPost[] }>("/forum/posts");
+    setPosts(data || []);
     } catch (error) {
       console.error('Error fetching posts:', error);
     } finally {
@@ -108,14 +141,8 @@ export default function Forum() {
 
   const fetchReplies = async (postId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('forum_replies')
-        .select('*')
-        .eq('post_id', postId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      setReplies(data || []);
+    const { data } = await apiFetch<{ data: ForumReply[] }>(`/forum/posts/${postId}/replies`);
+    setReplies(data || []);
     } catch (error) {
       console.error('Error fetching replies:', error);
     }
@@ -126,25 +153,24 @@ export default function Forum() {
     await fetchReplies(post.id);
     
     // Increment view count
-    await supabase
-      .from('forum_posts')
-      .update({ views_count: (post.views_count || 0) + 1 })
-      .eq('id', post.id);
+    await apiFetch(`/forum/posts/${post.id}/views`, {
+      method: "POST",
+    });
   };
 
   const handleCreatePost = async () => {
     if (!user || !newTitle.trim() || !newContent.trim()) return;
 
     try {
-      const { error } = await supabase.from('forum_posts').insert({
-        user_id: user.id,
-        title: newTitle,
-        content: newContent,
-        tags: newTags,
-        is_urgent: isUrgent,
+      await apiFetch("/forum/posts", {
+        method: "POST",
+        body: {
+          title: newTitle,
+          content: newContent,
+          tags: newTags,
+          is_urgent: isUrgent,
+        },
       });
-
-      if (error) throw error;
 
       toast({ title: t.success, description: "Question posted successfully" });
       setNewPostOpen(false);
@@ -163,23 +189,13 @@ export default function Forum() {
     if (!user || !selectedPost || !replyContent.trim()) return;
 
     try {
-      const { error } = await supabase.from('forum_replies').insert({
-        post_id: selectedPost.id,
-        user_id: user.id,
-        content: replyContent,
-        is_anonymous: replyAnonymously,
-        is_doctor_reply: isDoctor(),
+      await apiFetch(`/forum/posts/${selectedPost.id}/replies`, {
+        method: "POST",
+        body: {
+          content: replyContent,
+          is_anonymous: replyAnonymously,
+        },
       });
-
-      if (error) throw error;
-
-      // Update post status if doctor replied
-      if (isDoctor()) {
-        await supabase
-          .from('forum_posts')
-          .update({ status: 'answered' })
-          .eq('id', selectedPost.id);
-      }
 
       toast({ title: t.success });
       setReplyContent("");
@@ -381,13 +397,20 @@ export default function Forum() {
                         </div>
                         <h2 className="text-xl font-display font-bold">{selectedPost.title}</h2>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSelectedPost(null)}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {canManagePost(selectedPost) && (
+                          <Button variant="ghost" size="icon" onClick={handleDeletePost}>
+                            <Trash className="w-4 h-4 text-destructive" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setSelectedPost(null)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
 
                     <p className="text-muted-foreground mb-4">{selectedPost.content}</p>
@@ -421,21 +444,32 @@ export default function Forum() {
                                 : 'bg-muted'
                             }`}
                           >
-                            <div className="flex items-center gap-2 mb-2">
-                              {reply.is_doctor_reply ? (
-                                <Badge className="gap-1 bg-primary">
-                                  <Shield className="w-3 h-3" />
-                                  {t.doctorAnswer}
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline">
-                                  <User className="w-3 h-3 mr-1" />
-                                  {reply.is_anonymous ? 'Anonymous' : 'User'}
-                                </Badge>
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2">
+                                {reply.is_doctor_reply ? (
+                                  <Badge className="gap-1 bg-primary">
+                                    <Shield className="w-3 h-3" />
+                                    {t.doctorAnswer}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline">
+                                    <User className="w-3 h-3 mr-1" />
+                                    {reply.is_anonymous ? 'Anonymous' : 'User'}
+                                  </Badge>
+                                )}
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(reply.created_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                              {canManageReply(reply) && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDeleteReply(reply.id)}
+                                >
+                                  <Trash className="w-3 h-3 text-destructive" />
+                                </Button>
                               )}
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(reply.created_at).toLocaleDateString()}
-                              </span>
                             </div>
                             <p className="text-sm">{reply.content}</p>
                           </div>
@@ -486,3 +520,5 @@ export default function Forum() {
     </div>
   );
 }
+
+

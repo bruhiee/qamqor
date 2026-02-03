@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Mic, MicOff, Loader2 } from 'lucide-react';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage } from '@/contexts/useLanguage';
 import { cn } from '@/lib/utils';
 
 interface VoiceInputButtonProps {
@@ -81,3 +81,4 @@ export function VoiceInputButton({ onTranscript, disabled, className }: VoiceInp
     </div>
   );
 }
+

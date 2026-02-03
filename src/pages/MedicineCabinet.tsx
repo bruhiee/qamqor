@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,9 +35,9 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/contexts/useLanguage";
+import { useAuth } from "@/contexts/useAuth";
+import { apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 
@@ -85,22 +85,9 @@ export default function MedicineCabinet() {
     notes: "",
   });
 
-  useEffect(() => {
-    if (user) {
-      fetchMedicines();
-    } else {
-      setLoading(false);
-    }
-  }, [user]);
-
-  const fetchMedicines = async () => {
+  const fetchMedicines = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("medicines")
-        .select("*")
-        .order("expiration_date", { ascending: true });
-
-      if (error) throw error;
+      const { data } = await apiFetch<{ data: Medicine[] }>("/medicines");
       setMedicines(data || []);
     } catch (error) {
       console.error("Error fetching medicines:", error);
@@ -112,7 +99,15 @@ export default function MedicineCabinet() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t, toast]);
+
+  useEffect(() => {
+    if (user) {
+      fetchMedicines();
+    } else {
+      setLoading(false);
+    }
+  }, [user, fetchMedicines]);
 
   const isExpired = (date: string) => new Date(date) < new Date();
   const isExpiringSoon = (date: string) => {
@@ -157,19 +152,16 @@ export default function MedicineCabinet() {
       };
 
       if (editingMedicine) {
-        const { error } = await supabase
-          .from("medicines")
-          .update(medicineData)
-          .eq("id", editingMedicine.id);
-
-        if (error) throw error;
-        toast({ title: t.success, description: "Medicine updated" });
-      } else {
-        const { error } = await supabase
-          .from("medicines")
-          .insert(medicineData);
-
-        if (error) throw error;
+      await apiFetch(`/medicines/${editingMedicine.id}`, {
+        method: "PUT",
+        body: medicineData,
+      });
+      toast({ title: t.success, description: "Medicine updated" });
+    } else {
+        await apiFetch("/medicines", {
+          method: "POST",
+          body: medicineData,
+        });
         toast({ title: t.success, description: "Medicine added" });
       }
 
@@ -189,12 +181,9 @@ export default function MedicineCabinet() {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from("medicines")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
+      await apiFetch(`/medicines/${id}`, {
+        method: "DELETE",
+      });
       setMedicines((prev) => prev.filter((med) => med.id !== id));
       toast({ title: t.success, description: "Medicine deleted" });
     } catch (error) {
@@ -617,3 +606,5 @@ export default function MedicineCabinet() {
     </div>
   );
 }
+
+

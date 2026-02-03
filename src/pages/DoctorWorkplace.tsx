@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,11 +34,11 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/useLanguage";
+import { useAuth } from "@/contexts/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { apiFetch } from "@/lib/api";
 import { Navigate } from "react-router-dom";
 
 interface ClinicalCase {
@@ -100,59 +100,53 @@ export default function DoctorWorkplace() {
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [loadingAi, setLoadingAi] = useState(false);
 
+  const fetchCases = useCallback(async () => {
+    try {
+      const { data } = await apiFetch<{ data: ClinicalCase[] }>("/clinical-cases");
+      setCases(data || []);
+    } catch (error) {
+      console.error("Error fetching cases:", error);
+      toast({ variant: "destructive", title: t.error, description: t.errorOccurred });
+    } finally {
+      setLoading(false);
+    }
+  }, [t, toast]);
+
+  const fetchCollections = useCallback(async () => {
+    try {
+      const { data } = await apiFetch<{ data: CaseCollection[] }>("/case-collections");
+      setCollections(data || []);
+    } catch (error) {
+      console.error("Error fetching collections:", error);
+    }
+  }, []);
+
   useEffect(() => {
     if (user && isDoctor()) {
       fetchCases();
       fetchCollections();
     }
-  }, [user, isDoctor]);
-
-  const fetchCases = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('clinical_cases')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setCases(data || []);
-    } catch (error) {
-      console.error('Error fetching cases:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchCollections = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('case_collections')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setCollections(data || []);
-    } catch (error) {
-      console.error('Error fetching collections:', error);
-    }
-  };
+  }, [user, isDoctor, fetchCases, fetchCollections]);
 
   const handleCreateCase = async () => {
     if (!user || !ageRange || !symptoms.trim()) return;
 
     try {
-      const { error } = await supabase.from('clinical_cases').insert({
-        doctor_id: user.id,
-        age_range: ageRange,
-        symptoms: symptoms.split(',').map(s => s.trim()),
-        duration: duration,
-        diagnostic_markers: diagnosticMarkers.split(',').map(s => s.trim()).filter(Boolean),
-        insights: insights,
-        tags: caseTags,
-        is_private: isPrivate,
+      await apiFetch("/clinical-cases", {
+        method: "POST",
+        body: {
+          age_range: ageRange,
+          symptoms: symptoms.split(',').map((s) => s.trim()),
+          duration,
+          diagnostic_markers: diagnosticMarkers
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+          insights,
+          tags: caseTags,
+          is_private: isPrivate,
+        },
       });
-
-      if (error) throw error;
 
       toast({ title: t.success, description: "Case created successfully" });
       setNewCaseOpen(false);
@@ -186,17 +180,22 @@ export default function DoctorWorkplace() {
     
     setLoadingAi(true);
     try {
-      const { data, error } = await supabase.functions.invoke('medical-chat', {
+      const { response } = await apiFetch<{ response?: string }>("/ai/medical-chat", {
+        method: "POST",
         body: {
-          message: `Based on these symptoms: ${symptoms}, suggest relevant medical tags and categories for clinical classification. Return only a comma-separated list of tags.`,
-          language: 'en'
-        }
+          messages: [
+            {
+              role: "user",
+              content: `Based on these symptoms: ${symptoms}, suggest relevant medical tags and categories for clinical classification. Return only a comma-separated list of tags.`,
+            },
+          ],
+          language: "en",
+        },
       });
 
-      if (error) throw error;
-      
-      // Parse AI response for tags
-      const suggestedTags = data.content?.split(',').map((t: string) => t.trim().toLowerCase()) || [];
+      const suggestedTags = response
+        ? response.split(",").map((tag) => tag.trim().toLowerCase())
+        : [];
       setAiSuggestions(suggestedTags.slice(0, 5));
     } catch (error) {
       console.error('Error getting AI suggestions:', error);
@@ -487,3 +486,5 @@ export default function DoctorWorkplace() {
     </div>
   );
 }
+
+

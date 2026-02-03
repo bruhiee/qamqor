@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const MEDICAL_SYSTEM_PROMPT = `You are a professional AI health assistant for Disease Detector, a medical information platform. Your role is to provide helpful, accurate, and safety-focused health information.
+const MEDICAL_SYSTEM_PROMPT = `You are a professional AI health assistant for Qamqor, a medical information platform. Your role is to provide helpful, accurate, and safety-focused health information.
 
 CRITICAL GUIDELINES:
 1. NEVER provide medical diagnoses. You can only suggest possible conditions and recommend professional consultation.

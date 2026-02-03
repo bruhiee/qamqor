@@ -19,8 +19,8 @@ import {
   Shield,
 } from "lucide-react";
 import { LanguageSwitcher } from "./LanguageSwitcher";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/useLanguage";
+import { useAuth } from "@/contexts/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import {
   DropdownMenu,
@@ -75,7 +75,7 @@ export function Navbar() {
               <Heart className="w-5 h-5 text-white" />
             </div>
             <span className="font-display font-bold text-lg hidden sm:block">
-              Disease Detector
+              Qamqor
             </span>
           </Link>
 
@@ -196,3 +196,5 @@ export function Navbar() {
     </nav>
   );
 }
+
+

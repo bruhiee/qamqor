@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { motion } from "framer-motion";
@@ -19,7 +19,7 @@ import {
   Loader2
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/contexts/useLanguage";
 
 interface MedicalFacility {
   id: string;
@@ -222,56 +222,235 @@ export default function MapPage() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
+  const userMarker = useRef<mapboxgl.Marker | null>(null);
+  const [routeInfo, setRouteInfo] = useState("");
+  const routeSourceId = "route-source";
   const [selectedFacility, setSelectedFacility] = useState<MedicalFacility | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilters, setActiveFilters] = useState<string[]>(["pharmacy", "hospital", "clinic"]);
+  const [activeFilters, setActiveFilters] = useState<string[]>(["pharmacy"]);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(false);
   const [facilities, setFacilities] = useState<MedicalFacility[]>(globalFacilities);
+  const [nearbyPharmacies, setNearbyPharmacies] = useState<MedicalFacility[]>([]);
+  const [radiusKm, setRadiusKm] = useState(50);
 
-  const filteredFacilities = facilities.filter(
-    (f) =>
-      activeFilters.includes(f.type) &&
-      (f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        f.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        f.specializations?.some(s => s.toLowerCase().includes(searchQuery.toLowerCase())))
+  const filteredFacilities = useMemo(
+    () =>
+      facilities.filter(
+        (f) =>
+          activeFilters.includes(f.type) &&
+          (f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            f.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            f.specializations?.some((s) => s.toLowerCase().includes(searchQuery.toLowerCase())))
+      ),
+    [facilities, activeFilters, searchQuery]
   );
 
   // Calculate distance between two coordinates
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
+  const calculateDistance = useCallback(
+    (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+      const R = 6371; // Earth's radius in km
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    },
+    [],
+  );
+
+  const clearRoute = useCallback(() => {
+    if (!map.current) return;
+    if (map.current.getLayer(routeSourceId)) {
+      try {
+        map.current.removeLayer("route-line");
+      } catch (e) {
+        console.warn(e);
+      }
+      try {
+        map.current.removeLayer("route-glow");
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    if (map.current.getSource(routeSourceId)) {
+      try {
+        map.current.removeSource(routeSourceId);
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    setRouteInfo("");
+  }, []);
+
+  const drawRoute = useCallback(
+    (geojson: GeoJSON.LineString, user: [number, number]) => {
+      if (!map.current) return;
+      clearRoute();
+      if (!map.current.getSource(routeSourceId)) {
+        map.current.addSource(routeSourceId, { type: "geojson", data: { type: "Feature", geometry: geojson } });
+      } else {
+        (map.current.getSource(routeSourceId) as mapboxgl.GeoJSONSource).setData({ type: "Feature", geometry: geojson });
+      }
+      if (!map.current.getLayer("route-line")) {
+        map.current.addLayer({
+          id: "route-line",
+          type: "line",
+          source: routeSourceId,
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: { "line-color": "#1FA37A", "line-width": 6, "line-opacity": 0.9 },
+        });
+      }
+      if (!map.current.getLayer("route-glow")) {
+        map.current.addLayer({
+          id: "route-glow",
+          type: "line",
+          source: routeSourceId,
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: { "line-color": "#10B981", "line-width": 12, "line-opacity": 0.4 },
+        });
+      }
+      const bounds = new mapboxgl.LngLatBounds(user, user);
+      geojson.coordinates.forEach((coord) => bounds.extend(coord as [number, number]));
+      map.current.fitBounds(bounds, { padding: 60 });
+    },
+    [clearRoute],
+  );
+
+  type OverpassElement = {
+    type: "node" | "way" | "relation";
+    id: number;
+    lat?: number;
+    lon?: number;
+    center?: { lat: number; lon: number };
+    tags?: Record<string, string>;
   };
+
+  const buildOverpassQuery = (lat: number, lon: number, radius: number) => `[out:json][timeout:25];
+  (node["amenity"="pharmacy"](around:${radius},${lat},${lon});
+  way["amenity"="pharmacy"](around:${radius},${lat},${lon});
+  relation["amenity"="pharmacy"](around:${radius},${lat},${lon});
+  );
+  out center;`;
+
+  const fetchFacilitiesOverpass = useCallback(async (lat: number, lon: number, radius: number) => {
+    const query = buildOverpassQuery(lat, lon, radius);
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      },
+      body: query,
+    });
+    if (!res.ok) {
+      throw new Error("Overpass request failed");
+    }
+    const data = await res.json();
+    return (data.elements || [])
+      .map((el: OverpassElement) => {
+        const latlon =
+          el.type === "node"
+            ? { lat: el.lat, lon: el.lon }
+            : el.center
+              ? { lat: el.center.lat, lon: el.center.lon }
+              : null;
+        if (!latlon) return null;
+        const addressParts = [];
+        if (el.tags?.["addr:street"]) addressParts.push(el.tags["addr:street"]);
+        if (el.tags?.["addr:housenumber"]) addressParts.push(el.tags["addr:housenumber"]);
+        if (el.tags?.["addr:city"]) addressParts.push(el.tags["addr:city"]);
+        return {
+          id: `${el.type}-${el.id}`,
+          name: el.tags?.name || "Аптека",
+          type: "pharmacy",
+          coordinates: [latlon.lon, latlon.lat],
+          address: addressParts.join(", ") || el.tags?.village || el.tags?.city || "",
+          phone: el.tags?.phone || el.tags?.["contact:phone"] || "",
+          hours: el.tags?.opening_hours || "—",
+          website: el.tags?.website || el.tags?.url,
+          specializations: [],
+          doctorSummary: "",
+        };
+      })
+    .filter(Boolean) as MedicalFacility[];
+  }, []);
+
+  const loadFacilities = useCallback(
+    async (coords: [number, number], radKm: number) => {
+      const [lon, lat] = coords;
+      const radiusMeters = Math.max(1000, Math.min(200000, Math.round(radKm * 1000)));
+      try {
+        const data = await fetchFacilitiesOverpass(lat, lon, radiusMeters);
+        if (data && data.length) {
+          const decorated = data.map((facility) => ({
+            ...facility,
+            distance: calculateDistance(lat, lon, facility.coordinates[1], facility.coordinates[0]),
+          }));
+          setFacilities(decorated);
+          return decorated;
+        }
+      } catch (error) {
+        console.warn("facility fetch failed, falling back to defaults", error);
+      }
+      const fallback = globalFacilities.map((facility) => ({
+        ...facility,
+        distance: calculateDistance(lat, lon, facility.coordinates[1], facility.coordinates[0]),
+      }));
+      setFacilities(fallback);
+      return fallback;
+    },
+    [calculateDistance, fetchFacilitiesOverpass],
+  );
+
+  const fetchRouteToFacility = useCallback(
+    async (facility: MedicalFacility) => {
+      if (!userLocation) return;
+      const url = `https://router.project-osrm.org/route/v1/driving/${userLocation[0]},${userLocation[1]};${facility.coordinates[0]},${facility.coordinates[1]}?overview=full&geometries=geojson&steps=false`;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Routing failed");
+        const data = await res.json();
+        const route = data.routes?.[0];
+        if (!route) throw new Error("No route");
+        drawRoute(route.geometry, userLocation);
+        const distanceKm = route.distance ? route.distance / 1000 : 0;
+        const durationMin = route.duration ? Math.round(route.duration / 60) : 0;
+        setRouteInfo(`Distance ${distanceKm.toFixed(1)} km · ≈${durationMin} min`);
+      } catch (error) {
+        console.warn("Route error", error);
+        setRouteInfo("Не удалось проложить маршрут");
+      }
+    },
+    [userLocation, drawRoute],
+  );
 
   // Get user location
   const getUserLocation = () => {
     setLoading(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const coords: [number, number] = [position.coords.longitude, position.coords.latitude];
-          setUserLocation(coords);
-          
-          // Update facilities with distance
-          const updatedFacilities = globalFacilities.map(f => ({
-            ...f,
-            distance: calculateDistance(coords[1], coords[0], f.coordinates[1], f.coordinates[0])
-          })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
-          
-          setFacilities(updatedFacilities);
-          
-          if (map.current) {
+      if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const coords: [number, number] = [position.coords.longitude, position.coords.latitude];
+        setUserLocation(coords);
+        
+        await loadFacilities(coords, radiusKm);
+        
+        if (map.current) {
             map.current.flyTo({
               center: coords,
               zoom: 12,
               duration: 1500,
             });
+            if (userMarker.current) {
+              userMarker.current.setLngLat(coords);
+            } else {
+              userMarker.current = new mapboxgl.Marker({ color: "#ef4444" })
+                .setLngLat(coords)
+                .addTo(map.current);
+            }
           }
           setLoading(false);
         },
@@ -310,17 +489,47 @@ export default function MapPage() {
   }, []);
 
   useEffect(() => {
+    getUserLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!userLocation) return;
+    const nearby = facilities
+      .filter((entry) => entry.type === "pharmacy" && (entry.distance ?? 0) <= radiusKm)
+      .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
+    setNearbyPharmacies(nearby);
+  }, [facilities, radiusKm, userLocation]);
+
+  useEffect(() => {
     if (!map.current) return;
 
-    // Clear existing markers
-    markers.current.forEach((m) => m.remove());
-    markers.current = [];
+    const desiredIds = new Set(filteredFacilities.map((facility) => facility.id));
 
-    // Add markers for filtered facilities
+    // Remove markers that are no longer needed
+    markers.current.forEach((marker) => {
+      const id = marker.getElement().dataset.id;
+      if (id && !desiredIds.has(id)) {
+        marker.remove();
+      }
+    });
+
+    markers.current = markers.current.filter((marker) => {
+      const id = marker.getElement().dataset.id;
+      return !!id && desiredIds.has(id);
+    });
+
+    // Add or update markers for current facilities
     filteredFacilities.forEach((facility) => {
+      let existing = markers.current.find((marker) => marker.getElement().dataset.id === facility.id);
+      if (existing) {
+        existing.setLngLat(facility.coordinates);
+        return;
+      }
+
       const config = typeConfig[facility.type];
-      
       const el = document.createElement("div");
+      el.setAttribute("data-id", facility.id);
       el.className = "custom-marker";
       el.innerHTML = `
         <div style="
@@ -342,13 +551,15 @@ export default function MapPage() {
           </svg>
         </div>
       `;
-      
-      el.addEventListener("mouseenter", () => {
-        el.style.transform = "scale(1.1)";
-      });
-      el.addEventListener("mouseleave", () => {
-        el.style.transform = "scale(1)";
-      });
+
+      const innerDot = el.firstElementChild as HTMLElement | null;
+      const scaleMarker = (scale: string) => {
+        if (innerDot) {
+          innerDot.style.transform = scale;
+        }
+      };
+      el.addEventListener("mouseenter", () => scaleMarker("scale(1.1)"));
+      el.addEventListener("mouseleave", () => scaleMarker("scale(1)"));
       el.addEventListener("click", () => {
         setSelectedFacility(facility);
         map.current?.flyTo({
@@ -356,6 +567,7 @@ export default function MapPage() {
           zoom: 15,
           duration: 1000,
         });
+        fetchRouteToFacility(facility);
       });
 
       const marker = new mapboxgl.Marker({ element: el })
@@ -364,7 +576,7 @@ export default function MapPage() {
 
       markers.current.push(marker);
     });
-  }, [filteredFacilities]);
+  }, [filteredFacilities, fetchRouteToFacility]);
 
   const toggleFilter = (type: string) => {
     setActiveFilters((prev) =>
@@ -456,6 +668,31 @@ export default function MapPage() {
                   );
                 })}
               </div>
+              {userLocation && (
+                <div className="mt-3 px-3 py-2 bg-muted/50 rounded-lg text-xs text-muted-foreground space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span>Nearby pharmacies within {radiusKm} km:</span>
+                    <span className="text-primary font-semibold">{nearbyPharmacies.length}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-muted-foreground">Radius</span>
+                    <input
+                      type="range"
+                      min={10}
+                      max={120}
+                      value={radiusKm}
+                      onChange={(e) => setRadiusKm(Number(e.target.value))}
+                      className="flex-1"
+                    />
+                    <span className="text-xs">{radiusKm} km</span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {nearbyPharmacies.length > 0
+                      ? nearbyPharmacies.slice(0, 3).map((pharmacy) => pharmacy.name).join(", ")
+                      : t.noResults}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Facility List */}
