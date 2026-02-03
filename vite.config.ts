@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    allowedHosts: ["qamqor-j4dh.onrender.com"],
     proxy: {
       "/api": "http://localhost:4000",
     },
