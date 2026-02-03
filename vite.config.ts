@@ -8,9 +8,9 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    allowedHosts: ["qamqor-j4dh.onrender.com"],
+    allowedHosts: ["qamqorclient.onrender.com"],
     proxy: {
-      "/api": "http://localhost:4000",
+      "/api": "https://qamqorserver.onrender.com",
     },
     hmr: {
       overlay: false,
