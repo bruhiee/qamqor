@@ -6,7 +6,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Globe } from 'lucide-react';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage } from '@/contexts/useLanguage';
 import { Language, languageNames } from '@/lib/i18n';
 
 export function LanguageSwitcher() {
@@ -36,3 +36,4 @@ export function LanguageSwitcher() {
     </DropdownMenu>
   );
 }
+

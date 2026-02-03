@@ -26,6 +26,15 @@ export interface Translations {
   forum: string;
   doctorWorkplace: string;
   adminPanel: string;
+  users: string;
+  userManagement: string;
+  banUser: string;
+  unbanUser: string;
+  accountStatus: string;
+  banned: string;
+  active: string;
+  userBanned: string;
+  userUnbanned: string;
   
   // Common
   search: string;
@@ -367,6 +376,15 @@ export const translations: Record<Language, Translations> = {
     forum: 'Forum',
     doctorWorkplace: 'Doctor Workplace',
     adminPanel: 'Admin Panel',
+    users: 'Users',
+    userManagement: 'User Management',
+    banUser: 'Ban user',
+    unbanUser: 'Unban user',
+    accountStatus: 'Account status',
+    banned: 'Banned',
+    active: 'Active',
+    userBanned: 'User has been banned',
+    userUnbanned: 'User has been unbanned',
     
     // Common
     search: 'Search',
@@ -651,7 +669,7 @@ export const translations: Record<Language, Translations> = {
     // Why Choose Us
     whyChooseTitle1: 'Built with Your',
     whyChooseTitle2: 'Safety in Mind',
-    whyChooseDesc: 'We understand that health information is sensitive. That\'s why we\'ve designed Disease Detector with safety, privacy, and accuracy as our top priorities.',
+    whyChooseDesc: 'We understand that health information is sensitive. That\'s why we\'ve designed Qamqor with safety, privacy, and accuracy as our top priorities.',
     privacyFirst: 'Privacy First',
     privacyFirstDesc: 'Your health data stays on your device',
     instantInsights: 'Instant Insights',
@@ -661,7 +679,7 @@ export const translations: Record<Language, Translations> = {
     
     // CTA
     ctaTitle: 'Ready to Take Control of Your Health?',
-    ctaDesc: 'Join thousands of users who trust Disease Detector for their health information needs. It\'s free, private, and always available.',
+    ctaDesc: 'Join thousands of users who trust Qamqor for their health information needs. It\'s free, private, and always available.',
     getStartedFree: 'Get Started Free',
     
     // Chat messages
@@ -707,6 +725,15 @@ export const translations: Record<Language, Translations> = {
     forum: 'Форум',
     doctorWorkplace: 'Кабинет врача',
     adminPanel: 'Панель администратора',
+    users: 'Пользователи',
+    userManagement: 'Управление пользователями',
+    banUser: 'Заблокировать',
+    unbanUser: 'Разблокировать',
+    accountStatus: 'Статус аккаунта',
+    banned: 'Заблокирован',
+    active: 'Активен',
+    userBanned: 'Пользователь заблокирован',
+    userUnbanned: 'Пользователь разблокирован',
     
     // Common
     search: 'Поиск',
@@ -991,7 +1018,7 @@ export const translations: Record<Language, Translations> = {
     // Why Choose Us
     whyChooseTitle1: 'Создано с заботой',
     whyChooseTitle2: 'о вашей безопасности',
-    whyChooseDesc: 'Мы понимаем, что медицинская информация конфиденциальна. Поэтому Disease Detector разработан с приоритетом безопасности, конфиденциальности и точности.',
+    whyChooseDesc: 'Мы понимаем, что медицинская информация конфиденциальна. Поэтому Qamqor разработан с приоритетом безопасности, конфиденциальности и точности.',
     privacyFirst: 'Конфиденциальность',
     privacyFirstDesc: 'Ваши данные остаются на вашем устройстве',
     instantInsights: 'Мгновенные ответы',
@@ -1001,7 +1028,7 @@ export const translations: Record<Language, Translations> = {
     
     // CTA
     ctaTitle: 'Готовы взять здоровье под контроль?',
-    ctaDesc: 'Присоединяйтесь к тысячам пользователей, которые доверяют Disease Detector. Это бесплатно, конфиденциально и всегда доступно.',
+    ctaDesc: 'Присоединяйтесь к тысячам пользователей, которые доверяют Qamqor. Это бесплатно, конфиденциально и всегда доступно.',
     getStartedFree: 'Начать бесплатно',
     
     // Chat messages
@@ -1047,6 +1074,15 @@ export const translations: Record<Language, Translations> = {
     forum: 'Форум',
     doctorWorkplace: 'Дәрігер кабинеті',
     adminPanel: 'Әкімші панелі',
+    users: 'Қолданушылар',
+    userManagement: 'Қолданушыларды басқару',
+    banUser: 'Бұғаттау',
+    unbanUser: 'Бұғаттаудан шығару',
+    accountStatus: 'Аккаунт күйі',
+    banned: 'Бұғатталған',
+    active: 'Қол жетімді',
+    userBanned: 'Қолданушы бұғатталды',
+    userUnbanned: 'Қолданушы бұғаттан шығарылды',
     
     // Common
     search: 'Іздеу',
@@ -1331,7 +1367,7 @@ export const translations: Record<Language, Translations> = {
     // Why Choose Us
     whyChooseTitle1: 'Сіздің қауіпсіздігіңіз',
     whyChooseTitle2: 'үшін жасалған',
-    whyChooseDesc: 'Біз медициналық ақпараттың құпия екенін түсінеміз. Сондықтан Disease Detector қауіпсіздік, құпиялылық және дәлдікті басымдық ретінде жасалған.',
+    whyChooseDesc: 'Біз медициналық ақпараттың құпия екенін түсінеміз. Сондықтан Qamqor қауіпсіздік, құпиялылық және дәлдікті басымдық ретінде жасалған.',
     privacyFirst: 'Құпиялылық',
     privacyFirstDesc: 'Деректеріңіз құрылғыңызда қалады',
     instantInsights: 'Лезде жауаптар',
@@ -1341,7 +1377,7 @@ export const translations: Record<Language, Translations> = {
     
     // CTA
     ctaTitle: 'Денсаулықты бақылауға дайынсыз ба?',
-    ctaDesc: 'Disease Detector-ға сенетін мыңдаған пайдаланушыларға қосылыңыз. Тегін, құпия және әрқашан қолжетімді.',
+    ctaDesc: 'Qamqor-ға сенетін мыңдаған пайдаланушыларға қосылыңыз. Тегін, құпия және әрқашан қолжетімді.',
     getStartedFree: 'Тегін бастау',
     
     // Chat messages

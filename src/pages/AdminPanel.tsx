@@ -18,10 +18,10 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/useLanguage";
+import { useAuth } from "@/contexts/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
-import { supabase } from "@/integrations/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { Navigate } from "react-router-dom";
 
 interface AdminStats {
@@ -49,6 +49,15 @@ interface FlaggedPost {
   created_at: string;
 }
 
+interface AdminUser {
+  id: string;
+  email: string;
+  displayName: string;
+  roles: string[];
+  banned: boolean;
+  created_at: string;
+}
+
 export default function AdminPanel() {
   const { t } = useLanguage();
   const { user } = useAuth();
@@ -62,6 +71,8 @@ export default function AdminPanel() {
   });
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [flaggedPosts, setFlaggedPosts] = useState<FlaggedPost[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -69,39 +80,14 @@ export default function AdminPanel() {
       fetchStats();
       fetchLogs();
       fetchFlaggedPosts();
+      fetchUsers();
     }
   }, [user, isAdmin]);
 
   const fetchStats = async () => {
     try {
-      // Get user count (from profiles since we can't query auth.users)
-      const { count: usersCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
-
-      // Get posts count
-      const { count: postsCount } = await supabase
-        .from('forum_posts')
-        .select('*', { count: 'exact', head: true });
-
-      // Get flagged posts count
-      const { count: flaggedCount } = await supabase
-        .from('forum_posts')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'flagged');
-
-      // Get pending articles count
-      const { count: pendingCount } = await supabase
-        .from('health_articles')
-        .select('*', { count: 'exact', head: true })
-        .eq('needs_review', true);
-
-      setStats({
-        totalUsers: usersCount || 0,
-        totalPosts: postsCount || 0,
-        flaggedPosts: flaggedCount || 0,
-        pendingArticles: pendingCount || 0,
-      });
+      const { stats } = await apiFetch<{ stats: AdminStats }>("/admin/stats");
+      setStats(stats);
     } catch (error) {
       console.error('Error fetching stats:', error);
     } finally {
@@ -111,13 +97,7 @@ export default function AdminPanel() {
 
   const fetchLogs = async () => {
     try {
-      const { data, error } = await supabase
-        .from('admin_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
+      const { data } = await apiFetch<{ data: AdminLog[] }>("/admin/logs");
       setLogs(data || []);
     } catch (error) {
       console.error('Error fetching logs:', error);
@@ -126,34 +106,61 @@ export default function AdminPanel() {
 
   const fetchFlaggedPosts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('forum_posts')
-        .select('id, title, content, status, created_at')
-        .eq('status', 'flagged')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setFlaggedPosts(data || []);
+      const { data } = await apiFetch<{ data: FlaggedPost[] }>("/forum/posts");
+      const flagged = (data || [])
+        .filter((post) => post.status === "flagged")
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setFlaggedPosts(flagged);
     } catch (error) {
       console.error('Error fetching flagged posts:', error);
     }
   };
 
+  const fetchUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const { data } = await apiFetch<{ data: AdminUser[] }>("/admin/users");
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const handleToggleBan = async (target: AdminUser) => {
+    const action = target.banned ? "unban" : "ban";
+    try {
+      await apiFetch(`/admin/users/${target.id}/${action}`, {
+        method: "POST",
+      });
+      toast({
+        title: t.success,
+        description: target.banned ? t.userUnbanned : t.userBanned,
+      });
+      fetchUsers();
+      fetchStats();
+    } catch (error) {
+      console.error('Error updating user ban status:', error);
+      toast({ title: t.error, variant: "destructive" });
+    }
+  };
+
   const handleModeratePost = async (postId: string, newStatus: string) => {
     try {
-      const { error } = await supabase
-        .from('forum_posts')
-        .update({ status: newStatus })
-        .eq('id', postId);
+      await apiFetch(`/forum/posts/${postId}`, {
+        method: "PATCH",
+        body: { status: newStatus },
+      });
 
-      if (error) throw error;
-
-      // Log admin action
-      await supabase.from('admin_logs').insert({
-        admin_id: user!.id,
-        action: `Changed post status to ${newStatus}`,
-        target_type: 'forum_post',
-        target_id: postId,
+      await apiFetch("/admin/logs", {
+        method: "POST",
+        body: {
+          action: `Changed post status to ${newStatus}`,
+          target_type: "forum_post",
+          target_id: postId,
+          details: null,
+        },
       });
 
       fetchFlaggedPosts();
@@ -261,6 +268,10 @@ export default function AdminPanel() {
               <TabsTrigger value="logs" className="gap-2">
                 <Clock className="w-4 h-4" />
                 {t.activityLogs}
+              </TabsTrigger>
+              <TabsTrigger value="users" className="gap-2">
+                <Users className="w-4 h-4" />
+                {t.userManagement}
               </TabsTrigger>
             </TabsList>
 
@@ -405,6 +416,52 @@ export default function AdminPanel() {
                 )}
               </div>
             </TabsContent>
+
+            <TabsContent value="users">
+              <div className="bg-card rounded-xl border border-border p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-medium">{t.users}</h3>
+                  <Badge variant="outline">{t.accountStatus}</Badge>
+                </div>
+                {usersLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">{t.loading}</div>
+                ) : users.length === 0 ? (
+                  <p className="text-center py-8 text-muted-foreground">{t.noResults}</p>
+                ) : (
+                  <div className="space-y-3">
+                    {users.map((usr) => (
+                      <div
+                        key={usr.id}
+                        className="p-4 rounded-xl border border-border bg-muted/40"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="font-medium">{usr.displayName || usr.email}</p>
+                            <p className="text-xs text-muted-foreground">{usr.email}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(usr.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                          <Badge variant={usr.banned ? "destructive" : "secondary"}>
+                            {usr.banned ? t.banned : t.active}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between mt-4 text-xs text-muted-foreground">
+                          <span>{usr.roles.join(", ")}</span>
+                          <Button
+                            variant={usr.banned ? "secondary" : "destructive"}
+                            size="sm"
+                            onClick={() => handleToggleBan(usr)}
+                          >
+                            {usr.banned ? t.unbanUser : t.banUser}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
           </Tabs>
         </div>
       </main>
@@ -413,3 +470,5 @@ export default function AdminPanel() {
     </div>
   );
 }
+
+

@@ -19,7 +19,7 @@ import {
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { DisclaimerBanner } from "@/components/layout/DisclaimerBanner";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/contexts/useLanguage";
 
 export default function Home() {
   const { t } = useLanguage();
@@ -429,3 +429,4 @@ export default function Home() {
     </div>
   );
 }
+

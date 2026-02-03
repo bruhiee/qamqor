@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { supabase } from "@/integrations/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 
 interface SymptomLog {
@@ -81,13 +81,7 @@ export default function SymptomTracker() {
 
   const fetchLogs = async () => {
     try {
-      const { data, error } = await supabase
-        .from("symptom_logs")
-        .select("*")
-        .order("symptom_date", { ascending: false })
-        .limit(30);
-
-      if (error) throw error;
+      const { data } = await apiFetch<{ data: SymptomLog[] }>("/symptom-logs");
       setLogs(data || []);
     } catch (error) {
       console.error("Error fetching logs:", error);
@@ -104,16 +98,17 @@ export default function SymptomTracker() {
     }
 
     try {
-      const { error } = await supabase.from("symptom_logs").insert({
-        symptom_date: selectedDate,
-        symptoms: formData.symptoms,
-        severity: formData.severity,
-        notes: formData.notes || null,
-        mood: formData.mood,
-        sleep_hours: formData.sleepHours,
+      await apiFetch("/symptom-logs", {
+        method: "POST",
+        body: {
+          symptom_date: selectedDate,
+          symptoms: formData.symptoms,
+          severity: formData.severity,
+          notes: formData.notes || null,
+          mood: formData.mood,
+          sleep_hours: formData.sleepHours,
+        },
       });
-
-      if (error) throw error;
 
       toast.success("Symptom log saved successfully");
       resetForm();
@@ -126,8 +121,9 @@ export default function SymptomTracker() {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from("symptom_logs").delete().eq("id", id);
-      if (error) throw error;
+      await apiFetch(`/symptom-logs/${id}`, {
+        method: "DELETE",
+      });
       toast.success("Log deleted");
       fetchLogs();
     } catch (error) {

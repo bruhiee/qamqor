@@ -69,7 +69,7 @@ export default function About() {
               transition={{ delay: 0.1 }}
               className="font-display text-4xl md:text-5xl font-bold mb-6"
             >
-              About <span className="text-gradient">Disease Detector</span>
+              About <span className="text-gradient">Qamqor</span>
             </motion.h1>
             
             <motion.p
@@ -96,7 +96,7 @@ export default function About() {
                   Our Mission
                 </h2>
                 <p className="text-muted-foreground mb-4">
-                  Disease Detector was created to bridge the gap between complex medical 
+                  Qamqor was created to bridge the gap between complex medical 
                   information and everyday understanding. We believe everyone deserves 
                   access to reliable health information in their own language.
                 </p>

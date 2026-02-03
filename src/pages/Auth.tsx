@@ -7,12 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Heart, Mail, Lock, User, ArrowLeft, Stethoscope, UserCircle, Building, MapPin, Briefcase, FileText, ChevronRight, ChevronLeft } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/useAuth';
+import { useLanguage } from '@/contexts/useLanguage';
 import { useToast } from '@/hooks/use-toast';
 import { LanguageSwitcher } from '@/components/layout/LanguageSwitcher';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { apiFetch } from "@/lib/api";
 
 type RegistrationStep = 'credentials' | 'role-selection' | 'doctor-form';
 
@@ -74,7 +74,7 @@ export default function Auth() {
           toast({
             variant: 'destructive',
             title: t.error,
-            description: error.message,
+            description: error,
           });
         } else {
           navigate('/');
@@ -104,12 +104,12 @@ export default function Auth() {
   const completeRegistration = async (role: 'user' | 'doctor') => {
     setLoading(true);
     try {
-      const { error } = await signUp(email, password, displayName);
+      const { error } = await signUp(email, password, displayName, role);
       if (error) {
         toast({
-          variant: 'destructive',
+          variant: "destructive",
           title: t.error,
-          description: error.message,
+          description: error,
         });
         setLoading(false);
         return;
@@ -117,29 +117,29 @@ export default function Auth() {
 
       // If doctor, submit application after signup
       if (role === 'doctor') {
-        // Get the user's ID after signup
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (user) {
-          const { error: applicationError } = await supabase
-            .from('doctor_applications')
-            .insert({
-              user_id: user.id,
-              full_name: doctorForm.fullName || displayName,
+        try {
+          await apiFetch("/doctor-applications", {
+            method: "POST",
+            body: {
+              fullName: doctorForm.fullName || displayName,
               specialization: doctorForm.specialization,
-              license_number: doctorForm.licenseNumber || null,
+              licenseNumber: doctorForm.licenseNumber || null,
               bio: doctorForm.bio || null,
               country: doctorForm.country,
               region: doctorForm.region || null,
-              years_of_experience: doctorForm.yearsOfExperience ? parseInt(doctorForm.yearsOfExperience) : null,
+              yearsOfExperience: doctorForm.yearsOfExperience
+                ? parseInt(doctorForm.yearsOfExperience, 10)
+                : null,
               workplace: doctorForm.workplace || null,
-              status: 'pending',
-            });
-
-          if (applicationError) {
-            console.error('Doctor application error:', applicationError);
-            // Still show success for account creation
-          }
+            },
+          });
+        } catch (applicationError) {
+          console.error("Doctor application error:", applicationError);
+          toast({
+            variant: "destructive",
+            title: t.error,
+            description: (applicationError as Error).message || t.errorOccurred,
+          });
         }
 
         toast({
@@ -466,7 +466,7 @@ export default function Auth() {
                   : t.signIn}
             </h1>
             <p className="text-muted-foreground text-sm mt-2">
-              Disease Detector
+              Qamqor
             </p>
           </div>
 
@@ -507,3 +507,5 @@ export default function Auth() {
     </div>
   );
 }
+
+

@@ -20,8 +20,8 @@ import {
 import { Navbar } from "@/components/layout/Navbar";
 import { DisclaimerBanner } from "@/components/layout/DisclaimerBanner";
 import { VoiceInputButton } from "@/components/chat/VoiceInputButton";
-import { supabase } from "@/integrations/supabase/client";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { apiFetch } from "@/lib/api";
+import { useLanguage } from "@/contexts/useLanguage";
 import { Link } from "react-router-dom";
 
 interface AIReport {
@@ -101,7 +101,8 @@ export default function AIConsultant() {
         content: currentInput,
       });
 
-      const { data, error } = await supabase.functions.invoke("medical-chat", {
+      const data = await apiFetch<{ response?: string; report?: AIReport }>("/ai/medical-chat", {
+        method: "POST",
         body: {
           messages: messageHistory,
           image: currentImage,
@@ -109,14 +110,10 @@ export default function AIConsultant() {
         },
       });
 
-      if (error) {
-        throw error;
-      }
-
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.response || data.error || t.error,
+        content: data.response || t.error,
         timestamp: new Date(),
         report: data.report,
       };
@@ -402,3 +399,4 @@ export default function AIConsultant() {
     </div>
   );
 }
+

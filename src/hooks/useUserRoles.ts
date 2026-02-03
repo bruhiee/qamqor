@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/useAuth';
 
-export type AppRole = 'user' | 'doctor' | 'admin';
+export type AppRole = 'user' | 'doctor' | 'admin' | 'moderator';
 
 export function useUserRoles() {
   const { user } = useAuth();
@@ -16,29 +15,14 @@ export function useUserRoles() {
       return;
     }
 
-    const fetchRoles = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id);
-
-        if (error) throw error;
-        setRoles((data || []).map(r => r.role as AppRole));
-      } catch (error) {
-        console.error('Error fetching user roles:', error);
-        setRoles(['user']); // Default to user role
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchRoles();
+    setRoles((user.roles as AppRole[]) ?? ['user']);
+    setLoading(false);
   }, [user]);
 
   const hasRole = (role: AppRole) => roles.includes(role);
   const isDoctor = () => hasRole('doctor');
   const isAdmin = () => hasRole('admin');
+  const isModerator = () => hasRole('moderator');
   const isUser = () => hasRole('user');
 
   return {
@@ -47,6 +31,8 @@ export function useUserRoles() {
     hasRole,
     isDoctor,
     isAdmin,
+    isModerator,
     isUser,
   };
 }
+

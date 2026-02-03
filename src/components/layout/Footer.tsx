@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Activity, Heart, Mail, Phone, MapPin } from "lucide-react";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/contexts/useLanguage";
 
 export function Footer() {
   const { t } = useLanguage();
@@ -16,7 +16,7 @@ export function Footer() {
                 <Activity className="w-5 h-5 text-primary-foreground" />
               </div>
               <span className="font-display font-bold text-xl text-background">
-                DiseaseDetector
+                Qamqor
               </span>
             </Link>
             <p className="text-sm text-background/60 leading-relaxed">
@@ -88,7 +88,7 @@ export function Footer() {
             <ul className="space-y-3 text-sm">
               <li className="flex items-center gap-2 text-background/60">
                 <Mail className="w-4 h-4" />
-                support@diseasedetector.app
+                support@qamqor.app
               </li>
               <li className="flex items-center gap-2 text-background/60">
                 <Phone className="w-4 h-4" />
@@ -104,7 +104,7 @@ export function Footer() {
 
         <div className="border-t border-background/10 mt-8 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-background/40">
-            © 2024 Disease Detector. All rights reserved.
+            © 2024 Qamqor. All rights reserved.
           </p>
           <div className="flex items-center gap-2 text-sm text-background/40">
             <Heart className="w-4 h-4 text-medical-pulse" />
@@ -115,3 +115,4 @@ export function Footer() {
     </footer>
   );
 }
+
