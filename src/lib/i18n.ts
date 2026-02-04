@@ -597,7 +597,6 @@ export const translations: Record<Language, Translations> = {
     
     // Admin Panel
     dashboard: 'Dashboard',
-    userManagement: 'User Management',
     contentModeration: 'Content Moderation',
     analytics: 'Analytics',
     activityLogs: 'Activity Logs',
@@ -946,7 +945,6 @@ export const translations: Record<Language, Translations> = {
     
     // Admin Panel
     dashboard: 'Панель управления',
-    userManagement: 'Управление пользователями',
     contentModeration: 'Модерация контента',
     analytics: 'Аналитика',
     activityLogs: 'Журнал активности',
@@ -1295,7 +1293,6 @@ export const translations: Record<Language, Translations> = {
     
     // Admin Panel
     dashboard: 'Басқару панелі',
-    userManagement: 'Пайдаланушыларды басқару',
     contentModeration: 'Мазмұнды модерациялау',
     analytics: 'Аналитика',
     activityLogs: 'Белсенділік журналы',
