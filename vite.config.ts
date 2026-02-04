@@ -7,10 +7,10 @@ export default defineConfig(({ mode }) => {
   const apiProxyTarget = env.VITE_API_URL || "https://qamqorserver.onrender.com";
 
   return {
-    server: {
-      host: "::",
+  server: {
+      host: true,
       port: 8080,
-      allowedHosts: ["qamqorclient.onrender.com"],
+      allowedHosts: "all",
       proxy: {
         "/api": {
           target: apiProxyTarget,
