@@ -191,7 +191,7 @@ export default function AIConsultant() {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: t.error,
+        content: error instanceof Error ? error.message : t.error,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -315,7 +315,7 @@ export default function AIConsultant() {
                 </div>
                 <div>
                   <h1 className="font-display text-xl font-semibold">{t.aiConsultant}</h1>
-                  <p className="text-sm text-muted-foreground">Powered by Gemini AI</p>
+                  <p className="text-sm text-muted-foreground">{t.aiPoweredBy}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -392,7 +392,7 @@ export default function AIConsultant() {
                 )}
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-                  Online
+                  {t.onlineStatus}
                 </div>
               </div>
             </div>

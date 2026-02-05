@@ -1,19 +1,20 @@
 import { AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLanguage } from "@/contexts/useLanguage";
 
 interface DisclaimerBannerProps {
   compact?: boolean;
 }
 
 export function DisclaimerBanner({ compact = false }: DisclaimerBannerProps) {
+  const { t } = useLanguage();
+
   if (compact) {
     return (
       <div className="bg-warning/10 border-y border-warning/20 py-2 px-4">
         <div className="container mx-auto flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <AlertTriangle className="w-4 h-4 text-warning" />
-          <span>
-            <strong className="text-foreground">Medical Disclaimer:</strong> This platform provides informational support only and does not replace professional medical advice.
-          </span>
+          <span>{t.disclaimerSummary}</span>
         </div>
       </div>
     );
@@ -31,14 +32,9 @@ export function DisclaimerBanner({ compact = false }: DisclaimerBannerProps) {
         </div>
         <div>
           <h4 className="font-display font-semibold text-foreground mb-1">
-            Important Medical Disclaimer
+            {t.disclaimerTitle}
           </h4>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            This platform provides informational support only and does not replace professional medical advice. 
-            The AI-generated insights are not diagnoses and should never be used as a substitute for consultation 
-            with qualified healthcare professionals. Always seek the advice of your physician or other qualified 
-            health provider with any questions you may have regarding a medical condition.
-          </p>
+          <p className="text-sm text-muted-foreground leading-relaxed">{t.disclaimerDetails}</p>
         </div>
       </div>
     </motion.div>

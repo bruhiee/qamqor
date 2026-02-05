@@ -15,6 +15,9 @@ import {
   Flag,
   TrendingUp,
   MapPin,
+  Pill,
+  CircleQuestionMark,
+  MessageCircle,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -58,10 +61,73 @@ interface AdminUser {
   created_at: string;
 }
 
+interface AnalyticsTopic {
+  label: string;
+  mentions: number;
+}
+
+interface AnalyticsContributor {
+  userId: string;
+  displayName: string;
+  postCount: number;
+  flaggedCount: number;
+}
+
+interface AnalyticsForumData {
+  totalPosts: number;
+  visiblePosts: number;
+  hiddenPosts: number;
+  statusBreakdown: Record<string, number>;
+  trendingTopics: AnalyticsTopic[];
+  popularTags: AnalyticsTopic[];
+  topContributors: AnalyticsContributor[];
+  mostPopularQuestion: AnalyticsQuestion | null;
+}
+
+interface AnalyticsAiData {
+  evaluationCount: number;
+  averages: {
+    urgency: number;
+    safety: number;
+    handling: number;
+    consistency: number;
+  };
+  commonKeywords: AnalyticsTopic[];
+}
+
+interface AnalyticsQuestion {
+  id: string;
+  title: string;
+  views: number;
+  replies: number;
+}
+
+interface AnalyticsAiChatData {
+  sessionCount: number;
+  topQueries: AnalyticsTopic[];
+  commonKeywords: AnalyticsTopic[];
+}
+
+interface AnalyticsMedicineData {
+  totalMedicines: number;
+  uniqueUsers: number;
+  averagePerUser: number;
+  topMedicines: AnalyticsTopic[];
+}
+
+interface AnalyticsPayload {
+  timestamp: string;
+  forum: AnalyticsForumData;
+  aiConsultant: AnalyticsAiData;
+  medicineCabinet: AnalyticsMedicineData;
+  aiChat: AnalyticsAiChatData;
+}
+
 export default function AdminPanel() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { isAdmin, loading: rolesLoading } = useUserRoles();
+  const isAdminRole = isAdmin();
 
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
@@ -73,16 +139,21 @@ export default function AdminPanel() {
   const [flaggedPosts, setFlaggedPosts] = useState<FlaggedPost[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
+  const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user && isAdmin()) {
-      fetchStats();
-      fetchLogs();
-      fetchFlaggedPosts();
-      fetchUsers();
+    if (!user || rolesLoading || !isAdminRole) {
+      return;
     }
-  }, [user, isAdmin]);
+    fetchStats();
+    fetchLogs();
+    fetchFlaggedPosts();
+    fetchUsers();
+    fetchAnalytics();
+  }, [user, rolesLoading, isAdminRole]);
 
   const fetchStats = async () => {
     try {
@@ -106,11 +177,9 @@ export default function AdminPanel() {
 
   const fetchFlaggedPosts = async () => {
     try {
-      const { data } = await apiFetch<{ data: FlaggedPost[] }>("/forum/posts");
-      const flagged = (data || [])
-        .filter((post) => post.status === "flagged")
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setFlaggedPosts(flagged);
+      const { data } = await apiFetch<{ data: FlaggedPost[] }>("/forum/moderation/pending");
+      const pending = (data || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setFlaggedPosts(pending);
     } catch (error) {
       console.error('Error fetching flagged posts:', error);
     }
@@ -125,6 +194,20 @@ export default function AdminPanel() {
       console.error('Error fetching users:', error);
     } finally {
       setUsersLoading(false);
+    }
+  };
+
+  const fetchAnalytics = async () => {
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+    try {
+      const { data } = await apiFetch<{ data: AnalyticsPayload }>("/admin/analytics");
+      setAnalytics(data);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      setAnalyticsError(t.error);
+    } finally {
+      setAnalyticsLoading(false);
     }
   };
 
@@ -146,17 +229,17 @@ export default function AdminPanel() {
     }
   };
 
-  const handleModeratePost = async (postId: string, newStatus: string) => {
+  const handleModeratePost = async (postId: string, decision: "approve" | "reject") => {
     try {
-      await apiFetch(`/forum/posts/${postId}`, {
+      await apiFetch(`/forum/posts/${postId}/moderation`, {
         method: "PATCH",
-        body: { status: newStatus },
+        body: { decision },
       });
 
       await apiFetch("/admin/logs", {
         method: "POST",
         body: {
-          action: `Changed post status to ${newStatus}`,
+          action: `Moderator ${decision}d post`,
           target_type: "forum_post",
           target_id: postId,
           details: null,
@@ -165,6 +248,7 @@ export default function AdminPanel() {
 
       fetchFlaggedPosts();
       fetchStats();
+      fetchAnalytics();
     } catch (error) {
       console.error('Error moderating post:', error);
     }
@@ -305,16 +389,16 @@ export default function AdminPanel() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleModeratePost(post.id, 'open')}
+                              onClick={() => handleModeratePost(post.id, 'approve')}
                             >
                               Approve
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleModeratePost(post.id, 'closed')}
+                              onClick={() => handleModeratePost(post.id, 'reject')}
                             >
-                              Remove
+                              Reject
                             </Button>
                           </div>
                         </div>
@@ -333,49 +417,226 @@ export default function AdminPanel() {
                   <h3 className="font-medium">{t.aggregatedData}</h3>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Trend Detection */}
-                  <div className="p-4 rounded-lg bg-muted">
-                    <div className="flex items-center gap-2 mb-3">
-                      <TrendingUp className="w-4 h-4 text-primary" />
-                      <h4 className="font-medium">{t.trendingTopics}</h4>
-                    </div>
-                    <div className="space-y-2">
-                      {['Cold & Flu', 'Sleep Issues', 'Stress Management', 'Nutrition'].map((topic, i) => (
-                        <div key={topic} className="flex items-center justify-between">
-                          <span className="text-sm">{topic}</span>
-                          <Badge variant="secondary">
-                            {Math.floor(Math.random() * 50 + 10)} mentions
-                          </Badge>
+                {analyticsLoading ? (
+                  <div className="text-center py-10 text-muted-foreground">{t.loading}</div>
+                ) : analyticsError ? (
+                  <p className="text-sm text-center text-destructive">{analyticsError}</p>
+                ) : analytics ? (
+                  <div className="space-y-6">
+                    <div className="grid md:grid-cols-3 gap-6">
+                      <div className="p-4 rounded-lg bg-muted">
+                        <div className="flex items-center gap-2 mb-3">
+                          <TrendingUp className="w-4 h-4 text-primary" />
+                          <h4 className="font-medium">{t.trendingTopics}</h4>
                         </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-4">
-                      * Data is anonymized and aggregated at region level
-                    </p>
-                  </div>
+                        <div className="space-y-2">
+                          {analytics.forum.trendingTopics.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No significant trends yet.</p>
+                          ) : (
+                            analytics.forum.trendingTopics.map((topic) => (
+                              <div key={topic.label} className="flex items-center justify-between">
+                                <span className="text-sm capitalize">{topic.label}</span>
+                                <Badge variant="secondary">{topic.mentions} mentions</Badge>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-4">
+                          {analytics.forum.visiblePosts} visible posts · {analytics.forum.hiddenPosts} awaiting moderation
+                        </p>
+                      </div>
 
-                  {/* Region Breakdown */}
-                  <div className="p-4 rounded-lg bg-muted">
-                    <div className="flex items-center gap-2 mb-3">
-                      <MapPin className="w-4 h-4 text-primary" />
-                      <h4 className="font-medium">{t.regionBreakdown}</h4>
-                    </div>
-                    <div className="space-y-2">
-                      {['Kazakhstan', 'Russia', 'Other'].map((region) => (
-                        <div key={region} className="flex items-center justify-between">
-                          <span className="text-sm">{region}</span>
-                          <Badge variant="secondary">
-                            {Math.floor(Math.random() * 40 + 10)}%
-                          </Badge>
+                      <div className="p-4 rounded-lg bg-muted">
+                        <div className="flex items-center gap-2 mb-3">
+                          <MapPin className="w-4 h-4 text-primary" />
+                          <h4 className="font-medium">{t.popularTags}</h4>
                         </div>
-                      ))}
+                        <div className="space-y-2">
+                          {analytics.forum.popularTags.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Tags will appear once users add them.</p>
+                          ) : (
+                            analytics.forum.popularTags.map((tag) => (
+                              <div key={tag.label} className="flex items-center justify-between">
+                                <span className="text-sm lowercase">{tag.label}</span>
+                                <Badge variant="secondary">{tag.mentions} mentions</Badge>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-4">
+                          {Object.entries(analytics.forum.statusBreakdown)
+                            .map(([status, count]) => `${status}: ${count}`)
+                            .join(" · ")}
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-lg bg-muted">
+                        <div className="flex items-center gap-2 mb-3">
+                          <CircleQuestionMark className="w-4 h-4 text-primary" />
+                          <h4 className="font-medium">{t.mostPopularQuestion}</h4>
+                        </div>
+                        {analytics.forum.mostPopularQuestion ? (
+                          <>
+                            <p className="text-sm font-medium">{analytics.forum.mostPopularQuestion.title}</p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {t.questionViews}: {analytics.forum.mostPopularQuestion.views} · {t.questionReplies}: {analytics.forum.mostPopularQuestion.replies}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No questions yet.</p>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-4">
-                      * No personal location data is stored
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="p-4 rounded-lg bg-muted">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Users className="w-4 h-4 text-primary" />
+                          <h4 className="font-medium">{t.topContributors}</h4>
+                        </div>
+                        <div className="space-y-3">
+                          {analytics.forum.topContributors.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No contributors yet.</p>
+                          ) : (
+                            analytics.forum.topContributors.map((contributor) => (
+                              <div key={contributor.userId} className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-medium">{contributor.displayName}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {contributor.postCount} posts · {contributor.flaggedCount} flagged
+                                  </p>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-lg bg-muted">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Shield className="w-4 h-4 text-primary" />
+                          <h4 className="font-medium">{t.aiConsultantMetrics}</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {t.evaluationCount}: {analytics.aiConsultant.evaluationCount}
+                        </p>
+                        <div className="grid grid-cols-2 gap-2 mt-4 text-xs text-muted-foreground">
+                          <div>
+                            <p className="font-semibold text-sm">Urgency</p>
+                            <p>{analytics.aiConsultant.averages.urgency}</p>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm">Safety</p>
+                            <p>{analytics.aiConsultant.averages.safety}</p>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm">Handling</p>
+                            <p>{analytics.aiConsultant.averages.handling}</p>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm">Consistency</p>
+                            <p>{analytics.aiConsultant.averages.consistency}</p>
+                          </div>
+                        </div>
+                        <div className="mt-4">
+                          <p className="text-xs text-muted-foreground mb-2">{t.commonKeywords}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {analytics.aiConsultant.commonKeywords.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">No keywords yet.</p>
+                            ) : (
+                              analytics.aiConsultant.commonKeywords.map((keyword) => (
+                                <Badge key={keyword.label} variant="outline">
+                                  {keyword.label}: {keyword.mentions}
+                                </Badge>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="p-4 rounded-lg bg-muted">
+                        <div className="flex items-center gap-2 mb-3">
+                          <MessageCircle className="w-4 h-4 text-primary" />
+                          <h4 className="font-medium">{t.aiChatSessions}</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {analytics.aiChat.sessionCount} sessions recorded
+                        </p>
+                        <div className="space-y-2 mt-4">
+                          <p className="text-xs text-muted-foreground">{t.aiChatTopQueries}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {analytics.aiChat.topQueries.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">No chat queries yet.</p>
+                            ) : (
+                              analytics.aiChat.topQueries.map((query) => (
+                                <Badge key={query.label} variant="outline">
+                                  {query.label}: {query.mentions}
+                                </Badge>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <p className="text-xs text-muted-foreground">{t.aiChatKeywords}</p>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {analytics.aiChat.commonKeywords.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">No keywords yet.</p>
+                            ) : (
+                              analytics.aiChat.commonKeywords.map((keyword) => (
+                                <Badge key={keyword.label} variant="secondary">
+                                  {keyword.label}: {keyword.mentions}
+                                </Badge>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-lg bg-muted">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Pill className="w-4 h-4 text-primary" />
+                          <h4 className="font-medium">{t.medicineCabinetMetrics}</h4>
+                        </div>
+                        <div className="grid md:grid-cols-3 gap-3 text-sm">
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t.totalMedicines}</p>
+                            <p className="text-xl font-semibold">{analytics.medicineCabinet.totalMedicines}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t.uniqueUsers}</p>
+                            <p className="text-xl font-semibold">{analytics.medicineCabinet.uniqueUsers}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t.averagePerUser}</p>
+                            <p className="text-xl font-semibold">{analytics.medicineCabinet.averagePerUser}</p>
+                          </div>
+                        </div>
+                        <div className="mt-4 space-y-2">
+                          <p className="text-xs text-muted-foreground">{t.topMedicines}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {analytics.medicineCabinet.topMedicines.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">No medicines tracked yet.</p>
+                            ) : (
+                              analytics.medicineCabinet.topMedicines.map((med) => (
+                                <Badge key={med.label} variant="secondary">
+                                  {med.label}: {med.mentions}
+                                </Badge>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                      {t.lastUpdated}: {new Date(analytics.timestamp).toLocaleString()}
                     </p>
                   </div>
-                </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center">No analytics available.</p>
+                )}
 
                 <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/20">
                   <p className="text-sm text-muted-foreground">
