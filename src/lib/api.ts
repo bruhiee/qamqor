@@ -5,6 +5,16 @@ type ApiOptions = RequestInit & {
 
 const TOKEN_KEY = "disease-detector-token";
 
+const normalizePath = (value: string) => (value.startsWith("/") ? value : `/${value}`);
+const rawApiUrl = (import.meta.env.VITE_API_URL ?? "").trim();
+const trimmedApiUrl = rawApiUrl.replace(/\/+$/, "");
+const apiPrefix =
+  trimmedApiUrl === ""
+    ? "/api"
+    : trimmedApiUrl.endsWith("/api")
+      ? trimmedApiUrl
+      : `${trimmedApiUrl}/api`;
+
 export function getToken() {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(TOKEN_KEY);
@@ -38,7 +48,8 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}) {
     }
   }
 
-  const url = absolute ? path : `/api${path}`;
+  const requestPath = normalizePath(path);
+  const url = absolute ? path : `${apiPrefix}${requestPath}`;
   const response = await fetch(url, {
     ...rest,
     headers,
