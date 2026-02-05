@@ -23,6 +23,7 @@ import {
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { DisclaimerBanner } from "@/components/layout/DisclaimerBanner";
+import { useLanguage } from "@/contexts/useLanguage";
 
 interface FirstAidGuide {
   id: string;
@@ -234,6 +235,7 @@ const firstAidGuides: FirstAidGuide[] = [
 ];
 
 export default function FirstAidGuide() {
+  const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedGuide, setExpandedGuide] = useState<string | null>(null);
 
@@ -246,11 +248,11 @@ export default function FirstAidGuide() {
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
       case "critical":
-        return <span className="text-xs px-2 py-1 rounded-full bg-destructive/20 text-destructive font-medium">Critical</span>;
+        return <span className="text-xs px-2 py-1 rounded-full bg-destructive/20 text-destructive font-medium">{t.criticalLabel}</span>;
       case "urgent":
-        return <span className="text-xs px-2 py-1 rounded-full bg-warning/20 text-warning font-medium">Urgent</span>;
+        return <span className="text-xs px-2 py-1 rounded-full bg-warning/20 text-warning font-medium">{t.urgentLabel}</span>;
       case "moderate":
-        return <span className="text-xs px-2 py-1 rounded-full bg-primary/20 text-primary font-medium">Moderate</span>;
+        return <span className="text-xs px-2 py-1 rounded-full bg-primary/20 text-primary font-medium">{t.moderateLabel}</span>;
     }
   };
 
@@ -267,8 +269,8 @@ export default function FirstAidGuide() {
                 <Heart className="w-6 h-6 text-destructive" />
               </div>
               <div>
-                <h1 className="font-display text-3xl font-bold">First Aid Guide</h1>
-                <p className="text-muted-foreground">Emergency procedures and step-by-step instructions</p>
+                <h1 className="font-display text-3xl font-bold">{t.firstAidTitle}</h1>
+                <p className="text-muted-foreground">{t.firstAidSubtitle}</p>
               </div>
             </div>
           </div>
@@ -285,7 +287,7 @@ export default function FirstAidGuide() {
               </div>
               <div>
                 <h3 className="font-display font-bold text-lg text-destructive mb-2">
-                  Emergency Numbers
+                  {t.emergencyBannerTitle}
                 </h3>
                 <div className="grid sm:grid-cols-3 gap-4 text-sm">
                   <div>
@@ -301,9 +303,7 @@ export default function FirstAidGuide() {
                     <span className="ml-2">112</span>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  In a life-threatening emergency, always call emergency services first before providing first aid.
-                </p>
+                <p className="text-xs text-muted-foreground mt-2">{t.emergencyBannerDescription}</p>
               </div>
             </div>
           </motion.div>
@@ -317,8 +317,8 @@ export default function FirstAidGuide() {
           <div className="mb-6">
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search first aid guides..."
+                <Input
+                  placeholder={t.searchFirstAidPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -356,10 +356,10 @@ export default function FirstAidGuide() {
                         <h3 className="font-display font-semibold">{guide.title}</h3>
                         {getSeverityBadge(guide.severity)}
                         {guide.callEmergency && (
-                          <span className="text-xs px-2 py-1 rounded-full bg-destructive text-destructive-foreground font-medium flex items-center gap-1">
-                            <Phone className="w-3 h-3" />
-                            Call 103
-                          </span>
+                        <span className="text-xs px-2 py-1 rounded-full bg-destructive text-destructive-foreground font-medium flex items-center gap-1">
+                          <Phone className="w-3 h-3" />
+                          {t.callEmergencyLabel}
+                        </span>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground line-clamp-1">{guide.overview}</p>
@@ -425,7 +425,7 @@ export default function FirstAidGuide() {
                             <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4">
                               <h5 className="font-semibold text-sm mb-3 flex items-center gap-2 text-destructive">
                                 <XCircle className="w-4 h-4" />
-                                What NOT to Do
+                                {t.whatNotToDo}
                               </h5>
                               <ul className="space-y-2">
                                 {guide.doNots.map((item, i) => (
@@ -439,7 +439,7 @@ export default function FirstAidGuide() {
                             <div className="bg-warning/5 border border-warning/20 rounded-lg p-4">
                               <h5 className="font-semibold text-sm mb-3 flex items-center gap-2 text-warning">
                                 <AlertTriangle className="w-4 h-4" />
-                                When to Seek Help
+                                {t.whenToSeekHelp}
                               </h5>
                               <p className="text-sm text-muted-foreground">{guide.whenToSeekHelp}</p>
                             </div>
@@ -456,7 +456,7 @@ export default function FirstAidGuide() {
           {filteredGuides.length === 0 && (
             <div className="text-center py-12">
               <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No guides found</p>
+              <p className="text-muted-foreground">{t.noGuidesFound}</p>
             </div>
           )}
         </div>

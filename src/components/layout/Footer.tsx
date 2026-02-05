@@ -88,15 +88,15 @@ export function Footer() {
             <ul className="space-y-3 text-sm">
               <li className="flex items-center gap-2 text-background/60">
                 <Mail className="w-4 h-4" />
-                support@qamqor.app
+                nurzhan.kulzhan1@gmail.com
               </li>
               <li className="flex items-center gap-2 text-background/60">
                 <Phone className="w-4 h-4" />
-                +7 (700) 123-4567
+                +7 771 909 93 82
               </li>
               <li className="flex items-center gap-2 text-background/60">
                 <MapPin className="w-4 h-4" />
-                Astana, Kazakhstan
+                Atyrau, Kazakhstan
               </li>
             </ul>
           </div>
@@ -104,7 +104,7 @@ export function Footer() {
 
         <div className="border-t border-background/10 mt-8 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-background/40">
-            © 2024 Qamqor. All rights reserved.
+            © 2026 Qamqor. All rights reserved.
           </p>
           <div className="flex items-center gap-2 text-sm text-background/40">
             <Heart className="w-4 h-4 text-medical-pulse" />

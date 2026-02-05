@@ -14,6 +14,62 @@ export interface Translations {
   // Navigation
   home: string;
   aiConsultant: string;
+  aiPoweredBy: string;
+  onlineStatus: string;
+  symptomTrackerTitle: string;
+  symptomTrackerSubtitle: string;
+  logSymptomsButton: string;
+  logTodaysSymptomsTitle: string;
+  dateLabel: string;
+  selectSymptomsLabel: string;
+  addCustomSymptomPlaceholder: string;
+  addButton: string;
+  severityLabel: string;
+  severityMild: string;
+  severityModerate: string;
+  severitySevere: string;
+  overallMoodLabel: string;
+  hoursOfSleepLabel: string;
+  additionalNotesLabel: string;
+  moodGreat: string;
+  moodGood: string;
+  moodOkay: string;
+  moodBad: string;
+  moodTerrible: string;
+  totalLogs: string;
+  avgSeverity: string;
+  trend: string;
+  trendImproving: string;
+  trendWorsening: string;
+  trendStable: string;
+  topSymptom: string;
+  mostFrequentSymptoms: string;
+  recentLogs: string;
+  noLogsTitle: string;
+  noLogsDescription: string;
+  logFirstSymptomsButton: string;
+  logsLoadError: string;
+  selectSymptomWarning: string;
+  logsSaveSuccess: string;
+  logsSaveError: string;
+  logsDeleteSuccess: string;
+  logsDeleteError: string;
+  notAvailable: string;
+  firstAidTitle: string;
+  firstAidSubtitle: string;
+  emergencyBannerTitle: string;
+  emergencyBannerDescription: string;
+  searchFirstAidPlaceholder: string;
+  criticalLabel: string;
+  urgentLabel: string;
+  moderateLabel: string;
+  whatNotToDo: string;
+  whenToSeekHelp: string;
+  noGuidesFound: string;
+  callEmergencyLabel: string;
+  disclaimerTitle: string;
+  disclaimerSummary: string;
+  disclaimerDetails: string;
   medicineCabinet: string;
   map: string;
   firstAid: string;
@@ -40,6 +96,7 @@ export interface Translations {
   search: string;
   save: string;
   cancel: string;
+  saveLog: string;
   delete: string;
   edit: string;
   add: string;
@@ -258,6 +315,23 @@ export interface Translations {
   aggregatedData: string;
   regionBreakdown: string;
   trendingTopics: string;
+  popularTags: string;
+  topContributors: string;
+  aiConsultantMetrics: string;
+  evaluationCount: string;
+  commonKeywords: string;
+  lastUpdated: string;
+  mostPopularQuestion: string;
+  questionViews: string;
+  questionReplies: string;
+  aiChatSessions: string;
+  aiChatTopQueries: string;
+  aiChatKeywords: string;
+  medicineCabinetMetrics: string;
+  totalMedicines: string;
+  uniqueUsers: string;
+  averagePerUser: string;
+  topMedicines: string;
   doctorApplications: string;
   approveDoctor: string;
   rejectDoctor: string;
@@ -364,6 +438,8 @@ export const translations: Record<Language, Translations> = {
     // Navigation
     home: 'Home',
     aiConsultant: 'AI Consultant',
+    aiPoweredBy: 'Powered by Qamqor AI',
+    onlineStatus: 'Online',
     medicineCabinet: 'Medicine Cabinet',
     map: 'Find Care',
     firstAid: 'First Aid',
@@ -390,6 +466,7 @@ export const translations: Record<Language, Translations> = {
     search: 'Search',
     save: 'Save',
     cancel: 'Cancel',
+    saveLog: 'Save Log',
     delete: 'Delete',
     edit: 'Edit',
     add: 'Add',
@@ -607,6 +684,23 @@ export const translations: Record<Language, Translations> = {
     aggregatedData: 'Aggregated Data',
     regionBreakdown: 'Region Breakdown',
     trendingTopics: 'Trending Topics',
+    popularTags: 'Popular Tags',
+    topContributors: 'Top Contributors',
+    aiConsultantMetrics: 'AI Consultant Metrics',
+    evaluationCount: 'Evaluations Submitted',
+    commonKeywords: 'Common Keywords',
+    lastUpdated: 'Last Updated',
+    mostPopularQuestion: 'Most Popular Question',
+    questionViews: 'Views',
+    questionReplies: 'Replies',
+    aiChatSessions: 'AI Chat Sessions',
+    aiChatTopQueries: 'Top Chat Queries',
+    aiChatKeywords: 'Chat Keywords',
+    medicineCabinetMetrics: 'Medicine Cabinet Metrics',
+    totalMedicines: 'Total Medicines',
+    uniqueUsers: 'Unique Users',
+    averagePerUser: 'Average per User',
+    topMedicines: 'Top Medicines',
     doctorApplications: 'Doctor Applications',
     approveDoctor: 'Approve Doctor',
     rejectDoctor: 'Reject Doctor',
@@ -653,7 +747,7 @@ export const translations: Record<Language, Translations> = {
     
     // Features
     featureAiTitle: 'AI Medical Consultant',
-    featureAiDesc: 'Chat with our Gemini-powered AI assistant to get instant health insights and guidance.',
+    featureAiDesc: 'Chat with our Qamqor AI assistant to get instant health insights and guidance.',
     featureSymptomTitle: 'Symptom Tracker',
     featureSymptomDesc: 'Log daily symptoms, track severity trends, and monitor your health over time.',
     featureFirstAidTitle: 'First Aid Guide',
@@ -664,6 +758,60 @@ export const translations: Record<Language, Translations> = {
     featureMapDesc: 'Locate pharmacies, hospitals, and clinics near you with detailed information.',
     featureEducationTitle: 'Health Education',
     featureEducationDesc: 'Access trusted health articles in Russian and Kazakh with expert insights.',
+    symptomTrackerTitle: 'Symptom Tracker',
+    symptomTrackerSubtitle: 'Log and track your daily symptoms',
+    logSymptomsButton: 'Log Symptoms',
+    logTodaysSymptomsTitle: "Log Today's Symptoms",
+    dateLabel: 'Date',
+    selectSymptomsLabel: 'Select Symptoms',
+    addCustomSymptomPlaceholder: 'Add custom symptom...',
+    addButton: 'Add',
+    severityLabel: 'Severity',
+    severityMild: 'Mild',
+    severityModerate: 'Moderate',
+    severitySevere: 'Severe',
+    overallMoodLabel: 'Overall Mood',
+    hoursOfSleepLabel: 'Hours of Sleep',
+    additionalNotesLabel: 'Additional Notes',
+    moodGreat: 'Great',
+    moodGood: 'Good',
+    moodOkay: 'Okay',
+    moodBad: 'Bad',
+    moodTerrible: 'Terrible',
+    totalLogs: 'Total Logs',
+    avgSeverity: 'Avg Severity',
+    trend: 'Trend',
+    trendImproving: 'Improving',
+    trendWorsening: 'Worsening',
+    trendStable: 'Stable',
+    topSymptom: 'Top Symptom',
+    mostFrequentSymptoms: 'Most Frequent Symptoms',
+    recentLogs: 'Recent Logs',
+    noLogsTitle: 'No logs yet',
+    noLogsDescription: 'Start tracking your symptoms to see trends over time',
+    logFirstSymptomsButton: 'Log Your First Symptoms',
+    logsLoadError: 'Failed to load symptom logs',
+    selectSymptomWarning: 'Please select at least one symptom',
+    logsSaveSuccess: 'Symptom log saved successfully',
+    logsSaveError: 'Failed to save symptom log',
+    logsDeleteSuccess: 'Log deleted',
+    logsDeleteError: 'Failed to delete log',
+    notAvailable: 'N/A',
+    firstAidTitle: 'First Aid Guide',
+    firstAidSubtitle: 'Emergency procedures and step-by-step instructions',
+    emergencyBannerTitle: 'Emergency Numbers',
+    emergencyBannerDescription: 'In a life-threatening emergency, always call emergency services first before providing first aid.',
+    searchFirstAidPlaceholder: 'Search first aid guides...',
+    criticalLabel: 'Critical',
+    urgentLabel: 'Urgent',
+    moderateLabel: 'Moderate',
+    whatNotToDo: 'What NOT to Do',
+    whenToSeekHelp: 'When to Seek Help',
+    noGuidesFound: 'No guides found',
+    callEmergencyLabel: 'Call 103',
+    disclaimerTitle: 'Important Medical Disclaimer',
+    disclaimerSummary: 'Medical Disclaimer: This platform provides informational support only and does not replace professional medical advice.',
+    disclaimerDetails: 'This platform provides informational support only and does not replace professional medical advice. The AI-generated insights are not diagnoses and should never be used as a substitute for consultation with qualified healthcare professionals. Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.',
     
     // Why Choose Us
     whyChooseTitle1: 'Built with Your',
@@ -712,6 +860,8 @@ export const translations: Record<Language, Translations> = {
     // Navigation
     home: 'Главная',
     aiConsultant: 'ИИ Консультант',
+    aiPoweredBy: 'Работает на Qamqor AI',
+    onlineStatus: 'Онлайн',
     medicineCabinet: 'Аптечка',
     map: 'Найти помощь',
     firstAid: 'Первая помощь',
@@ -738,6 +888,7 @@ export const translations: Record<Language, Translations> = {
     search: 'Поиск',
     save: 'Сохранить',
     cancel: 'Отмена',
+    saveLog: 'Сохранить запись',
     delete: 'Удалить',
     edit: 'Редактировать',
     add: 'Добавить',
@@ -955,6 +1106,23 @@ export const translations: Record<Language, Translations> = {
     aggregatedData: 'Агрегированные данные',
     regionBreakdown: 'Разбивка по регионам',
     trendingTopics: 'Трендовые темы',
+    popularTags: 'Популярные теги',
+    topContributors: 'Лучшие участники',
+    aiConsultantMetrics: 'Метрики AI-консультанта',
+    evaluationCount: 'Количество оценок',
+    commonKeywords: 'Частые ключевые слова',
+    lastUpdated: 'Последнее обновление',
+    mostPopularQuestion: 'Самый популярный вопрос',
+    questionViews: 'Просмотры',
+    questionReplies: 'Ответы',
+    aiChatSessions: 'Сессии AI-чата',
+    aiChatTopQueries: 'Популярные запросы чата',
+    aiChatKeywords: 'Ключевые слова чата',
+    medicineCabinetMetrics: 'Метрики кабинета лекарств',
+    totalMedicines: 'Всего лекарств',
+    uniqueUsers: 'Уникальных пользователей',
+    averagePerUser: 'В среднем на пользователя',
+    topMedicines: 'Популярные лекарства',
     doctorApplications: 'Заявки врачей',
     approveDoctor: 'Одобрить врача',
     rejectDoctor: 'Отклонить врача',
@@ -1001,7 +1169,7 @@ export const translations: Record<Language, Translations> = {
     
     // Features
     featureAiTitle: 'ИИ Медицинский Консультант',
-    featureAiDesc: 'Общайтесь с нашим ИИ-помощником на базе Gemini для получения мгновенных медицинских рекомендаций.',
+    featureAiDesc: 'Общайтесь с Qamqor AI на Supabase, чтобы получать мгновенные медицинские рекомендации.',
     featureSymptomTitle: 'Дневник симптомов',
     featureSymptomDesc: 'Записывайте ежедневные симптомы, отслеживайте тяжесть и мониторьте здоровье со временем.',
     featureFirstAidTitle: 'Справочник первой помощи',
@@ -1012,6 +1180,60 @@ export const translations: Record<Language, Translations> = {
     featureMapDesc: 'Находите аптеки, больницы и клиники поблизости с подробной информацией.',
     featureEducationTitle: 'Медицинское образование',
     featureEducationDesc: 'Доступ к проверенным статьям о здоровье на русском и казахском языках.',
+    symptomTrackerTitle: 'Дневник симптомов',
+    symptomTrackerSubtitle: 'Записывайте и отслеживайте ежедневные симптомы',
+    logSymptomsButton: 'Записать симптомы',
+    logTodaysSymptomsTitle: 'Записать сегодняшние симптомы',
+    dateLabel: 'Дата',
+    selectSymptomsLabel: 'Выберите симптомы',
+    addCustomSymptomPlaceholder: 'Добавить симптом...',
+    addButton: 'Добавить',
+    severityLabel: 'Тяжесть',
+    severityMild: 'Легкая',
+    severityModerate: 'Средняя',
+    severitySevere: 'Тяжелая',
+    overallMoodLabel: 'Общее самочувствие',
+    hoursOfSleepLabel: 'Часы сна',
+    additionalNotesLabel: 'Дополнительные заметки',
+    moodGreat: 'Прекрасно',
+    moodGood: 'Хорошо',
+    moodOkay: 'Так себе',
+    moodBad: 'Плохо',
+    moodTerrible: 'Ужасно',
+    totalLogs: 'Всего записей',
+    avgSeverity: 'Средняя тяжесть',
+    trend: 'Тренд',
+    trendImproving: 'Снижается',
+    trendWorsening: 'Ухудшается',
+    trendStable: 'Стабильно',
+    topSymptom: 'Самый частый симптом',
+    mostFrequentSymptoms: 'Наиболее частые симптомы',
+    recentLogs: 'Последние записи',
+    noLogsTitle: 'Записей пока нет',
+    noLogsDescription: 'Начните отслеживать симптомы, чтобы увидеть динамику',
+    logFirstSymptomsButton: 'Записать первые симптомы',
+    logsLoadError: 'Не удалось загрузить записи симптомов',
+    selectSymptomWarning: 'Пожалуйста, выберите хотя бы один симптом',
+    logsSaveSuccess: 'Запись симптомов успешно сохранена',
+    logsSaveError: 'Не удалось сохранить запись',
+    logsDeleteSuccess: 'Запись удалена',
+    logsDeleteError: 'Не удалось удалить запись',
+    notAvailable: 'Н/Д',
+    firstAidTitle: 'Справочник первой помощи',
+    firstAidSubtitle: 'Экстренные действия и пошаговые инструкции',
+    emergencyBannerTitle: 'Номера экстренных служб',
+    emergencyBannerDescription: 'В ситуации, угрожающей жизни, всегда звоните в службы экстренной помощи прежде, чем оказывать первую помощь.',
+    searchFirstAidPlaceholder: 'Поиск руководств по первой помощи...',
+    criticalLabel: 'Критично',
+    urgentLabel: 'Срочно',
+    moderateLabel: 'Средне',
+    whatNotToDo: 'Чего нельзя делать',
+    whenToSeekHelp: 'Когда обращаться за помощью',
+    noGuidesFound: 'Руководства не найдены',
+    callEmergencyLabel: 'Вызовите 103',
+    disclaimerTitle: 'Важный медицинский отказ от ответственности',
+    disclaimerSummary: 'Медицинский отказ: платформа предоставляет лишь информационную поддержку и не заменяет профессиональный медицинский совет.',
+    disclaimerDetails: 'Платформа предоставляет только информационную поддержку и не является диагнозом. Ни одна информация, полученная здесь, не должна заменять консультацию с врачом. Всегда обращайтесь к медицинскому специалисту с любыми вопросами по поводу здоровья.',
     
     // Why Choose Us
     whyChooseTitle1: 'Создано с заботой',
@@ -1060,6 +1282,8 @@ export const translations: Record<Language, Translations> = {
     // Navigation
     home: 'Басты бет',
     aiConsultant: 'ЖИ Кеңесші',
+    aiPoweredBy: 'Qamqor AI-пен жұмыс істейді',
+    onlineStatus: 'Желіде',
     medicineCabinet: 'Дәрі қорабы',
     map: 'Көмек табу',
     firstAid: 'Алғашқы көмек',
@@ -1086,6 +1310,7 @@ export const translations: Record<Language, Translations> = {
     search: 'Іздеу',
     save: 'Сақтау',
     cancel: 'Бас тарту',
+    saveLog: 'Жазбаны сақтау',
     delete: 'Жою',
     edit: 'Өңдеу',
     add: 'Қосу',
@@ -1303,6 +1528,23 @@ export const translations: Record<Language, Translations> = {
     aggregatedData: 'Жиынтық деректер',
     regionBreakdown: 'Аймақтық бөлу',
     trendingTopics: 'Трендтегі тақырыптар',
+    popularTags: 'Танымал тегтер',
+    topContributors: 'Ең белсенді үлескерлер',
+    aiConsultantMetrics: 'AI кеңесшісі көрсеткіштері',
+    evaluationCount: 'Бағалаулар саны',
+    commonKeywords: 'Жиі кездесетін кілт сөздер',
+    lastUpdated: 'Соңғы жаңарту',
+    mostPopularQuestion: 'Ең танымал сұрақ',
+    questionViews: 'Көрілімдер',
+    questionReplies: 'Жауаптар',
+    aiChatSessions: 'AI чат сессиялары',
+    aiChatTopQueries: 'Танымал сұрақтар',
+    aiChatKeywords: 'Чат кілт сөздері',
+    medicineCabinetMetrics: 'Дәріхана кабинеті көрсеткіштері',
+    totalMedicines: 'Дәрілер саны',
+    uniqueUsers: 'Уникалды пайдаланушылар',
+    averagePerUser: 'Орташа бір қолданушыға',
+    topMedicines: 'Танымал дәрілер',
     doctorApplications: 'Дәрігер өтінімдері',
     approveDoctor: 'Дәрігерді мақұлдау',
     rejectDoctor: 'Дәрігерді қабылдамау',
@@ -1349,7 +1591,7 @@ export const translations: Record<Language, Translations> = {
     
     // Features
     featureAiTitle: 'ЖИ Медициналық Кеңесші',
-    featureAiDesc: 'Gemini негізіндегі ЖИ көмекшімен сөйлесіп, лезде денсаулық кеңестерін алыңыз.',
+    featureAiDesc: 'Qamqor AI-мен Supabase арқылы сөйлесіп, лезде денсаулық кеңестерін алыңыз.',
     featureSymptomTitle: 'Симптом журналы',
     featureSymptomDesc: 'Күнделікті симптомдарды жазыңыз, ауырлық деңгейін бақылаңыз және денсаулықты мониторингтеңіз.',
     featureFirstAidTitle: 'Алғашқы көмек нұсқаулығы',
@@ -1360,6 +1602,60 @@ export const translations: Record<Language, Translations> = {
     featureMapDesc: 'Жақындағы дәріханалар, ауруханалар және клиникаларды толық ақпаратпен табыңыз.',
     featureEducationTitle: 'Медициналық білім',
     featureEducationDesc: 'Қазақ және орыс тілдерінде сенімді денсаулық мақалаларына қол жеткізіңіз.',
+    symptomTrackerTitle: 'Симптом жазбасы',
+    symptomTrackerSubtitle: 'Күнделікті симптомдарды жазып, өзгерістерді бақылаңыз',
+    logSymptomsButton: 'Симптомдарды жазу',
+    logTodaysSymptomsTitle: 'Бүгінгі симптомдарды жазу',
+    dateLabel: 'Күні',
+    selectSymptomsLabel: 'Симптомдарды таңдаңыз',
+    addCustomSymptomPlaceholder: 'Арнайы симптом қосу...',
+    addButton: 'Қосу',
+    severityLabel: 'Ауырлығы',
+    severityMild: 'Жеңіл',
+    severityModerate: 'Орташа',
+    severitySevere: 'Ауыр',
+    overallMoodLabel: 'Жалпы көңіл-күй',
+    hoursOfSleepLabel: 'Ұйқы сағаттары',
+    additionalNotesLabel: 'Қосымша жазбалар',
+    moodGreat: 'Тамаша',
+    moodGood: 'Жақсы',
+    moodOkay: 'Қанағаттанарлық',
+    moodBad: 'Жаман',
+    moodTerrible: 'Өте жаман',
+    totalLogs: 'Жалпы жазбалар',
+    avgSeverity: 'Орташа ауырлық',
+    trend: 'Тренд',
+    trendImproving: 'Жақсарып жатыр',
+    trendWorsening: 'Нашарлап жатыр',
+    trendStable: 'Тұрақты',
+    topSymptom: 'Ең жиі симптом',
+    mostFrequentSymptoms: 'Ең жиі кездесетін симптомдар',
+    recentLogs: 'Жуықтағы жазбалар',
+    noLogsTitle: 'Жазбалар әлі жоқ',
+    noLogsDescription: 'Өзгерістерді көру үшін симптомдарды жазуды бастаңыз',
+    logFirstSymptomsButton: 'Алғашқы симптомдарды жазу',
+    logsLoadError: 'Симптом жазбаларын жүктеу мүмкін болмады',
+    selectSymptomWarning: 'Қанеки, кем дегенде бір симптомды таңдаңыз',
+    logsSaveSuccess: 'Симптом жазбасы сәтті сақталды',
+    logsSaveError: 'Симптом жазбасын сақтай алмады',
+    logsDeleteSuccess: 'Жазба жойылды',
+    logsDeleteError: 'Жазбаны жою мүмкін болмады',
+    notAvailable: 'Ж/к',
+    firstAidTitle: 'Бірінші көмек нұсқауы',
+    firstAidSubtitle: 'Шұғыл әрекеттер мен қадамдық нұсқаулар',
+    emergencyBannerTitle: 'Жедел жәрдем нөмірлері',
+    emergencyBannerDescription: 'Өмірге қатер төнген жағдайда бірінші көмекті көрсетуге кіріспес бұрын әрқашан жедел жәрдемге қоңырау шалыңыз.',
+    searchFirstAidPlaceholder: 'Бірінші көмектің нұсқауларын іздеу...',
+    criticalLabel: 'Маңызды',
+    urgentLabel: 'Шұғыл',
+    moderateLabel: 'Орташа',
+    whatNotToDo: 'Не істемеу керек',
+    whenToSeekHelp: 'Қашан көмекке жүгіну керек',
+    noGuidesFound: 'Нұсқаулар табылмады',
+    callEmergencyLabel: '103 нөміріне қоңырау шалыңыз',
+    disclaimerTitle: 'Маңызды медициналық ескерту',
+    disclaimerSummary: 'Медициналық ескерту: бұл платформа тек ақпараттық қолдау көрсетеді және кәсіби медициналық кеңесті алмастырмайды.',
+    disclaimerDetails: 'Бұл платформа тек ақпараттық қолдау береді және диагноз қойылмайды. Мұнда берілген ақпарат дәрігердің кеңесінің орнына пайдаланылмауы тиіс. Денсаулыққа қатысты кез келген сұрақ бойынша білікті медициналық маманға жүгініңіз.',
     
     // Why Choose Us
     whyChooseTitle1: 'Сіздің қауіпсіздігіңіз',

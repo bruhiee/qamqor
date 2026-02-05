@@ -32,6 +32,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
+import { useLanguage } from "@/contexts/useLanguage";
 
 interface SymptomLog {
   id: string;
@@ -50,15 +51,8 @@ const commonSymptoms = [
   "Stomach pain", "Back pain", "Anxiety", "Insomnia"
 ];
 
-const moodOptions = [
-  { value: "great", label: "Great", icon: Smile, color: "text-success" },
-  { value: "good", label: "Good", icon: Smile, color: "text-primary" },
-  { value: "okay", label: "Okay", icon: Meh, color: "text-warning" },
-  { value: "bad", label: "Bad", icon: Frown, color: "text-orange-500" },
-  { value: "terrible", label: "Terrible", icon: Frown, color: "text-destructive" },
-];
-
 export default function SymptomTracker() {
+  const { t } = useLanguage();
   const [logs, setLogs] = useState<SymptomLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -74,6 +68,13 @@ export default function SymptomTracker() {
     sleepHours: 7,
     customSymptom: "",
   });
+  const moodOptions = [
+    { value: "great", label: t.moodGreat, icon: Smile, color: "text-success" },
+    { value: "good", label: t.moodGood, icon: Smile, color: "text-primary" },
+    { value: "okay", label: t.moodOkay, icon: Meh, color: "text-warning" },
+    { value: "bad", label: t.moodBad, icon: Frown, color: "text-orange-500" },
+    { value: "terrible", label: t.moodTerrible, icon: Frown, color: "text-destructive" },
+  ];
 
   useEffect(() => {
     fetchLogs();
@@ -85,7 +86,7 @@ export default function SymptomTracker() {
       setLogs(data || []);
     } catch (error) {
       console.error("Error fetching logs:", error);
-      toast.error("Failed to load symptom logs");
+      toast.error(t.logsLoadError);
     } finally {
       setIsLoading(false);
     }
@@ -93,7 +94,7 @@ export default function SymptomTracker() {
 
   const handleSubmit = async () => {
     if (formData.symptoms.length === 0) {
-      toast.error("Please select at least one symptom");
+      toast.error(t.selectSymptomWarning);
       return;
     }
 
@@ -110,12 +111,12 @@ export default function SymptomTracker() {
         },
       });
 
-      toast.success("Symptom log saved successfully");
+      toast.success(t.logsSaveSuccess);
       resetForm();
       fetchLogs();
     } catch (error) {
       console.error("Error saving log:", error);
-      toast.error("Failed to save symptom log");
+      toast.error(t.logsSaveError);
     }
   };
 
@@ -124,11 +125,11 @@ export default function SymptomTracker() {
       await apiFetch(`/symptom-logs/${id}`, {
         method: "DELETE",
       });
-      toast.success("Log deleted");
+      toast.success(t.logsDeleteSuccess);
       fetchLogs();
     } catch (error) {
       console.error("Error deleting log:", error);
-      toast.error("Failed to delete log");
+      toast.error(t.logsDeleteError);
     }
   };
 
@@ -180,6 +181,13 @@ export default function SymptomTracker() {
   };
 
   const trend = getSeverityTrend();
+  const trendLabel = trend
+    ? trend === "improving"
+      ? t.trendImproving
+      : trend === "worsening"
+        ? t.trendWorsening
+        : t.trendStable
+    : t.notAvailable;
 
   // Get unique symptoms from recent logs for frequency chart
   const symptomFrequency = logs.reduce((acc, log) => {
@@ -207,26 +215,26 @@ export default function SymptomTracker() {
                   <Activity className="w-6 h-6 text-secondary" />
                 </div>
                 <div>
-                  <h1 className="font-display text-3xl font-bold">Symptom Tracker</h1>
-                  <p className="text-muted-foreground">Log and track your daily symptoms</p>
+                  <h1 className="font-display text-3xl font-bold">{t.symptomTrackerTitle}</h1>
+                  <p className="text-muted-foreground">{t.symptomTrackerSubtitle}</p>
                 </div>
               </div>
 
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="medical-gradient shadow-medical gap-2">
-                    <Plus className="w-4 h-4" />
-                    Log Symptoms
-                  </Button>
+                    <Button className="medical-gradient shadow-medical gap-2">
+                      <Plus className="w-4 h-4" />
+                      {t.logSymptomsButton}
+                    </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="font-display">Log Today's Symptoms</DialogTitle>
-                  </DialogHeader>
+                    <DialogHeader>
+                      <DialogTitle className="font-display">{t.logTodaysSymptomsTitle}</DialogTitle>
+                    </DialogHeader>
                   <div className="space-y-6 mt-4">
                     {/* Date */}
                     <div>
-                      <Label>Date</Label>
+                      <Label>{t.dateLabel}</Label>
                       <Input
                         type="date"
                         value={selectedDate}
@@ -237,7 +245,7 @@ export default function SymptomTracker() {
 
                     {/* Symptoms */}
                     <div>
-                      <Label className="mb-3 block">Select Symptoms</Label>
+                      <Label className="mb-3 block">{t.selectSymptomsLabel}</Label>
                       <div className="flex flex-wrap gap-2 mb-3">
                         {commonSymptoms.map((symptom) => (
                           <Button
@@ -254,13 +262,13 @@ export default function SymptomTracker() {
                       </div>
                       <div className="flex gap-2">
                         <Input
-                          placeholder="Add custom symptom..."
+                          placeholder={t.addCustomSymptomPlaceholder}
                           value={formData.customSymptom}
                           onChange={(e) => setFormData({ ...formData, customSymptom: e.target.value })}
                           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomSymptom())}
                         />
                         <Button type="button" variant="outline" onClick={addCustomSymptom}>
-                          Add
+                          {t.addButton}
                         </Button>
                       </div>
                       {formData.symptoms.filter((s) => !commonSymptoms.includes(s)).length > 0 && (
@@ -285,7 +293,7 @@ export default function SymptomTracker() {
                     {/* Severity */}
                     <div>
                       <Label className="mb-3 block">
-                        Severity: <span className="font-bold">{formData.severity}/10</span>
+                        {t.severityLabel}: <span className="font-bold">{formData.severity}/10</span>
                       </Label>
                       <Slider
                         value={[formData.severity]}
@@ -296,15 +304,15 @@ export default function SymptomTracker() {
                         className="py-4"
                       />
                       <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Mild</span>
-                        <span>Moderate</span>
-                        <span>Severe</span>
+                        <span>{t.severityMild}</span>
+                        <span>{t.severityModerate}</span>
+                        <span>{t.severitySevere}</span>
                       </div>
                     </div>
 
                     {/* Mood */}
                     <div>
-                      <Label className="mb-3 block">Overall Mood</Label>
+                      <Label className="mb-3 block">{t.overallMoodLabel}</Label>
                       <div className="flex gap-2">
                         {moodOptions.map((option) => {
                           const Icon = option.icon;
@@ -329,7 +337,7 @@ export default function SymptomTracker() {
                     <div>
                       <Label className="mb-3 block flex items-center gap-2">
                         <Moon className="w-4 h-4" />
-                        Hours of Sleep: <span className="font-bold">{formData.sleepHours}h</span>
+                        {t.hoursOfSleepLabel}: <span className="font-bold">{formData.sleepHours}h</span>
                       </Label>
                       <Slider
                         value={[formData.sleepHours]}
@@ -343,7 +351,7 @@ export default function SymptomTracker() {
 
                     {/* Notes */}
                     <div>
-                      <Label>Additional Notes</Label>
+                      <Label>{t.additionalNotesLabel}</Label>
                       <Textarea
                         value={formData.notes}
                         onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -354,10 +362,10 @@ export default function SymptomTracker() {
 
                     <div className="flex gap-2 pt-4">
                       <Button variant="outline" onClick={resetForm} className="flex-1">
-                        Cancel
+                        {t.cancel}
                       </Button>
                       <Button onClick={handleSubmit} className="flex-1 medical-gradient">
-                        Save Log
+                        {t.saveLog}
                       </Button>
                     </div>
                   </div>
@@ -374,7 +382,7 @@ export default function SymptomTracker() {
               className="bg-card rounded-xl border border-border p-5"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">Total Logs</span>
+                <span className="text-sm text-muted-foreground">{t.totalLogs}</span>
                 <Calendar className="w-4 h-4 text-muted-foreground" />
               </div>
               <div className="font-display text-2xl font-bold">{logs.length}</div>
@@ -387,7 +395,7 @@ export default function SymptomTracker() {
               className="bg-card rounded-xl border border-border p-5"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">Avg Severity</span>
+                <span className="text-sm text-muted-foreground">{t.avgSeverity}</span>
                 <BarChart3 className="w-4 h-4 text-muted-foreground" />
               </div>
               <div className="font-display text-2xl font-bold">
@@ -404,7 +412,7 @@ export default function SymptomTracker() {
               className="bg-card rounded-xl border border-border p-5"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">Trend</span>
+                <span className="text-sm text-muted-foreground">{t.trend}</span>
                 {trend === "improving" && <TrendingDown className="w-4 h-4 text-success" />}
                 {trend === "worsening" && <TrendingUp className="w-4 h-4 text-destructive" />}
                 {trend === "stable" && <Minus className="w-4 h-4 text-muted-foreground" />}
@@ -413,7 +421,7 @@ export default function SymptomTracker() {
               <div className={`font-display text-2xl font-bold capitalize ${
                 trend === "improving" ? "text-success" : trend === "worsening" ? "text-destructive" : ""
               }`}>
-                {trend || "N/A"}
+                {trendLabel}
               </div>
             </motion.div>
 
@@ -424,7 +432,7 @@ export default function SymptomTracker() {
               className="bg-card rounded-xl border border-border p-5"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">Top Symptom</span>
+                <span className="text-sm text-muted-foreground">{t.topSymptom}</span>
                 <Activity className="w-4 h-4 text-muted-foreground" />
               </div>
               <div className="font-display text-lg font-bold truncate">
@@ -440,7 +448,7 @@ export default function SymptomTracker() {
               animate={{ opacity: 1, y: 0 }}
               className="bg-card rounded-xl border border-border p-5 mb-8"
             >
-              <h3 className="font-display font-semibold mb-4">Most Frequent Symptoms</h3>
+              <h3 className="font-display font-semibold mb-4">{t.mostFrequentSymptoms}</h3>
               <div className="space-y-3">
                 {topSymptoms.map(([symptom, count], index) => (
                   <div key={symptom} className="flex items-center gap-3">
@@ -462,7 +470,7 @@ export default function SymptomTracker() {
 
           {/* Logs List */}
           <div className="space-y-3">
-            <h3 className="font-display font-semibold">Recent Logs</h3>
+            <h3 className="font-display font-semibold">{t.recentLogs}</h3>
             
             {isLoading ? (
               <div className="text-center py-12">
@@ -471,11 +479,11 @@ export default function SymptomTracker() {
             ) : logs.length === 0 ? (
               <div className="text-center py-12 bg-card rounded-xl border border-border">
                 <Activity className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                <h3 className="font-display font-semibold mb-2">No logs yet</h3>
-                <p className="text-muted-foreground mb-4">Start tracking your symptoms to see trends over time</p>
+                <h3 className="font-display font-semibold mb-2">{t.noLogsTitle}</h3>
+                <p className="text-muted-foreground mb-4">{t.noLogsDescription}</p>
                 <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2">
                   <Plus className="w-4 h-4" />
-                  Log Your First Symptoms
+                  {t.logFirstSymptomsButton}
                 </Button>
               </div>
             ) : (
