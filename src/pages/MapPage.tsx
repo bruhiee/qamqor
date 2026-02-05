@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { useLanguage } from "@/contexts/useLanguage";
+import { apiFetch } from "@/lib/api";
 
 interface MedicalFacility {
   id: string;
@@ -319,63 +320,14 @@ export default function MapPage() {
     },
     [clearRoute],
   );
-
-  type OverpassElement = {
-    type: "node" | "way" | "relation";
-    id: number;
-    lat?: number;
-    lon?: number;
-    center?: { lat: number; lon: number };
-    tags?: Record<string, string>;
-  };
-
-  const buildOverpassQuery = (lat: number, lon: number, radius: number) => `[out:json][timeout:25];
-  (node["amenity"="pharmacy"](around:${radius},${lat},${lon});
-  way["amenity"="pharmacy"](around:${radius},${lat},${lon});
-  relation["amenity"="pharmacy"](around:${radius},${lat},${lon});
-  );
-  out center;`;
-
   const fetchFacilitiesOverpass = useCallback(async (lat: number, lon: number, radius: number) => {
-    const query = buildOverpassQuery(lat, lon, radius);
-    const res = await fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      },
-      body: query,
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lon),
+      radius: String(radius),
     });
-    if (!res.ok) {
-      throw new Error("Overpass request failed");
-    }
-    const data = await res.json();
-    return (data.elements || [])
-      .map((el: OverpassElement) => {
-        const latlon =
-          el.type === "node"
-            ? { lat: el.lat, lon: el.lon }
-            : el.center
-              ? { lat: el.center.lat, lon: el.center.lon }
-              : null;
-        if (!latlon) return null;
-        const addressParts = [];
-        if (el.tags?.["addr:street"]) addressParts.push(el.tags["addr:street"]);
-        if (el.tags?.["addr:housenumber"]) addressParts.push(el.tags["addr:housenumber"]);
-        if (el.tags?.["addr:city"]) addressParts.push(el.tags["addr:city"]);
-        return {
-          id: `${el.type}-${el.id}`,
-          name: el.tags?.name || "Аптека",
-          type: "pharmacy",
-          coordinates: [latlon.lon, latlon.lat],
-          address: addressParts.join(", ") || el.tags?.village || el.tags?.city || "",
-          phone: el.tags?.phone || el.tags?.["contact:phone"] || "",
-          hours: el.tags?.opening_hours || "—",
-          website: el.tags?.website || el.tags?.url,
-          specializations: [],
-          doctorSummary: "",
-        };
-      })
-    .filter(Boolean) as MedicalFacility[];
+    const { data } = await apiFetch<{ data: MedicalFacility[] }>(`/facilities?${params.toString()}`);
+    return Array.isArray(data) ? data : [];
   }, []);
 
   const loadFacilities = useCallback(
@@ -873,3 +825,4 @@ export default function MapPage() {
     </div>
   );
 }
+
