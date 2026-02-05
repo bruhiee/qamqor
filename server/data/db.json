@@ -100,6 +100,518 @@
         ]
       },
       "created_at": "2026-02-03T14:02:20.934Z"
+    },
+    {
+      "id": "ZoQeUWy-CSziUObU0U-4E",
+      "email": "mansurkurmet0@gmail.com",
+      "displayName": "Abilmansur",
+      "passwordHash": "$2a$10$k.slsETcikNgNEF1YycFOeLq9gtszWw.9m66NkgsiHVRU2nH/84KC",
+      "roles": [
+        "user",
+        "doctor"
+      ],
+      "user_metadata": {
+        "display_name": "Abilmansur"
+      },
+      "app_metadata": {
+        "provider": "email",
+        "roles": [
+          "user",
+          "doctor"
+        ]
+      },
+      "created_at": "2026-02-05T06:19:17.028Z",
+      "banned": false
+    }
+  ],
+  "doctor_applications": [
+    {
+      "id": "H34Q4cZz2jvY892H0s9Ps",
+      "user_id": "llgK3b7WqDTYjmm2O8dtn",
+      "full_name": "fsgrgsdg",
+      "specialization": "cardiologist",
+      "license_number": "55-675434",
+      "bio": "fsdfsdf",
+      "country": "kazakhstan",
+      "region": "atyrau",
+      "years_of_experience": 34,
+      "workplace": "3efafasdf",
+      "status": "pending",
+      "submitted_at": "2026-02-03T14:02:20.956Z"
+    },
+    {
+      "id": "YzZOsbhTPJtfUYIK08ySS",
+      "user_id": "ZoQeUWy-CSziUObU0U-4E",
+      "full_name": "Abilmansur",
+      "specialization": "urologist",
+      "license_number": "YX-219321",
+      "bio": null,
+      "country": "Kazakhstan",
+      "region": "Atyrau",
+      "years_of_experience": 20,
+      "workplace": "Medicer",
+      "status": "pending",
+      "submitted_at": "2026-02-05T06:19:17.043Z"
+    }
+  ],
+  "medicines": [
+    {
+      "id": "PPZA0z44FvbzaHLkS8rXF",
+      "user_id": "6fYk_uFmd4zVnd76-IEdX",
+      "created_at": "2026-02-03T07:24:23.259Z",
+      "name": "paracetomol",
+      "purpose": null,
+      "dosage": null,
+      "quantity": 1,
+      "form_type": "tablet",
+      "tags": [],
+      "expiration_date": "2026-02-13",
+      "notes": null
+    }
+  ],
+  "forum_posts": [
+    {
+      "id": "pZUJfEAIJhjruAzKCThYm",
+      "user_id": "6fYk_uFmd4zVnd76-IEdX",
+      "created_at": "2026-02-03T05:47:40.661Z",
+      "status": "open",
+      "views_count": 6,
+      "replies_count": 1,
+      "title": "я гей",
+      "content": "привет",
+      "tags": [],
+      "is_urgent": true
+    },
+    {
+      "id": "Xfgngb39M6yNfYmF36FL1",
+      "user_id": "6fYk_uFmd4zVnd76-IEdX",
+      "created_at": "2026-02-03T06:57:53.794Z",
+      "status": "open",
+      "views_count": 3,
+      "replies_count": 1,
+      "title": "Я хочу повеситься",
+      "content": "вы",
+      "tags": [],
+      "is_urgent": true
+    },
+    {
+      "id": "XwCWsBhctuIe78H_Pl-_-",
+      "user_id": "EZDO7c3IQFhpWyXGOimm_",
+      "created_at": "2026-02-03T12:54:15.258Z",
+      "status": "open",
+      "views_count": 3,
+      "replies_count": 1,
+      "title": "",
+      "content": "",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": false
+    },
+    {
+      "id": "7l23aOlha-j1FvMuJpy93",
+      "user_id": "EZDO7c3IQFhpWyXGOimm_",
+      "created_at": "2026-02-03T12:55:45.131Z",
+      "status": "open",
+      "views_count": 3,
+      "replies_count": 1,
+      "title": "e",
+      "content": "dd",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": false
+    },
+    {
+      "id": "0vJITE6tcaPbpZNpha4Yy",
+      "user_id": "EZDO7c3IQFhpWyXGOimm_",
+      "created_at": "2026-02-03T12:56:03.731Z",
+      "status": "open",
+      "views_count": 2,
+      "replies_count": 0,
+      "title": "hi bro",
+      "content": "hi",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": false
+    },
+    {
+      "id": "Ck7l9vwPMCk95zKnhGuIA",
+      "user_id": "llgK3b7WqDTYjmm2O8dtn",
+      "created_at": "2026-02-03T14:02:44.530Z",
+      "status": "answered",
+      "views_count": 4,
+      "replies_count": 1,
+      "title": "i am gay",
+      "content": "hi",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": false
+    },
+    {
+      "id": "HEfq-OaZogKvcINn6PY_T",
+      "user_id": "ZoQeUWy-CSziUObU0U-4E",
+      "created_at": "2026-02-05T06:34:29.036Z",
+      "status": "flagged",
+      "views_count": 0,
+      "replies_count": 0,
+      "title": "Я хочу взорвать абделла",
+      "content": "Все Абдуллы в мире ужасные люди и хаслуживают наказания",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": true,
+      "moderation": {
+        "source": "ai",
+        "flagged": true,
+        "severity": "high",
+        "reasons": [
+          "Violence threats",
+          "Hate speech"
+        ]
+      }
+    },
+    {
+      "id": "NBWcyBUkQJjMwiGFYcEti",
+      "user_id": "ZoQeUWy-CSziUObU0U-4E",
+      "created_at": "2026-02-05T06:34:29.283Z",
+      "status": "open",
+      "views_count": 1,
+      "replies_count": 0,
+      "title": "Я хочу взорвать абделла",
+      "content": "Все Абдуллы в мире ужасные люди и хаслуживают наказания",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": false,
+      "moderation": null
+    },
+    {
+      "id": "oBE9dvcfixDfL0FBWTWbD",
+      "user_id": "ZoQeUWy-CSziUObU0U-4E",
+      "created_at": "2026-02-05T06:34:30.597Z",
+      "status": "flagged",
+      "views_count": 0,
+      "replies_count": 0,
+      "title": "Я хочу взорвать абделла",
+      "content": "Все Абдуллы в мире ужасные люди и хаслуживают наказания",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": true,
+      "moderation": {
+        "source": "ai",
+        "flagged": true,
+        "severity": "high",
+        "reasons": [
+          "Violence threats",
+          "Hate speech"
+        ]
+      }
+    },
+    {
+      "id": "-DZrc8qvlFsHQkJRz2zut",
+      "user_id": "ZoQeUWy-CSziUObU0U-4E",
+      "created_at": "2026-02-05T06:34:30.598Z",
+      "status": "flagged",
+      "views_count": 0,
+      "replies_count": 0,
+      "title": "Я хочу взорвать абделла",
+      "content": "Все Абдуллы в мире ужасные люди и хаслуживают наказания",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": true,
+      "moderation": {
+        "source": "ai",
+        "flagged": true,
+        "severity": "high",
+        "reasons": [
+          "Violence threats",
+          "Hate speech"
+        ]
+      }
+    },
+    {
+      "id": "oE4EKJtoIyr092kHlQtpU",
+      "user_id": "ZoQeUWy-CSziUObU0U-4E",
+      "created_at": "2026-02-05T06:34:31.264Z",
+      "status": "flagged",
+      "views_count": 0,
+      "replies_count": 0,
+      "title": "Я хочу взорвать абделла",
+      "content": "Все Абдуллы в мире ужасные люди и хаслуживают наказания",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": true,
+      "moderation": {
+        "source": "ai",
+        "flagged": true,
+        "severity": "high",
+        "reasons": [
+          "Violence threats",
+          "Hate speech"
+        ]
+      }
+    },
+    {
+      "id": "rG3wsYjzNioLX10T9cUzn",
+      "user_id": "ZoQeUWy-CSziUObU0U-4E",
+      "created_at": "2026-02-05T06:34:31.570Z",
+      "status": "flagged",
+      "views_count": 0,
+      "replies_count": 0,
+      "title": "Я хочу взорвать абделла",
+      "content": "Все Абдуллы в мире ужасные люди и хаслуживают наказания",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": true,
+      "moderation": {
+        "source": "ai",
+        "flagged": true,
+        "severity": "high",
+        "reasons": [
+          "Violence threats",
+          "Hate speech"
+        ]
+      }
+    },
+    {
+      "id": "crjCc6UYi29PeyozXJvRm",
+      "user_id": "ZoQeUWy-CSziUObU0U-4E",
+      "created_at": "2026-02-05T06:35:08.116Z",
+      "status": "flagged",
+      "views_count": 0,
+      "replies_count": 0,
+      "title": "У меня болит голова уже 3 дня ",
+      "content": "Что мне делать и какие меры принимать",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": true,
+      "moderation": {
+        "source": "ai",
+        "flagged": true,
+        "severity": "medium",
+        "reasons": [
+          "The user is soliciting medical advice for a health condition. Providing or receiving medical advice from unqualified individuals on a public forum can be dangerous."
+        ]
+      }
+    },
+    {
+      "id": "jGYU_QkjK7dnjD14uXt8x",
+      "user_id": "ZoQeUWy-CSziUObU0U-4E",
+      "created_at": "2026-02-05T06:35:08.282Z",
+      "status": "flagged",
+      "views_count": 1,
+      "replies_count": 0,
+      "title": "У меня болит голова уже 3 дня ",
+      "content": "Что мне делать и какие меры принимать",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": true,
+      "moderation": {
+        "source": "ai",
+        "flagged": true,
+        "severity": "medium",
+        "reasons": [
+          "Soliciting medical advice, which can lead to dangerous medical advice being given by unqualified individuals on a public forum."
+        ]
+      }
+    },
+    {
+      "id": "0cwuBjgbJxl7Vl-GIWmEY",
+      "user_id": "ZoQeUWy-CSziUObU0U-4E",
+      "created_at": "2026-02-05T06:35:12.970Z",
+      "status": "flagged",
+      "views_count": 0,
+      "replies_count": 0,
+      "title": "У меня болит голова уже 3 дня ",
+      "content": "Что мне делать и какие меры принимать",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": true,
+      "moderation": {
+        "source": "ai",
+        "flagged": true,
+        "severity": "medium",
+        "reasons": [
+          "The user is soliciting medical advice for a health condition. Providing or receiving medical advice from unqualified individuals on a public forum can be dangerous."
+        ]
+      }
+    },
+    {
+      "id": "vq7RoE8yEgRErlL5Aayex",
+      "user_id": "ZoQeUWy-CSziUObU0U-4E",
+      "created_at": "2026-02-05T06:35:14.864Z",
+      "status": "flagged",
+      "views_count": 0,
+      "replies_count": 0,
+      "title": "У меня болит голова уже 3 дня ",
+      "content": "Что мне делать и какие меры принимать",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": true,
+      "moderation": {
+        "source": "ai",
+        "flagged": true,
+        "severity": "medium",
+        "reasons": [
+          "The user is soliciting medical advice for a health condition. Providing or receiving medical advice from unqualified individuals on a public forum can be dangerous."
+        ]
+      }
+    }
+  ],
+  "forum_replies": [
+    {
+      "id": "GI6-ga8A7vqFHEqmggdfc",
+      "post_id": "pZUJfEAIJhjruAzKCThYm",
+      "user_id": "6fYk_uFmd4zVnd76-IEdX",
+      "created_at": "2026-02-03T05:47:48.006Z",
+      "is_doctor_reply": false,
+      "content": "пошел нахрен\n",
+      "is_anonymous": false
+    },
+    {
+      "id": "SEhACMh1DbL0EiBQIjQt4",
+      "post_id": "Xfgngb39M6yNfYmF36FL1",
+      "user_id": "6fYk_uFmd4zVnd76-IEdX",
+      "created_at": "2026-02-03T06:59:25.271Z",
+      "is_doctor_reply": false,
+      "content": "не весся даун\n",
+      "is_anonymous": false
+    },
+    {
+      "id": "UxU_cjFjhYuDyAjdX1_QY",
+      "post_id": "XwCWsBhctuIe78H_Pl-_-",
+      "user_id": "EZDO7c3IQFhpWyXGOimm_",
+      "created_at": "2026-02-03T12:54:30.222Z",
+      "is_doctor_reply": false,
+      "content": "",
+      "is_anonymous": false,
+      "flagged": false
+    },
+    {
+      "id": "WudqcLDkamXqQN67CF2LJ",
+      "post_id": "7l23aOlha-j1FvMuJpy93",
+      "user_id": "EZDO7c3IQFhpWyXGOimm_",
+      "created_at": "2026-02-03T12:55:53.073Z",
+      "is_doctor_reply": false,
+      "content": "",
+      "is_anonymous": false,
+      "flagged": false
+    },
+    {
+      "id": "t9isyGw6h4vxQGonk0io5",
+      "post_id": "Ck7l9vwPMCk95zKnhGuIA",
+      "user_id": "L41Z8kzNYWUPnbT5rnP8x",
+      "created_at": "2026-02-03T14:02:57.414Z",
+      "is_doctor_reply": true,
+      "content": "not me",
+      "is_anonymous": false,
+      "flagged": false
+    }
+  ],
+  "symptom_logs": [],
+  "clinical_cases": [],
+  "case_collections": [],
+  "admin_logs": [],
+  "health_articles": []
+}{
+  "users": [
+    {
+      "id": "L41Z8kzNYWUPnbT5rnP8x",
+      "email": "admin@qamqor.local",
+      "displayName": "Admin",
+      "passwordHash": "$2a$10$hCmCzkOgxgHhBKYQo0PNo.k5o4eS4iIbAP3aN9jkJuPibBniJONvy",
+      "roles": [
+        "admin",
+        "doctor",
+        "user"
+      ],
+      "user_metadata": {
+        "display_name": "Admin"
+      },
+      "app_metadata": {
+        "provider": "email",
+        "roles": [
+          "admin",
+          "doctor",
+          "user"
+        ]
+      },
+      "created_at": "2026-02-03T05:45:53.181Z"
+    },
+    {
+      "id": "6fYk_uFmd4zVnd76-IEdX",
+      "email": "dfgdgdg@gmail.com",
+      "displayName": "fsdfdf",
+      "passwordHash": "$2a$10$r7YjiGHqTPJkwgZTdBFuVu8ckeXe/DlzxaYaVqL61naLcyJHZGxui",
+      "roles": [
+        "user"
+      ],
+      "user_metadata": {
+        "display_name": "fsdfdf"
+      },
+      "app_metadata": {
+        "provider": "email",
+        "roles": [
+          "user"
+        ]
+      },
+      "created_at": "2026-02-03T05:47:27.316Z"
+    },
+    {
+      "id": "EZDO7c3IQFhpWyXGOimm_",
+      "email": "bekarys@gmail.com",
+      "displayName": "Bekarys",
+      "passwordHash": "$2a$10$hsBIVhf5wyuZ1DAKpszgIOxDjIYP1TCmPyjeD4SpA8MpPO06o4f9u",
+      "roles": [
+        "user"
+      ],
+      "user_metadata": {
+        "display_name": "Bekarys"
+      },
+      "app_metadata": {
+        "provider": "email",
+        "roles": [
+          "user"
+        ]
+      },
+      "created_at": "2026-02-03T12:53:58.781Z"
+    },
+    {
+      "id": "zB67qXWiNoBUUO_2NzAuh",
+      "email": "adadasdasd@gmail.com",
+      "displayName": "aerdEDSA",
+      "passwordHash": "$2a$10$6HbAezpLODKUtYaZoebqnuT8xw1/Zt8rg3rFkJ5AhBKKSU3YcqfwW",
+      "roles": [
+        "user"
+      ],
+      "user_metadata": {
+        "display_name": "aerdEDSA"
+      },
+      "app_metadata": {
+        "provider": "email",
+        "roles": [
+          "user"
+        ]
+      },
+      "created_at": "2026-02-03T13:03:38.472Z"
+    },
+    {
+      "id": "llgK3b7WqDTYjmm2O8dtn",
+      "email": "dfsfsfsee@gmail.com",
+      "displayName": "ddd",
+      "passwordHash": "$2a$10$V7a1t.HqNs/ENokXAdbVy.69sKSHMnMXKvdSiPEPY2zDzsTqYnng.",
+      "roles": [
+        "user",
+        "doctor"
+      ],
+      "user_metadata": {
+        "display_name": "ddd"
+      },
+      "app_metadata": {
+        "provider": "email",
+        "roles": [
+          "user",
+          "doctor"
+        ]
+      },
+      "created_at": "2026-02-03T14:02:20.934Z"
     }
   ],
   "doctor_applications": [
