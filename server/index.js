@@ -17,7 +17,6 @@ const DB_PATH = path.join(__dirname, "data", "db.json");
 const JWT = "qamqorS";
 const PORT = 4000;
 const SUPABASE_FUNCTION_URL = process.env.SUPABASE_FUNCTION_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 let db = null;
 
 const emptyDb = {
@@ -352,53 +351,6 @@ function buildAnalyticsPayload() {
   };
 }
 
-function parseSupabaseStream(raw) {
-  const trimmed = String(raw || "").trim();
-  const dataLines = trimmed
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith("data:"));
-
-  let aiResponse = "";
-  let firstData = null;
-
-  const parsedChunks = dataLines
-    .map((line) => line.slice("data:".length).trim())
-    .filter((line) => line && line !== "[DONE]");
-
-  for (const chunk of parsedChunks) {
-    try {
-      const parsed = JSON.parse(chunk);
-      if (!firstData) {
-        firstData = parsed;
-      }
-      const payloadChoice = parsed?.choices?.[0];
-      const delta = payloadChoice?.delta;
-      const message = payloadChoice?.message;
-      if (delta?.content) {
-        aiResponse += String(delta.content);
-      } else if (message?.content) {
-        aiResponse += String(message.content);
-      }
-    } catch (error) {
-      console.warn("Failed to parse Supabase chunk:", chunk, error);
-    }
-  }
-
-  if (!firstData && trimmed) {
-    try {
-      firstData = JSON.parse(trimmed);
-    } catch {
-      // ignore
-    }
-  }
-
-  return {
-    text: aiResponse.trim(),
-    data: firstData,
-  };
-}
-
 function extractStructuredResponse(rawText) {
   const raw = String(rawText || "").trim();
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -427,8 +379,8 @@ function extractStructuredResponse(rawText) {
   };
 }
 
-async function fetchSupabaseStreamResponse(payload) {
-  if (!SUPABASE_FUNCTION_URL || !SUPABASE_ANON_KEY) {
+async function makeSupabaseChatRequest(payload) {
+  if (!SUPABASE_FUNCTION_URL) {
     throw new Error("AI assistant is not configured.");
   }
 
@@ -436,33 +388,58 @@ async function fetchSupabaseStreamResponse(payload) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
     },
     body: JSON.stringify(payload),
   });
 
-  const rawSupabase = await resp.text();
+  const raw = await resp.text();
 
   if (!resp.ok) {
-    const errorText = rawSupabase || resp.statusText;
+    const errorText = raw || resp.statusText;
     throw new Error(errorText || "AI service unavailable");
   }
 
-  const { text, data } = parseSupabaseStream(rawSupabase);
-  const structured = extractStructuredResponse(text || data?.response || data?.reply || data?.answer || data?.message || rawSupabase);
+  let parsed = null;
+  if (raw) {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
+  }
+
+  const candidate =
+    parsed?.choices?.[0]?.message?.content ??
+    parsed?.message?.content ??
+    parsed?.response ??
+    raw;
+
+  const structured = extractStructuredResponse(candidate);
   return {
-    text: structured.text || (data?.response ?? ""),
+    raw,
+    data: parsed,
+    text: structured.text,
     report: structured.report,
-    parsed: structured.parsed,
-    data,
+    parsed: structured.parsed ?? parsed,
   };
+}
+
+function parseJsonSafe(value) {
+  if (typeof value !== "string") return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }
 
 async function moderateForumContentWithAI(text) {
   if (!text?.trim()) return null;
 
   try {
-    const { parsed } = await fetchSupabaseStreamResponse({
+    const { text: aiText, data } = await makeSupabaseChatRequest({
+      model: "google/gemini-3-flash-preview",
+      stream: false,
       messages: [
         {
           role: "system",
@@ -475,7 +452,9 @@ async function moderateForumContentWithAI(text) {
       ],
     });
 
+    const parsed = data ?? parseJsonSafe(aiText);
     if (!parsed) return null;
+
     return {
       flagged: Boolean(parsed.flagged),
       severity: ["low", "medium", "high"].includes(parsed.severity) ? parsed.severity : "low",
@@ -1129,10 +1108,10 @@ function createRouter() {
   });
 
   app.post("/api/ai/medical-chat", async (req, res) => {
-    if (!SUPABASE_FUNCTION_URL || !SUPABASE_ANON_KEY) {
+    if (!SUPABASE_FUNCTION_URL) {
       return res.json({
         response:
-          "AI assistant is temporarily unavailable because the SUPABASE_FUNCTION_URL or SUPABASE_ANON_KEY is not configured.",
+          "AI assistant is temporarily unavailable because the SUPABASE_FUNCTION_URL is not configured.",
       });
     }
 
@@ -1157,9 +1136,14 @@ function createRouter() {
     let responseText = "";
     let assistantReport = null;
     try {
-      const { text, report } = await fetchSupabaseStreamResponse({ messages: payloadMessages });
-      responseText = String(text || "").trim();
-      assistantReport = report;
+      const { text, report } = await makeSupabaseChatRequest({
+        messages: payloadMessages,
+        language,
+        model: "google/gemini-3-flash-preview",
+        stream: false,
+      });
+      responseText = text;
+      assistantReport = report ?? null;
     } catch (error) {
       console.error("Supabase chat error", error);
       const message = error instanceof Error ? error.message : "AI service unavailable";
