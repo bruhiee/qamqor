@@ -15,7 +15,6 @@ import SymptomTracker from "./pages/SymptomTracker";
 import About from "./pages/About";
 import Auth from "./pages/Auth";
 import Forum from "./pages/Forum";
-import DoctorWorkplace from "./pages/DoctorWorkplace";
 import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 
@@ -39,7 +38,6 @@ const App = () => (
               <Route path="/first-aid" element={<FirstAidGuide />} />
               <Route path="/symptom-tracker" element={<SymptomTracker />} />
               <Route path="/forum" element={<Forum />} />
-              <Route path="/doctor-workplace" element={<DoctorWorkplace />} />
               <Route path="/admin" element={<AdminPanel />} />
               <Route path="/about" element={<About />} />
               <Route path="*" element={<NotFound />} />
