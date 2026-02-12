@@ -352,7 +352,7 @@ export default function MapPage() {
       }
     }
     setRouteInfo("");
-  }, []);
+  }, [mapboxToken]);
 
   const drawRoute = useCallback(
     (geojson: GeoJSON.LineString, user: [number, number]) => {
