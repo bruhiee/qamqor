@@ -290,6 +290,7 @@ export default function MapPage() {
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
   const userMarker = useRef<mapboxgl.Marker | null>(null);
+  const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
   const [routeInfo, setRouteInfo] = useState("");
   const routeSourceId = "route-source";
   const [selectedFacility, setSelectedFacility] = useState<MedicalFacility | null>(null);
@@ -485,7 +486,11 @@ export default function MapPage() {
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    mapboxgl.accessToken = "MAPBOX_TOKEN_REDACTED";
+    if (!mapboxToken) {
+      console.warn("Mapbox token is missing. Set VITE_MAPBOX_TOKEN in your environment.");
+      return;
+    }
+    mapboxgl.accessToken = mapboxToken;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -504,7 +509,7 @@ export default function MapPage() {
       map.current?.remove();
       map.current = null;
     };
-  }, []);
+  }, [mapboxToken]);
 
   useEffect(() => {
     getUserLocation();
