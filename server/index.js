@@ -122,6 +122,15 @@ const POST_REJECTED_STATUS = "rejected";
 const HIDDEN_FORUM_STATUSES = new Set([POST_PENDING_STATUS, "flagged", POST_REJECTED_STATUS]);
 const MODERATION_WARNING_MESSAGE =
   "Your post is awaiting moderator review and will only appear on the forum after a moderator approves it.";
+const HEALTH_ONLY_FORUM_MESSAGE =
+  "Only health-related content is allowed in the forum. Off-topic content is automatically removed.";
+const HEALTH_TOPIC_KEYWORDS = [
+  "health", "medical", "medicine", "symptom", "symptoms", "pain", "fever", "cough", "cold",
+  "flu", "infection", "doctor", "hospital", "clinic", "disease", "diagnosis", "treatment",
+  "therapy", "mental", "anxiety", "depression", "stress", "blood", "pressure", "heart",
+  "diabetes", "asthma", "allergy", "pregnancy", "nutrition", "diet", "sleep", "headache",
+  "nausea", "vomit", "stomach", "rash", "injury", "medicine", "drug", "dose", "recovery",
+];
 
 const isForumPostVisible = (post) => !HIDDEN_FORUM_STATUSES.has(post?.status);
 
@@ -468,6 +477,89 @@ async function moderateForumContentWithAI(text) {
   }
 }
 
+function isLikelyHealthRelated(text) {
+  if (!text?.trim()) return false;
+  const lowered = sanitizeText(String(text)).toLowerCase();
+  return HEALTH_TOPIC_KEYWORDS.some((keyword) => lowered.includes(keyword));
+}
+
+async function moderateForumTopicWithAI(text) {
+  if (!text?.trim()) {
+    return {
+      healthRelated: false,
+      confidence: "high",
+      reasons: ["empty-content"],
+      source: "validation",
+    };
+  }
+
+  const heuristicHealthRelated = isLikelyHealthRelated(text);
+  const aiEnabled = Boolean(SUPABASE_FUNCTION_URL);
+  const buildFallbackResponse = (extraReasons = []) => {
+    const reasons = [...extraReasons];
+    if (heuristicHealthRelated) {
+      reasons.push("keyword-match");
+    } else {
+      reasons.push("topic-check-fallback");
+    }
+    return {
+      healthRelated: heuristicHealthRelated,
+      confidence: heuristicHealthRelated ? "medium" : "high",
+      reasons,
+      source: "validation",
+    };
+  };
+
+  if (!aiEnabled) {
+    return buildFallbackResponse(["ai-disabled"]);
+  }
+
+  try {
+    const { text: aiText, data } = await makeSupabaseChatRequest({
+      model: "google/gemini-3-flash-preview",
+      stream: false,
+      messages: [
+        {
+          role: "system",
+          content: `You are a strict forum topic moderator for a medical platform. Determine whether text is health-related. Health-related means symptoms, diseases, treatment, doctors, medications, mental health, nutrition, preventive care, or personal medical support. Reply ONLY with valid JSON: {"healthRelated": true|false, "confidence": "low"|"medium"|"high", "reasons": ["reason1","reason2"]}.`,
+        },
+        {
+          role: "user",
+          content: String(text).slice(0, 3500),
+        },
+      ],
+    });
+
+    const parsed = data ?? parseJsonSafe(aiText);
+    if (!parsed || typeof parsed !== "object") {
+      return buildFallbackResponse();
+    }
+
+    const parsedDecision =
+      typeof parsed.healthRelated === "boolean"
+        ? parsed.healthRelated
+        : typeof parsed.isHealthRelated === "boolean"
+          ? parsed.isHealthRelated
+          : null;
+
+    if (parsedDecision === null) {
+      return buildFallbackResponse();
+    }
+
+    return {
+      healthRelated: parsedDecision,
+      confidence: ["low", "medium", "high"].includes(parsed.confidence) ? parsed.confidence : "low",
+      reasons: Array.isArray(parsed.reasons)
+        ? parsed.reasons.map((reason) => String(reason)).slice(0, 5)
+        : [],
+      source: "ai",
+    };
+  } catch (error) {
+    console.error("Forum topic moderation AI failure", error);
+    return buildFallbackResponse(["topic-check-error"]);
+  }
+}
+
 const systemPrompt = `You are a professional AI health assistant for Qamqor, a medical information platform. Your role is to provide helpful, accurate, and safety-focused health information.
 
 CRITICAL GUIDELINES:
@@ -796,15 +888,24 @@ function createRouter() {
     }
     const result = moderateText(text);
     const aiModeration = await moderateForumContentWithAI(text);
+    const topicModeration = await moderateForumTopicWithAI(text);
     return res.json({
       moderated: result.text,
-      flagged: result.flagged || Boolean(aiModeration?.flagged),
+      flagged: result.flagged || Boolean(aiModeration?.flagged) || !topicModeration.healthRelated,
       aiModeration,
+      topicModeration,
     });
   });
 
   app.post("/api/forum/posts", requireAuth, async (req, res) => {
     const cleaned = sanitizeRequestBody(req.body);
+    const topicModeration = await moderateForumTopicWithAI(`${req.body?.title || ""}\n${req.body?.content || ""}`);
+    if (!topicModeration.healthRelated) {
+      return res.status(422).json({
+        message: HEALTH_ONLY_FORUM_MESSAGE,
+        topicModeration,
+      });
+    }
     const keywordFlagged = isBodyFlagged(req.body);
     const aiModeration = await moderateForumContentWithAI(`${req.body?.title || ""}\n${req.body?.content || ""}`);
     const flagged = keywordFlagged || Boolean(aiModeration?.flagged);
@@ -839,7 +940,19 @@ function createRouter() {
     if (!post) {
       return res.status(404).json({ message: "Post not found" });
     }
+    const isDoctor = req.user.roles?.includes("doctor");
+    const isAdmin = req.user.roles?.includes("admin");
+    if (!isDoctor && !isAdmin) {
+      return res.status(403).json({ message: "Only doctors can reply to forum questions" });
+    }
     const cleaned = sanitizeRequestBody(req.body);
+    const topicModeration = await moderateForumTopicWithAI(req.body?.content || "");
+    if (!topicModeration.healthRelated) {
+      return res.status(422).json({
+        message: HEALTH_ONLY_FORUM_MESSAGE,
+        topicModeration,
+      });
+    }
     const keywordFlagged = isBodyFlagged(req.body);
     const aiModeration = await moderateForumContentWithAI(req.body?.content || "");
     const flagged = keywordFlagged || Boolean(aiModeration?.flagged);
@@ -1242,43 +1355,51 @@ function createRouter() {
 
 async function fetchFacilitiesOverpass(lat, lon, radius) {
   const query = `[out:json][timeout:25];
-(node["amenity"="pharmacy"](around:${radius},${lat},${lon});
-way["amenity"="pharmacy"](around:${radius},${lat},${lon});
-relation["amenity"="pharmacy"](around:${radius},${lat},${lon});
+(node["amenity"~"pharmacy|hospital|clinic"](around:${radius},${lat},${lon});
+way["amenity"~"pharmacy|hospital|clinic"](around:${radius},${lat},${lon});
+relation["amenity"~"pharmacy|hospital|clinic"](around:${radius},${lat},${lon});
 );
 out center;`;
 
-  const res = await fetch(OVERPASS_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-    },
-    body: query,
-  });
+  const body = new URLSearchParams({ data: query }).toString();
 
-  if (!res.ok) {
-    throw new Error("Overpass request failed");
-  }
+  try {
+    const res = await fetch(OVERPASS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      },
+      body,
+    });
 
-  const data = await res.json();
-  console.log(data);
-  return (data.elements || [])
-    .map((el) => {
-      const latlon =
-        el.type === "node"
-          ? { lat: el.lat, lon: el.lon }
-          : el.center
-            ? { lat: el.center.lat, lon: el.center.lon }
-            : null;
-      if (!latlon) return null;
-      const addressParts = [];
-      if (el.tags?.["addr:street"]) addressParts.push(el.tags["addr:street"]);
-      if (el.tags?.["addr:housenumber"]) addressParts.push(el.tags["addr:housenumber"]);
-      if (el.tags?.["addr:city"]) addressParts.push(el.tags["addr:city"]);
+    if (!res.ok) {
+      console.error("Overpass response not ok", await res.text());
+      return [];
+    }
+
+    const data = await res.json();
+    return (data.elements || [])
+      .map((el) => {
+        const latlon =
+          el.type === "node"
+            ? { lat: el.lat, lon: el.lon }
+            : el.center
+              ? { lat: el.center.lat, lon: el.center.lon }
+              : null;
+        if (!latlon) return null;
+        const addressParts = [];
+        if (el.tags?.["addr:street"]) addressParts.push(el.tags["addr:street"]);
+        if (el.tags?.["addr:housenumber"]) addressParts.push(el.tags["addr:housenumber"]);
+        if (el.tags?.["addr:city"]) addressParts.push(el.tags["addr:city"]);
         return {
           id: `${el.type}-${el.id}`,
-          name: el.tags?.name || "Аптека",
-          type: "pharmacy",
+          name: el.tags?.name || "Место",
+          type:
+            el.tags?.amenity === "hospital"
+              ? "hospital"
+              : el.tags?.amenity === "clinic"
+                ? "clinic"
+                : "pharmacy",
           coordinates: [latlon.lon, latlon.lat],
           address: addressParts.join(", ") || el.tags?.village || el.tags?.city || "",
           phone: el.tags?.phone || el.tags?.["contact:phone"] || "",
@@ -1287,8 +1408,12 @@ out center;`;
           specializations: [],
           doctorSummary: "",
         };
-    })
-    .filter(Boolean);
+      })
+      .filter(Boolean);
+  } catch (error) {
+    console.error("Overpass request failed", error);
+    return [];
+  }
 }
 
 async function start() {

@@ -181,7 +181,11 @@ export default function Forum() {
       fetchPosts();
     } catch (error) {
       console.error('Error creating post:', error);
-      toast({ title: t.error, variant: "destructive" });
+      toast({
+        title: t.error,
+        description: error instanceof Error ? error.message : t.error,
+        variant: "destructive",
+      });
     }
   };
 
@@ -203,7 +207,11 @@ export default function Forum() {
       fetchReplies(selectedPost.id);
     } catch (error) {
       console.error('Error creating reply:', error);
-      toast({ title: t.error, variant: "destructive" });
+      toast({
+        title: t.error,
+        description: error instanceof Error ? error.message : t.error,
+        variant: "destructive",
+      });
     }
   };
 

@@ -113,6 +113,29 @@ const globalFacilities: MedicalFacility[] = [
     phone: "+7 (727) 330-55-66",
     hours: "08:00 - 23:00",
   },
+  {
+    id: "kz-8",
+    name: "Shymkent Regional Hospital",
+    type: "hospital",
+    coordinates: [69.5901, 42.3242],
+    address: "1 Tauke Khan Ave, Shymkent",
+    phone: "+7 (7252) 55-55-55",
+    hours: "24/7",
+    website: "https://shymkentmed.kz",
+    specializations: ["Trauma", "Cardiology", "Neurology"],
+    doctorSummary: "Regional referral center serving southern Kazakhstan with trauma and neurology teams.",
+  },
+  {
+    id: "kz-9",
+    name: "Aktobe Family Clinic",
+    type: "clinic",
+    coordinates: [57.1533, 50.2830],
+    address: "12 Bogenbai Batyr St, Aktobe",
+    phone: "+7 (7132) 30-30-30",
+    hours: "Mon-Sat: 8:00 - 20:00",
+    specializations: ["Family Medicine", "Pediatrics"],
+    doctorSummary: "Community clinic offering preventive care and pediatric follow-ups.",
+  },
   // USA - New York
   {
     id: "us-1",
@@ -144,6 +167,17 @@ const globalFacilities: MedicalFacility[] = [
     phone: "+1 (212) 555-0300",
     hours: "Mon-Fri: 8:00 - 18:00",
     specializations: ["General Practice", "Urgent Care", "Vaccination"],
+  },
+  {
+    id: "us-4",
+    name: "Chicago Lakeview Health",
+    type: "clinic",
+    coordinates: [-87.6462, 41.9410],
+    address: "3200 N Lincoln Ave, Chicago, IL",
+    phone: "+1 (312) 555-0400",
+    hours: "Mon-Fri: 8:00 - 20:00",
+    specializations: ["Primary Care", "Occupational Health"],
+    doctorSummary: "Urban clinic with bilingual staff and evening hours for working families.",
   },
   // UK - London
   {
@@ -189,6 +223,16 @@ const globalFacilities: MedicalFacility[] = [
     phone: "+49 30 2000 5000",
     hours: "08:00 - 20:00",
   },
+  {
+    id: "de-3",
+    name: "Berlin City Clinic",
+    type: "clinic",
+    coordinates: [13.4049, 52.5201],
+    address: "Friedrichstraße 10, Berlin",
+    phone: "+49 30 1234 5678",
+    hours: "Mon-Fri: 8:00 - 18:00",
+    specializations: ["General Practice", "Internal Medicine"],
+  },
   // Russia - Moscow
   {
     id: "ru-1",
@@ -209,6 +253,28 @@ const globalFacilities: MedicalFacility[] = [
     phone: "+7 (495) 123-45-67",
     hours: "24/7",
     website: "https://366.ru",
+  },
+  {
+    id: "ru-3",
+    name: "Moscow Cardiovascular Clinic",
+    type: "clinic",
+    coordinates: [37.6208, 55.7577],
+    address: "Ulitsa Bolshaya Dmitrovka, 7, Moscow",
+    phone: "+7 (495) 777-77-77",
+    hours: "Mon-Fri: 8:00 - 21:00",
+    specializations: ["Cardiology", "Preventive Care"],
+    doctorSummary: "Private clinic focused on cardiovascular risk assessment and rehabilitation.",
+  },
+  {
+    id: "ru-4",
+    name: "Sklifosovsky Emergency Research Institute",
+    type: "hospital",
+    coordinates: [37.6176, 55.7778],
+    address: "Bolshaya Sukharevskaya Ploshchad, 3, Moscow",
+    phone: "+7 (495) 600-07-07",
+    hours: "24/7",
+    specializations: ["Emergency", "Surgery", "Trauma"],
+    doctorSummary: "Leading emergency research hospital handling complex trauma and disaster cases.",
   },
 ];
 

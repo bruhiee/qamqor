@@ -25,13 +25,102 @@
       },
       "created_at": "2026-02-05T13:28:32.306Z",
       "banned": false
+    },
+    {
+      "id": "RVvrPkQj9zmu4Ftf4RCDl",
+      "email": "dfsdfsgfdfgsdg@gmail.com",
+      "displayName": "fgdfgdfg",
+      "passwordHash": "$2a$10$lEU2q4cEcdoQVRvLsY9P1e7B88Xg87pH.j0RzL9qgjphH1LTC1ORm",
+      "roles": [
+        "user"
+      ],
+      "user_metadata": {
+        "display_name": "fgdfgdfg"
+      },
+      "app_metadata": {
+        "provider": "email",
+        "roles": [
+          "user"
+        ]
+      },
+      "created_at": "2026-02-12T14:34:38.742Z",
+      "banned": false
     }
   ],
   "doctor_applications": [],
   "medicines": [],
-  "forum_posts": [],
+  "forum_posts": [
+    {
+      "id": "zgQCmKiabjmiUqzcJzueE",
+      "user_id": "wE3IwfanCIXIiGScmeRHV",
+      "created_at": "2026-02-12T14:33:59.611Z",
+      "status": "open",
+      "views_count": 2,
+      "replies_count": 0,
+      "title": "i have headache doctors help me",
+      "content": "ive been ill for like 40 days by now ",
+      "tags": [],
+      "is_urgent": false,
+      "flagged": false,
+      "moderation": {
+        "source": "ai",
+        "flagged": false,
+        "severity": "low",
+        "reasons": []
+      }
+    }
+  ],
   "forum_replies": [],
-  "symptom_logs": [],
+  "symptom_logs": [
+    {
+      "id": "xPwRM4Y0J0D9Rrmzk6i2B",
+      "created_at": "2026-02-12T13:24:27.057Z",
+      "symptom_date": "2026-02-12",
+      "symptoms": [
+        "Sore throat"
+      ],
+      "severity": 10,
+      "notes": null,
+      "mood": "terrible",
+      "sleep_hours": 2
+    },
+    {
+      "id": "PrY-U7hMlvyjFNFsY8H6c",
+      "created_at": "2026-02-12T13:08:08.209Z",
+      "symptom_date": "2026-02-11",
+      "symptoms": [
+        "Headache"
+      ],
+      "severity": 3,
+      "notes": null,
+      "mood": "good",
+      "sleep_hours": 1
+    },
+    {
+      "id": "fox7_GfgPnpF3W4ZmB0AE",
+      "created_at": "2026-02-12T13:32:44.907Z",
+      "symptom_date": "2026-02-10",
+      "symptoms": [
+        "Headache"
+      ],
+      "severity": 2,
+      "notes": null,
+      "mood": "good",
+      "sleep_hours": 7
+    },
+    {
+      "id": "_hZ2TgZ7Nsri7bzKO51qS",
+      "created_at": "2026-02-12T13:32:58.843Z",
+      "symptom_date": "2026-02-09",
+      "symptoms": [
+        "Headache"
+      ],
+      "severity": 1,
+      "notes": null,
+      "mood": "great",
+      "sleep_hours": 9.5
+    }
+  ],
   "clinical_cases": [],
   "case_collections": [],
   "ai_chat_evaluations": [],
@@ -212,6 +301,16 @@
       "language": "ru",
       "response_summary": "Здравствуйте! Мне очень жаль, что вы столкнулись с болью в горле – это всегда неприятное состояние. Боль в горле может быть вызвана как обычным ОРВИ, так и бактериальными инфекциями, поэтому важно следить за сопутствующими симптомами. Пожалуйста, помните, что эта информация носит ознакомительный характер и не является диагнозом. Вам следует обеспечить себе покой и пить больше теплой жидкости, пока",
       "created_at": "2026-02-09T05:22:14.658Z"
+    },
+    {
+      "id": "jQMpCKCWRPinWh494goZ4",
+      "question": "привет",
+      "keywords": [
+        "привет"
+      ],
+      "language": "en",
+      "response_summary": "Hello! I am your AI health assistant for Qamqor. How can I help you today? If you are experiencing any symptoms or have health-related questions, please feel free to share them.\n\n*Disclaimer: This platform provides informational support only and does not replace professional medical advice.*",
+      "created_at": "2026-02-12T13:51:03.819Z"
     }
   ],
   "admin_logs": [],

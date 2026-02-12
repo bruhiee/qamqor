@@ -171,10 +171,21 @@ export default function SymptomTracker() {
   };
 
   const getSeverityTrend = () => {
-    if (logs.length < 2) return null;
-    const recentAvg = logs.slice(0, 3).reduce((a, b) => a + b.severity, 0) / Math.min(logs.length, 3);
-    const olderAvg = logs.slice(3, 6).reduce((a, b) => a + b.severity, 0) / Math.min(logs.length - 3, 3);
     if (logs.length < 4) return null;
+
+    const recentCount = Math.min(logs.length, 3);
+    const olderCount = Math.min(Math.max(logs.length - 3, 0), 3);
+    if (recentCount === 0 || olderCount === 0) return null;
+
+    const recentLogs = logs.slice(0, recentCount);
+    const olderLogs = logs.slice(3, 3 + olderCount);
+
+    const averageSeverity = (entries: SymptomLog[]) =>
+      entries.reduce((sum, entry) => sum + entry.severity, 0) / entries.length;
+
+    const recentAvg = averageSeverity(recentLogs);
+    const olderAvg = averageSeverity(olderLogs);
+
     if (recentAvg < olderAvg - 0.5) return "improving";
     if (recentAvg > olderAvg + 0.5) return "worsening";
     return "stable";

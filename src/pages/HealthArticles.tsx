@@ -32,6 +32,9 @@ interface Article {
   readTime: string;
   category: string;
   image: string;
+  content: string[];
+  contentKz?: string[];
+  contentRu?: string[];
 }
 
 const articles: Article[] = [
@@ -62,6 +65,16 @@ const articles: Article[] = [
     date: "2024-01-15",
     readTime: "8 min",
     category: "Cardiology",
+    content: [
+      "The heart is a muscle that works around the clock to deliver oxygen-rich blood throughout the body; high blood pressure, high cholesterol, smoking, diabetes, and inactivity are the most common risk factors for heart disease.",
+      "Regular exercise, a Mediterranean-style diet rich in vegetables, lean proteins, and whole grains, and maintaining a healthy weight help lower blood pressure and inflammation.",
+      "Keep track of blood pressure, cholesterol, and blood sugar with regular checkups and discuss medication adjustments with your doctor."
+    ],
+    contentRu: [
+      "Сердце — это мышца, работающая круглосуточно, а основные факторы риска — высокое давление, холестерин, курение, диабет и малоподвижный образ жизни.",
+      "Регулярные упражнения, средиземноморская диета с овощами, нежирным белком и цельными зернами, а также поддержание здорового веса снижают кровяное давление и воспаление.",
+      "Контролируйте давление, холестерин и уровень сахара, регулярно проходя обследования и обсуждая лекарства с врачом."
+    ],
     image: "https://images.unsplash.com/photo-1559757175-5700dde675bc?w=400"
   },
   {
@@ -91,6 +104,16 @@ const articles: Article[] = [
     date: "2024-01-10",
     readTime: "6 min",
     category: "Wellness",
+    content: [
+      "Sleep supports brain clearance, hormone balance, and immune defense; chronic disruptions raise inflammation and worsen mood.",
+      "Stick to a consistent bedtime, dim screens at least an hour before sleep, and keep the bedroom cool, dark, and quiet.",
+      "If problems persist, track your habits and talk to a provider about sleep apnea, restless legs, or stress-related insomnia."
+    ],
+    contentRu: [
+      "Сон помогает очищать мозг, регулировать гормоны и поддерживать иммунитет; хронические нарушения сна повышают воспаление и ухудшают самочувствие.",
+      "Соблюдайте постоянный режим, отключайте экраны за час до сна и обеспечьте прохладу, темноту и тишину в спальне.",
+      "Если трудности не проходят, фиксируйте привычки и обсудите их с врачом — возможно, это апноэ, синдром беспокойных ног или стресс."
+    ],
     image: "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=400"
   },
   {
@@ -120,6 +143,16 @@ const articles: Article[] = [
     date: "2024-01-05",
     readTime: "10 min",
     category: "Nutrition",
+    content: [
+      "Understanding macronutrients — carbohydrates, proteins, and fats — helps you build meals that support steady energy and satiety.",
+      "Hydration matters as much as nutrition; choose mostly water, limit sugary beverages, and respond to your body's thirst cues.",
+      "Swap highly processed foods for whole ingredients, check labels for sodium and added sugar, and practice portion control."
+    ],
+    contentRu: [
+      "Понимание макроэлементов — углеводов, белков и жиров — помогает составить рацион, поддерживающий стабильную энергию и сытость.",
+      "Гидратация важна, как и питание; выбирайте в основном воду, сократите сладкие напитки и прислушивайтесь к жажде.",
+      "Заменяйте обработанные продукты цельными ингредиентами, изучайте этикетки на соль и сахар и контролируйте размеры порций."
+    ],
     image: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400"
   }
 ];
@@ -151,11 +184,57 @@ const healthFacts = [
   }
 ];
 
+const articlePageCopy = {
+  en: {
+    title: "Health Articles",
+    subtitle: "Evidence-based health information",
+    mythTitle: "Health Myth Busted!",
+    factTitle: "Did You Know?",
+    searchPlaceholder: "Search articles...",
+    noArticles: "No articles found",
+    keyTakeaways: "Key Takeaways",
+    medicalDisclaimerTitle: "Medical Disclaimer",
+    medicalDisclaimerText:
+      "This article is for informational purposes only and does not constitute medical advice. Always consult with a qualified healthcare provider for medical concerns.",
+    nextFact: "Next",
+    close: "Close",
+  },
+  ru: {
+    title: "Статьи о здоровье",
+    subtitle: "Информация, основанная на доказательствах",
+    mythTitle: "Миф о здоровье развенчан!",
+    factTitle: "Знаете ли вы?",
+    searchPlaceholder: "Поиск статей...",
+    noArticles: "Статьи не найдены",
+    keyTakeaways: "Основные выводы",
+    medicalDisclaimerTitle: "Медицинская оговорка",
+    medicalDisclaimerText:
+      "Эта статья предназначена только для информации и не заменяет консультацию врача. Обратитесь к квалифицированному специалисту по медицинским вопросам.",
+    nextFact: "Далее",
+    close: "Закрыть",
+  },
+  kz: {
+    title: "Денсаулық мақалалары",
+    subtitle: "Дәлелді денсаулық ақпараты",
+    mythTitle: "Денсаулық мифы жоққа шығарылды!",
+    factTitle: "Сіз білдіңіз бе?",
+    searchPlaceholder: "Мақалаларды іздеу...",
+    noArticles: "Мақалалар табылмады",
+    keyTakeaways: "Негізгі тұжырымдар",
+    medicalDisclaimerTitle: "Медициналық ескерту",
+    medicalDisclaimerText:
+      "Бұл мақала ақпараттық сипатта және дәрігерлік кеңес орнына шықпайды. Денсаулық мәселелері бойынша білікті маманға жүгініңіз.",
+    nextFact: "Келесі",
+    close: "Жабу",
+  },
+};
+
 export default function HealthArticles() {
   const [searchQuery, setSearchQuery] = useState("");
   const [language, setLanguage] = useState<"en" | "ru" | "kz">("en");
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [currentFactIndex, setCurrentFactIndex] = useState(0);
+  const copy = articlePageCopy[language];
 
   const filteredArticles = articles.filter((article) => {
     const title = language === "ru" ? article.titleRu : language === "kz" ? article.titleKz : article.title;
@@ -183,6 +262,12 @@ export default function HealthArticles() {
     if (language === "ru") return article.keyTakeawaysRu || article.keyTakeaways;
     if (language === "kz") return article.keyTakeawaysKz || article.keyTakeaways;
     return article.keyTakeaways;
+  };
+
+  const getContent = (article: Article) => {
+    if (language === "ru") return article.contentRu || article.content;
+    if (language === "kz") return article.contentKz || article.content;
+    return article.content;
   };
 
   const getFact = () => {
@@ -216,8 +301,10 @@ export default function HealthArticles() {
                   <BookOpen className="w-6 h-6 text-medical-pulse" />
                 </div>
                 <div>
-                  <h1 className="font-display text-3xl font-bold">Health Articles</h1>
-                  <p className="text-muted-foreground">Evidence-based health information</p>
+                  <h1 className="font-display text-3xl font-bold">
+                    {copy.title}
+                  </h1>
+                  <p className="text-muted-foreground">{copy.subtitle}</p>
                 </div>
               </div>
 
@@ -254,7 +341,7 @@ export default function HealthArticles() {
                 </div>
                 <div>
                   <h3 className="font-display font-semibold mb-1">
-                    {healthFacts[currentFactIndex].type === "myth" ? "Health Myth Busted!" : "Did You Know?"}
+                    {healthFacts[currentFactIndex].type === "myth" ? copy.mythTitle : copy.factTitle}
                   </h3>
                   <AnimatePresence mode="wait">
                     <motion.p
@@ -276,7 +363,7 @@ export default function HealthArticles() {
                 className="gap-2 flex-shrink-0"
               >
                 <RefreshCw className="w-4 h-4" />
-                Next
+                {copy.nextFact}
               </Button>
             </div>
           </motion.div>
@@ -285,12 +372,12 @@ export default function HealthArticles() {
           <div className="mb-6">
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search articles..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+                 <Input
+                   placeholder={copy.searchPlaceholder}
+                   value={searchQuery}
+                   onChange={(e) => setSearchQuery(e.target.value)}
+                   className="pl-10"
+                 />
             </div>
           </div>
 
@@ -342,7 +429,7 @@ export default function HealthArticles() {
           {filteredArticles.length === 0 && (
             <div className="text-center py-12">
               <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No articles found</p>
+              <p className="text-muted-foreground">{copy.noArticles}</p>
             </div>
           )}
 
@@ -386,11 +473,16 @@ export default function HealthArticles() {
                     <p className="text-muted-foreground mb-6">
                       {getSummary(selectedArticle)}
                     </p>
+                    {getContent(selectedArticle).map((paragraph, index) => (
+                      <p key={`content-${index}`} className="text-muted-foreground mb-4">
+                        {paragraph}
+                      </p>
+                    ))}
 
                     <div className="bg-muted rounded-xl p-4 mb-6">
                       <h4 className="font-semibold mb-3 flex items-center gap-2">
                         <ChevronRight className="w-4 h-4 text-primary" />
-                        Key Takeaways
+                        {copy.keyTakeaways}
                       </h4>
                       <ul className="space-y-2">
                         {getTakeaways(selectedArticle).map((takeaway, i) => (
@@ -407,10 +499,9 @@ export default function HealthArticles() {
                       <div className="flex items-start gap-3">
                         <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0" />
                         <div>
-                          <h5 className="font-medium text-warning text-sm mb-1">Medical Disclaimer</h5>
+                          <h5 className="font-medium text-warning text-sm mb-1">{copy.medicalDisclaimerTitle}</h5>
                           <p className="text-xs text-muted-foreground">
-                            This article is for informational purposes only and does not constitute medical advice. 
-                            Always consult with a qualified healthcare provider for medical concerns.
+                            {copy.medicalDisclaimerText}
                           </p>
                         </div>
                       </div>
@@ -421,9 +512,9 @@ export default function HealthArticles() {
                         <User className="w-4 h-4" />
                         {selectedArticle.author}
                       </div>
-                      <Button onClick={() => setSelectedArticle(null)}>
-                        Close
-                      </Button>
+                       <Button onClick={() => setSelectedArticle(null)}>
+                         {copy.close}
+                       </Button>
                     </div>
                   </div>
                 </motion.div>
