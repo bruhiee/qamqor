@@ -35,7 +35,7 @@ export function Navbar() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { user, signOut } = useAuth();
-  const { isAdmin } = useUserRoles();
+  const { isAdmin, isDoctor } = useUserRoles();
 
   const navItems = [
     { href: "/consultant", label: t.aiConsultant, icon: MessageSquare },
@@ -52,7 +52,10 @@ export function Navbar() {
     { href: "/admin", label: t.adminPanel, icon: Shield },
   ] : [];
 
-  const allNavItems = [...navItems, ...adminItems];
+  const doctorItems = isDoctor()
+    ? [{ href: "/doctor-workplace", label: t.doctorWorkplace, icon: Shield }]
+    : [];
+  const allNavItems = [...navItems, ...doctorItems, ...adminItems];
 
   const handleSignOut = async () => {
     await signOut();

@@ -12,6 +12,8 @@ export type AuthUser = {
     roles: string[];
   };
   created_at: string;
+  doctor_application_status?: "pending" | "approved" | "rejected" | null;
+  doctor_verified?: boolean;
 };
 
 export interface AuthContextType {

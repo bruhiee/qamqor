@@ -32,6 +32,8 @@ const emptyDb = {
   ai_chat_sessions: [],
   admin_logs: [],
   health_articles: [],
+  health_news_events: [],
+  medical_facilities: [],
 };
 const bannedWords = [
   "fuck",
@@ -131,6 +133,14 @@ const HEALTH_TOPIC_KEYWORDS = [
   "diabetes", "asthma", "allergy", "pregnancy", "nutrition", "diet", "sleep", "headache",
   "nausea", "vomit", "stomach", "rash", "injury", "medicine", "drug", "dose", "recovery",
 ];
+const DOCTOR_APPLICATION_PENDING = "pending";
+const DOCTOR_APPLICATION_APPROVED = "approved";
+const DOCTOR_APPLICATION_REJECTED = "rejected";
+const DOCTOR_APPLICATION_STATUSES = new Set([
+  DOCTOR_APPLICATION_PENDING,
+  DOCTOR_APPLICATION_APPROVED,
+  DOCTOR_APPLICATION_REJECTED,
+]);
 
 const isForumPostVisible = (post) => !HIDDEN_FORUM_STATUSES.has(post?.status);
 
@@ -595,6 +605,9 @@ async function loadDb() {
     const parsed = JSON.parse(text);
     parsed.ai_chat_evaluations = Array.isArray(parsed.ai_chat_evaluations) ? parsed.ai_chat_evaluations : [];
     parsed.ai_chat_sessions = Array.isArray(parsed.ai_chat_sessions) ? parsed.ai_chat_sessions : [];
+    parsed.doctor_applications = Array.isArray(parsed.doctor_applications) ? parsed.doctor_applications : [];
+    parsed.health_news_events = Array.isArray(parsed.health_news_events) ? parsed.health_news_events : [];
+    parsed.medical_facilities = Array.isArray(parsed.medical_facilities) ? parsed.medical_facilities : [];
     return parsed;
   } catch {
     await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
@@ -611,9 +624,14 @@ async function persistDb() {
 function sanitizeUser(user) {
   if (!user) return null;
   const { passwordHash, ...rest } = user;
+  const latestApplication = getLatestDoctorApplication(user.id);
+  const doctorApplicationStatus = latestApplication?.status || null;
+  const doctorVerified = user.roles?.includes("doctor") || doctorApplicationStatus === DOCTOR_APPLICATION_APPROVED;
   return {
     ...rest,
     banned: Boolean(user.banned),
+    doctor_application_status: doctorApplicationStatus,
+    doctor_verified: Boolean(doctorVerified),
     user_metadata: user.user_metadata || { display_name: user.displayName },
     app_metadata: user.app_metadata || { provider: "email", roles: user.roles },
   };
@@ -672,6 +690,30 @@ function ensureRoles(user) {
   return user.roles;
 }
 
+function getLatestDoctorApplication(userId) {
+  if (!db || !Array.isArray(db.doctor_applications)) return null;
+  const applications = db.doctor_applications
+    .filter((application) => application.user_id === userId)
+    .sort((a, b) => new Date(b.submitted_at || b.created_at || 0) - new Date(a.submitted_at || a.created_at || 0));
+  return applications[0] || null;
+}
+
+function canUseDoctorFeatures(user) {
+  if (!user) return false;
+  if (user.roles?.includes("admin")) return true;
+  if (!user.roles?.includes("doctor")) return false;
+  const latestApplication = getLatestDoctorApplication(user.id);
+  if (!latestApplication) return true;
+  return latestApplication.status === DOCTOR_APPLICATION_APPROVED;
+}
+
+function requireVerifiedDoctor(req, res, next) {
+  if (!canUseDoctorFeatures(req.user)) {
+    return res.status(403).json({ message: "Verified doctor access required" });
+  }
+  return next();
+}
+
 function requireAdmin(req, res, next) {
   if (!req.user.roles?.includes("admin")) {
     return res.status(403).json({ message: "Admins only" });
@@ -697,6 +739,37 @@ function logAdminAction(adminId, action, target_type = null, target_id = null, d
     details,
     created_at: new Date().toISOString(),
   });
+}
+
+function deriveTriageFromReport(report, responseText) {
+  const normalizedRisk = String(report?.riskLevel || "").toLowerCase();
+  const scoreByRisk = {
+    low: 2,
+    medium: 3,
+    high: 4,
+  };
+  const emergencyPattern = /(chest pain|cannot breathe|difficulty breathing|severe bleeding|loss of consciousness|stroke|seizure|suicide|self-harm|anaphylaxis|heart attack)/i;
+  const uncertaintyPattern = /(not sure|uncertain|cannot determine|insufficient|seek professional evaluation)/i;
+  const body = `${responseText || ""} ${report?.whenToSeeDoctor || ""}`;
+  let triageScore = scoreByRisk[normalizedRisk] || (report ? 3 : 1);
+  if (emergencyPattern.test(body)) {
+    triageScore = 5;
+  }
+  const humanReviewFlag = triageScore >= 4 || !report || uncertaintyPattern.test(body);
+  const triageLevelLabel = triageScore === 1
+    ? "non-urgent"
+    : triageScore === 2
+      ? "low-risk"
+      : triageScore === 3
+        ? "moderate-risk"
+        : triageScore === 4
+          ? "high-risk"
+          : "critical-risk";
+  return {
+    triageScore,
+    triageLevelLabel,
+    humanReviewFlag,
+  };
 }
 
 async function ensureAdminUser() {
@@ -734,9 +807,6 @@ function createRouter() {
     }
     const passwordHash = await bcrypt.hash(password, 10);
     const roles = ["user"];
-    if (role === "doctor") {
-      roles.push("doctor");
-    }
     const newUser = {
       id: nanoid(),
       email: normalizedEmail,
@@ -747,6 +817,7 @@ function createRouter() {
       app_metadata: { provider: "email", roles },
       created_at: new Date().toISOString(),
       banned: false,
+      requested_role: role === "doctor" ? "doctor" : "user",
     };
     db.users.push(newUser);
     await persistDb();
@@ -788,6 +859,10 @@ function createRouter() {
 
   app.post("/api/doctor-applications", requireAuth, async (req, res) => {
     const { fullName, specialization, licenseNumber, bio, country, region, yearsOfExperience, workplace } = req.body;
+    const latestApplication = getLatestDoctorApplication(req.user.id);
+    if (latestApplication?.status === DOCTOR_APPLICATION_PENDING) {
+      return res.status(409).json({ message: "Doctor application is already pending review" });
+    }
     const application = {
       id: nanoid(),
       user_id: req.user.id,
@@ -799,15 +874,76 @@ function createRouter() {
       region: region || null,
       years_of_experience: yearsOfExperience ? Number(yearsOfExperience) : null,
       workplace: workplace || null,
-      status: "pending",
+      status: DOCTOR_APPLICATION_PENDING,
       submitted_at: new Date().toISOString(),
+      reviewed_at: null,
+      reviewed_by: null,
+      review_note: null,
     };
     db.doctor_applications.push(application);
-    if (!req.user.roles.includes("doctor")) {
-      req.user.roles.push("doctor");
-    }
     await persistDb();
     return res.status(201).json({ application });
+  });
+
+  app.get("/api/doctor-applications/me", requireAuth, (req, res) => {
+    const mine = db.doctor_applications
+      .filter((application) => application.user_id === req.user.id)
+      .sort((a, b) => new Date(b.submitted_at || b.created_at || 0) - new Date(a.submitted_at || a.created_at || 0));
+    return res.json({ data: mine });
+  });
+
+  app.get("/api/admin/doctor-applications", requireAuth, requireAdmin, (req, res) => {
+    const applications = [...db.doctor_applications].sort(
+      (a, b) => new Date(b.submitted_at || b.created_at || 0) - new Date(a.submitted_at || a.created_at || 0),
+    );
+    return res.json({ data: applications });
+  });
+
+  app.patch("/api/admin/doctor-applications/:applicationId", requireAuth, requireAdmin, async (req, res) => {
+    const application = db.doctor_applications.find((entry) => entry.id === req.params.applicationId);
+    if (!application) {
+      return res.status(404).json({ message: "Doctor application not found" });
+    }
+    const decision = String(req.body?.decision || "").toLowerCase();
+    if (!["approve", "reject"].includes(decision)) {
+      return res.status(400).json({ message: "Decision must be approve or reject" });
+    }
+    const targetUser = db.users.find((user) => user.id === application.user_id);
+    if (!targetUser) {
+      return res.status(404).json({ message: "Application owner not found" });
+    }
+
+    application.status = decision === "approve" ? DOCTOR_APPLICATION_APPROVED : DOCTOR_APPLICATION_REJECTED;
+    application.reviewed_at = new Date().toISOString();
+    application.reviewed_by = req.user.id;
+    application.review_note = req.body?.note ? sanitizeText(String(req.body.note).slice(0, 1000)) : null;
+
+    ensureRoles(targetUser);
+    if (application.status === DOCTOR_APPLICATION_APPROVED) {
+      if (!targetUser.roles.includes("doctor")) {
+        targetUser.roles.push("doctor");
+      }
+    } else {
+      targetUser.roles = targetUser.roles.filter((roleName) => roleName !== "doctor");
+      if (!targetUser.roles.length) {
+        targetUser.roles = ["user"];
+      }
+    }
+    targetUser.app_metadata = {
+      ...(targetUser.app_metadata || { provider: "email" }),
+      roles: targetUser.roles,
+    };
+
+    logAdminAction(
+      req.user.id,
+      `Doctor application ${application.status}`,
+      "doctor_application",
+      application.id,
+      { user_id: targetUser.id },
+    );
+
+    await persistDb();
+    return res.json({ data: application, user: sanitizeUser(targetUser) });
   });
 
   app.get("/api/medicines", requireAuth, (req, res) => {
@@ -940,7 +1076,7 @@ function createRouter() {
     if (!post) {
       return res.status(404).json({ message: "Post not found" });
     }
-    const isDoctor = req.user.roles?.includes("doctor");
+    const isDoctor = canUseDoctorFeatures(req.user);
     const isAdmin = req.user.roles?.includes("admin");
     if (!isDoctor && !isAdmin) {
       return res.status(403).json({ message: "Only doctors can reply to forum questions" });
@@ -1109,8 +1245,8 @@ function createRouter() {
   });
 
   app.post("/api/clinical-cases", requireAuth, async (req, res) => {
-    if (!req.user.roles.includes("doctor")) {
-      return res.status(403).json({ message: "Doctors only" });
+    if (!canUseDoctorFeatures(req.user)) {
+      return res.status(403).json({ message: "Verified doctors only" });
     }
     const clinicalCase = {
       id: nanoid(),
@@ -1133,8 +1269,11 @@ function createRouter() {
     const totalPosts = db.forum_posts.length;
     const flaggedPosts = db.forum_posts.filter((post) => HIDDEN_FORUM_STATUSES.has(post.status)).length;
     const pendingArticles = db.health_articles.filter((article) => article.needs_review).length;
+    const pendingDoctorApplications = db.doctor_applications.filter(
+      (application) => application.status === DOCTOR_APPLICATION_PENDING,
+    ).length;
     return res.json({
-      stats: { totalUsers, totalPosts, flaggedPosts, pendingArticles },
+      stats: { totalUsers, totalPosts, flaggedPosts, pendingArticles, pendingDoctorApplications },
     });
   });
 
@@ -1202,6 +1341,39 @@ function createRouter() {
     return res.status(201).json({ data: log });
   });
 
+  app.get("/api/health-news-events", (req, res) => {
+    const events = [...(db.health_news_events || [])]
+      .sort((a, b) => new Date(b.published_at || b.created_at || 0) - new Date(a.published_at || a.created_at || 0));
+    return res.json({ data: events });
+  });
+
+  app.post("/api/admin/health-news-events", requireAuth, requireAdmin, async (req, res) => {
+    const payload = sanitizeRequestBody(req.body || {});
+    if (!payload.title || !payload.region || !payload.source_url) {
+      return res.status(400).json({ message: "title, region and source_url are required" });
+    }
+    const event = {
+      id: nanoid(),
+      title: String(payload.title).slice(0, 250),
+      region: String(payload.region).slice(0, 120),
+      country: payload.country ? String(payload.country).slice(0, 120) : null,
+      summary: payload.summary ? String(payload.summary).slice(0, 1200) : null,
+      symptoms: Array.isArray(payload.symptoms)
+        ? payload.symptoms.map((symptom) => String(symptom).slice(0, 80)).slice(0, 20)
+        : [],
+      severity_level: Math.max(1, Math.min(5, Number(payload.severity_level) || 3)),
+      source_url: String(payload.source_url).slice(0, 500),
+      latitude: Number.isFinite(Number(payload.latitude)) ? Number(payload.latitude) : null,
+      longitude: Number.isFinite(Number(payload.longitude)) ? Number(payload.longitude) : null,
+      published_at: payload.published_at || new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      created_by: req.user.id,
+    };
+    db.health_news_events.push(event);
+    await persistDb();
+    return res.status(201).json({ data: event });
+  });
+
   app.get("/api/facilities", async (req, res) => {
     const lat = Number(req.query.lat);
     const lon = Number(req.query.lon);
@@ -1264,9 +1436,23 @@ function createRouter() {
     }
 
     const userMessage =
-      messages?.find((message) => message.role === "user")?.content || "";
+      [...messages]
+        .reverse()
+        .find((message) => message.role === "user")?.content || "";
     const sanitizedQuestion = sanitizeText(String(userMessage || "")).trim().slice(0, 400);
     const keywords = extractSignificantWords(userMessage).slice(0, 6);
+    const triage = deriveTriageFromReport(assistantReport, responseText);
+    const structuredSummary = {
+      summaryText: sanitizeText(responseText).slice(0, 500),
+      possibleConditions: Array.isArray(assistantReport?.possibleConditions)
+        ? assistantReport.possibleConditions.slice(0, 6)
+        : [],
+      recommendations: Array.isArray(assistantReport?.recommendations)
+        ? assistantReport.recommendations.slice(0, 6)
+        : [],
+      whenToSeeDoctor: assistantReport?.whenToSeeDoctor || "",
+      keywords,
+    };
 
     if (!Array.isArray(db.ai_chat_sessions)) {
       db.ai_chat_sessions = [];
@@ -1277,6 +1463,8 @@ function createRouter() {
       keywords,
       language,
       response_summary: sanitizeText(responseText).slice(0, 400),
+      triage_score: triage.triageScore,
+      human_review_flag: triage.humanReviewFlag,
       created_at: new Date().toISOString(),
     });
     await persistDb();
@@ -1285,13 +1473,12 @@ function createRouter() {
     return res.json({
       response: safeResponse,
       report: assistantReport,
+      triage,
+      summary: structuredSummary,
     });
   });
 
-  app.post("/api/ai/chat-evaluations", requireAuth, async (req, res) => {
-    if (!req.user.roles.includes("doctor")) {
-      return res.status(403).json({ message: "Doctors only" });
-    }
+  app.post("/api/ai/chat-evaluations", requireAuth, requireVerifiedDoctor, async (req, res) => {
 
     const {
       urgencyAssessmentCorrectness,

@@ -36,6 +36,18 @@ interface MedicalFacility {
   distance?: number;
 }
 
+interface HealthNewsEvent {
+  id: string;
+  title: string;
+  region: string;
+  country?: string | null;
+  summary?: string | null;
+  symptoms?: string[];
+  severity_level: number;
+  source_url: string;
+  published_at: string;
+}
+
 // Global medical facilities database
 const globalFacilities: MedicalFacility[] = [
   // Kazakhstan - Astana
@@ -301,6 +313,7 @@ export default function MapPage() {
   const [facilities, setFacilities] = useState<MedicalFacility[]>(globalFacilities);
   const [nearbyPharmacies, setNearbyPharmacies] = useState<MedicalFacility[]>([]);
   const [radiusKm, setRadiusKm] = useState(50);
+  const [healthNewsEvents, setHealthNewsEvents] = useState<HealthNewsEvent[]>([]);
 
   const filteredFacilities = useMemo(
     () =>
@@ -517,6 +530,18 @@ export default function MapPage() {
   }, []);
 
   useEffect(() => {
+    const loadHealthNews = async () => {
+      try {
+        const { data } = await apiFetch<{ data: HealthNewsEvent[] }>("/health-news-events");
+        setHealthNewsEvents((data || []).slice(0, 6));
+      } catch (error) {
+        console.warn("Failed to load health news map events", error);
+      }
+    };
+    loadHealthNews();
+  }, []);
+
+  useEffect(() => {
     if (!userLocation) return;
     const nearby = facilities
       .filter((entry) => entry.type === "pharmacy" && (entry.distance ?? 0) <= radiusKm)
@@ -714,6 +739,22 @@ export default function MapPage() {
                       ? nearbyPharmacies.slice(0, 3).map((pharmacy) => pharmacy.name).join(", ")
                       : t.noResults}
                   </div>
+                </div>
+              )}
+              {healthNewsEvents.length > 0 && (
+                <div className="mt-3 px-3 py-2 bg-muted/50 rounded-lg text-xs text-muted-foreground space-y-2">
+                  <div className="font-semibold text-foreground">Health News Map</div>
+                  {healthNewsEvents.slice(0, 3).map((event) => (
+                    <a
+                      key={event.id}
+                      href={event.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block hover:text-primary"
+                    >
+                      • {event.region}: {event.title}
+                    </a>
+                  ))}
                 </div>
               )}
             </div>

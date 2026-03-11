@@ -16,6 +16,7 @@ import About from "./pages/About";
 import Auth from "./pages/Auth";
 import Forum from "./pages/Forum";
 import AdminPanel from "./pages/AdminPanel";
+import DoctorWorkplace from "./pages/DoctorWorkplace";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/first-aid" element={<FirstAidGuide />} />
               <Route path="/symptom-tracker" element={<SymptomTracker />} />
               <Route path="/forum" element={<Forum />} />
+              <Route path="/doctor-workplace" element={<DoctorWorkplace />} />
               <Route path="/admin" element={<AdminPanel />} />
               <Route path="/about" element={<About />} />
               <Route path="*" element={<NotFound />} />

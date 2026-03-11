@@ -43,6 +43,20 @@ interface AIReport {
   whenToSeeDoctor: string;
 }
 
+interface AITriage {
+  triageScore: number;
+  triageLevelLabel: string;
+  humanReviewFlag: boolean;
+}
+
+interface AISummary {
+  summaryText: string;
+  possibleConditions: string[];
+  recommendations: string[];
+  whenToSeeDoctor: string;
+  keywords: string[];
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -50,6 +64,8 @@ interface Message {
   timestamp: Date;
   image?: string;
   report?: AIReport;
+  triage?: AITriage;
+  summary?: AISummary;
 }
 
 export default function AIConsultant() {
@@ -135,6 +151,39 @@ export default function AIConsultant() {
     scrollToBottom();
   }, [messages]);
 
+  const exportSummaryAsPdf = (message: Message) => {
+    const win = window.open("", "_blank", "width=900,height=700");
+    if (!win) return;
+    const triageLine = message.triage
+      ? `Triage: ${message.triage.triageScore}/5 (${message.triage.triageLevelLabel})`
+      : "";
+    const content = `
+      <html>
+      <head><title>Qamqor AI Summary</title></head>
+      <body style="font-family: Arial, sans-serif; padding: 24px; line-height: 1.5;">
+        <h2>Qamqor AI Consultation Summary</h2>
+        <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+        <p><strong>${triageLine}</strong></p>
+        <h3>Assistant Response</h3>
+        <p>${(message.content || "").replace(/\n/g, "<br/>")}</p>
+        <h3>Possible Conditions</h3>
+        <p>${message.summary?.possibleConditions?.join(", ") || "-"}</p>
+        <h3>Recommendations</h3>
+        <p>${message.summary?.recommendations?.join("; ") || "-"}</p>
+        <h3>When To See Doctor</h3>
+        <p>${message.summary?.whenToSeeDoctor || "-"}</p>
+        <h3>Medical Disclaimer</h3>
+        <p>This summary is informational and does not replace professional medical diagnosis.</p>
+      </body>
+      </html>
+    `;
+    win.document.open();
+    win.document.write(content);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
   const handleSend = async () => {
     if (!input.trim() && !selectedImage) return;
 
@@ -168,7 +217,7 @@ export default function AIConsultant() {
         content: currentInput,
       });
 
-      const data = await apiFetch<{ response?: string; report?: AIReport }>("/ai/medical-chat", {
+      const data = await apiFetch<{ response?: string; report?: AIReport; triage?: AITriage; summary?: AISummary }>("/ai/medical-chat", {
         method: "POST",
         body: {
           messages: messageHistory,
@@ -183,6 +232,8 @@ export default function AIConsultant() {
         content: data.response || t.error,
         timestamp: new Date(),
         report: data.report,
+        triage: data.triage,
+        summary: data.summary,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -453,6 +504,16 @@ export default function AIConsultant() {
                             {getRiskLabel(message.report.riskLevel)}
                           </span>
                         </div>
+                        {message.triage && (
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            Triage score: <span className="font-semibold">{message.triage.triageScore}/5</span> ({message.triage.triageLevelLabel})
+                          </div>
+                        )}
+                        {message.triage?.humanReviewFlag && (
+                          <div className="mt-2 bg-destructive/10 border border-destructive/30 rounded-lg p-2 text-xs text-destructive">
+                            Human Review Flag: consult a licensed doctor as soon as possible.
+                          </div>
+                        )}
 
                         {/* Possible Conditions */}
                         <div>
@@ -503,6 +564,14 @@ export default function AIConsultant() {
                             </Button>
                           </Link>
                         )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => exportSummaryAsPdf(message)}
+                        >
+                          Export Summary (PDF)
+                        </Button>
                       </motion.div>
                     )}
                     

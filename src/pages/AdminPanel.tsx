@@ -18,6 +18,7 @@ import {
   Pill,
   CircleQuestionMark,
   MessageCircle,
+  Stethoscope,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -26,12 +27,14 @@ import { useAuth } from "@/contexts/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { apiFetch } from "@/lib/api";
 import { Navigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 interface AdminStats {
   totalUsers: number;
   totalPosts: number;
   flaggedPosts: number;
   pendingArticles: number;
+  pendingDoctorApplications?: number;
 }
 
 interface AdminLog {
@@ -123,11 +126,29 @@ interface AnalyticsPayload {
   aiChat: AnalyticsAiChatData;
 }
 
+interface DoctorApplication {
+  id: string;
+  user_id: string;
+  full_name: string;
+  specialization: string;
+  license_number: string | null;
+  country: string | null;
+  region: string | null;
+  workplace: string | null;
+  years_of_experience: number | null;
+  bio: string | null;
+  status: "pending" | "approved" | "rejected";
+  submitted_at: string;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+}
+
 export default function AdminPanel() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { isAdmin, loading: rolesLoading } = useUserRoles();
   const isAdminRole = isAdmin();
+  const { toast } = useToast();
 
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
@@ -142,6 +163,8 @@ export default function AdminPanel() {
   const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [doctorApplications, setDoctorApplications] = useState<DoctorApplication[]>([]);
+  const [doctorApplicationsLoading, setDoctorApplicationsLoading] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -153,6 +176,7 @@ export default function AdminPanel() {
     fetchFlaggedPosts();
     fetchUsers();
     fetchAnalytics();
+    fetchDoctorApplications();
   }, [user, rolesLoading, isAdminRole]);
 
   const fetchStats = async () => {
@@ -211,6 +235,18 @@ export default function AdminPanel() {
     }
   };
 
+  const fetchDoctorApplications = async () => {
+    setDoctorApplicationsLoading(true);
+    try {
+      const { data } = await apiFetch<{ data: DoctorApplication[] }>("/admin/doctor-applications");
+      setDoctorApplications(data || []);
+    } catch (error) {
+      console.error("Error fetching doctor applications:", error);
+    } finally {
+      setDoctorApplicationsLoading(false);
+    }
+  };
+
   const handleToggleBan = async (target: AdminUser) => {
     const action = target.banned ? "unban" : "ban";
     try {
@@ -251,6 +287,25 @@ export default function AdminPanel() {
       fetchAnalytics();
     } catch (error) {
       console.error('Error moderating post:', error);
+    }
+  };
+
+  const handleDoctorApplicationDecision = async (applicationId: string, decision: "approve" | "reject") => {
+    try {
+      await apiFetch(`/admin/doctor-applications/${applicationId}`, {
+        method: "PATCH",
+        body: { decision },
+      });
+      toast({
+        title: t.success,
+        description: decision === "approve" ? t.approveDoctor : t.rejectDoctor,
+      });
+      fetchDoctorApplications();
+      fetchUsers();
+      fetchStats();
+    } catch (error) {
+      console.error("Error moderating doctor application:", error);
+      toast({ title: t.error, variant: "destructive" });
     }
   };
 
@@ -356,6 +411,10 @@ export default function AdminPanel() {
               <TabsTrigger value="users" className="gap-2">
                 <Users className="w-4 h-4" />
                 {t.userManagement}
+              </TabsTrigger>
+              <TabsTrigger value="doctor-applications" className="gap-2">
+                <Stethoscope className="w-4 h-4" />
+                {t.doctorApplications}
               </TabsTrigger>
             </TabsList>
 
@@ -717,6 +776,67 @@ export default function AdminPanel() {
                             {usr.banned ? t.unbanUser : t.banUser}
                           </Button>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="doctor-applications">
+              <div className="bg-card rounded-xl border border-border p-6">
+                <h3 className="font-medium mb-4">{t.doctorApplications}</h3>
+                {doctorApplicationsLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">{t.loading}</div>
+                ) : doctorApplications.length === 0 ? (
+                  <p className="text-center py-8 text-muted-foreground">{t.noResults}</p>
+                ) : (
+                  <div className="space-y-3">
+                    {doctorApplications.map((application) => (
+                      <div key={application.id} className="p-4 rounded-xl border border-border bg-muted/40">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{application.full_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {application.specialization} {application.country ? `• ${application.country}` : ""}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(application.submitted_at).toLocaleString()}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={
+                              application.status === "approved"
+                                ? "secondary"
+                                : application.status === "rejected"
+                                  ? "destructive"
+                                  : "outline"
+                            }
+                          >
+                            {application.status}
+                          </Badge>
+                        </div>
+                        {application.bio && (
+                          <p className="text-sm text-muted-foreground mt-3">{application.bio}</p>
+                        )}
+                        {application.status === "pending" && (
+                          <div className="flex gap-2 mt-4">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDoctorApplicationDecision(application.id, "approve")}
+                            >
+                              {t.approveDoctor}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDoctorApplicationDecision(application.id, "reject")}
+                            >
+                              {t.rejectDoctor}
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
