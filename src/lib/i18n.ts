@@ -1,13 +1,20 @@
-export type Language = 'en' | 'ru' | 'kk';
+export type Language = 'en' | 'ru' | 'kk' | 'zh' | 'de' | 'fr' | 'es';
 
 export const languageNames: Record<Language, string> = {
   en: 'English',
   ru: 'Русский',
   kk: 'Қазақша',
+  zh: '中文',
+  de: 'Deutsch',
+  fr: 'Français',
+  es: 'Español',
 };
 
 export function getTranslation(language: Language): Translations {
-  return translations[language];
+  const base = translations.en;
+  const locale = translations[language] ?? base;
+  const override = localeOverrides[language] ?? {};
+  return { ...base, ...locale, ...override };
 }
 
 export interface Translations {
@@ -433,7 +440,7 @@ export interface Translations {
   emailVerificationSent: string;
 }
 
-export const translations: Record<Language, Translations> = {
+export const translations: Record<string, Translations> = {
   en: {
     // Navigation
     home: 'Home',
@@ -737,7 +744,7 @@ export const translations: Record<Language, Translations> = {
     heroTagline: 'AI-Powered Health Assistant',
     heroTitle1: 'Your Personal',
     heroTitle2: 'Health Companion',
-    heroDescription: 'Get instant health insights, manage your medications, and find nearby care—all powered by advanced AI technology designed with your safety in mind.',
+    heroDescription: 'Get instant health insights, manage your medications, and find nearby careвЂ”all powered by advanced AI technology designed with your safety in mind.',
     startConsultation: 'Start Consultation',
     exploreArticles: 'Explore Articles',
     aiAvailable: 'AI Available',
@@ -1159,7 +1166,7 @@ export const translations: Record<Language, Translations> = {
     heroTagline: 'Медицинский помощник на основе ИИ',
     heroTitle1: 'Ваш Персональный',
     heroTitle2: 'Помощник Здоровья',
-    heroDescription: 'Получайте мгновенные медицинские консультации, управляйте лекарствами и находите ближайшую помощь — всё на основе передовых технологий ИИ.',
+    heroDescription: 'Получайте мгновенные медицинские консультации, управляйте лекарствами и находите ближайшую помощь вЂ” всё на основе передовых технологий ИИ.',
     startConsultation: 'Начать консультацию',
     exploreArticles: 'Читать статьи',
     aiAvailable: 'ИИ Доступен',
@@ -1581,7 +1588,7 @@ export const translations: Record<Language, Translations> = {
     heroTagline: 'ЖИ негізіндегі денсаулық көмекшісі',
     heroTitle1: 'Сіздің Жеке',
     heroTitle2: 'Денсаулық Көмекшіңіз',
-    heroDescription: 'Лезде денсаулық кеңестерін алыңыз, дәрілерді басқарыңыз және жақын көмек табыңыз — барлығы қауіпсіздікті ескере отырып жасалған ЖИ технологиясымен.',
+    heroDescription: 'Лезде денсаулық кеңестерін алыңыз, дәрілерді басқарыңыз және жақын көмек табыңыз вЂ” барлығы қауіпсіздікті ескере отырып жасалған ЖИ технологиясымен.',
     startConsultation: 'Консультация бастау',
     exploreArticles: 'Мақалаларды оқу',
     aiAvailable: 'ЖИ қолжетімді',
@@ -1700,3 +1707,121 @@ export const translations: Record<Language, Translations> = {
     emailVerificationSent: 'Растау хаты жіберілді',
   },
 };
+
+// Ensure all declared UI languages are usable even if full translations are missing.
+const missingLocales: Language[] = ["zh", "de", "fr", "es"];
+for (const locale of missingLocales) {
+  if (!translations[locale]) {
+    translations[locale] = { ...translations.en };
+  }
+}
+
+const localeOverrides: Partial<Record<Language, Partial<Translations>>> = {
+  zh: {
+    home: "首页",
+    aiConsultant: "AI 咨询",
+    medicineCabinet: "药箱",
+    map: "就医地图",
+    firstAid: "急救",
+    symptomTracker: "症状追踪",
+    forum: "论坛",
+    articles: "健康文章",
+    doctorWorkplace: "医生工作台",
+    adminPanel: "管理面板",
+    signIn: "登录",
+    signOut: "退出",
+    heroTagline: "AI 健康助手",
+    heroTitle1: "您的个人",
+    heroTitle2: "健康伙伴",
+    heroDescription:
+      "快速获得健康建议、管理药物并查找附近医疗服务，基于注重安全的先进 AI 技术。",
+    startConsultation: "开始咨询",
+    exploreArticles: "浏览文章",
+    aiAvailable: "全天候在线",
+    languages: "语言",
+    safePrivate: "安全与隐私",
+    freeToUse: "免费使用",
+  },
+  de: {
+    home: "Startseite",
+    aiConsultant: "KI-Berater",
+    medicineCabinet: "Medikamentenschrank",
+    map: "Hilfe finden",
+    firstAid: "Erste Hilfe",
+    symptomTracker: "Symptom-Tracker",
+    forum: "Forum",
+    articles: "Gesundheitsartikel",
+    doctorWorkplace: "Arztbereich",
+    adminPanel: "Admin-Panel",
+    signIn: "Anmelden",
+    signOut: "Abmelden",
+    heroTagline: "KI-gestützter Gesundheitsassistent",
+    heroTitle1: "Ihr persönlicher",
+    heroTitle2: "Gesundheitsbegleiter",
+    heroDescription:
+      "Erhalten Sie sofortige Gesundheitshinweise, verwalten Sie Medikamente und finden Sie Hilfe in der Nähe.",
+    startConsultation: "Beratung starten",
+    exploreArticles: "Artikel lesen",
+    aiAvailable: "24/7 verfügbar",
+    languages: "Sprachen",
+    safePrivate: "Sicher & privat",
+    freeToUse: "Kostenlos",
+  },
+  fr: {
+    home: "Accueil",
+    aiConsultant: "Consultant IA",
+    medicineCabinet: "Armoire à pharmacie",
+    map: "Trouver des soins",
+    firstAid: "Premiers secours",
+    symptomTracker: "Suivi des symptômes",
+    forum: "Forum",
+    articles: "Articles santé",
+    doctorWorkplace: "Espace médecin",
+    adminPanel: "Panneau admin",
+    signIn: "Se connecter",
+    signOut: "Se déconnecter",
+    heroTagline: "Assistant santé alimenté par IA",
+    heroTitle1: "Votre",
+    heroTitle2: "compagnon santé",
+    heroDescription:
+      "Obtenez des conseils santé instantanés, gérez vos médicaments et trouvez des soins à proximité.",
+    startConsultation: "Commencer",
+    exploreArticles: "Voir les articles",
+    aiAvailable: "Disponible 24/7",
+    languages: "Langues",
+    safePrivate: "Sûr et privé",
+    freeToUse: "Gratuit",
+  },
+  es: {
+    home: "Inicio",
+    aiConsultant: "Consultor IA",
+    medicineCabinet: "Botiquín",
+    map: "Encontrar atención",
+    firstAid: "Primeros auxilios",
+    symptomTracker: "Seguimiento de síntomas",
+    forum: "Foro",
+    articles: "Artículos de salud",
+    doctorWorkplace: "Espacio médico",
+    adminPanel: "Panel admin",
+    signIn: "Iniciar sesión",
+    signOut: "Cerrar sesión",
+    heroTagline: "Asistente de salud con IA",
+    heroTitle1: "Tu",
+    heroTitle2: "compañero de salud",
+    heroDescription:
+      "Obtén consejos de salud al instante, gestiona tus medicamentos y encuentra atención cercana.",
+    startConsultation: "Iniciar consulta",
+    exploreArticles: "Explorar artículos",
+    aiAvailable: "Disponible 24/7",
+    languages: "Idiomas",
+    safePrivate: "Seguro y privado",
+    freeToUse: "Gratis",
+  },
+};
+
+for (const locale of missingLocales) {
+  const override = localeOverrides[locale] ?? {};
+  translations[locale] = { ...translations.en, ...translations[locale], ...override };
+}
+
+

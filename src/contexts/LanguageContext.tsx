@@ -6,7 +6,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('language');
-      if (saved && (saved === 'en' || saved === 'ru' || saved === 'kk')) {
+      if (saved && ['en', 'ru', 'kk', 'zh', 'de', 'fr', 'es'].includes(saved)) {
         return saved as Language;
       }
     }

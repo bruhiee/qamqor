@@ -7,6 +7,7 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { nanoid } from "nanoid";
+import { randomInt } from "crypto";
 
 dotenv.config();
 
@@ -23,6 +24,9 @@ const emptyDb = {
   users: [],
   doctor_applications: [],
   medicines: [],
+  medicine_history: [],
+  medicine_notifications: [],
+  medicine_notification_prefs: [],
   forum_posts: [],
   forum_replies: [],
   symptom_logs: [],
@@ -30,6 +34,11 @@ const emptyDb = {
   case_collections: [],
   ai_chat_evaluations: [],
   ai_chat_sessions: [],
+  doctor_reply_training_samples: [],
+  two_factor_challenges: [],
+  user_profiles: [],
+  bookmarks: [],
+  tutorial_status: [],
   admin_logs: [],
   health_articles: [],
   health_news_events: [],
@@ -73,7 +82,17 @@ const sanitizeRequestBody = (body) => {
 const sanitizeForumRecord = (record) => {
   if (!record) return record;
   const sanitized = { ...record };
-  const textFields = ["title", "content", "body", "answer", "summary", "description"];
+  const textFields = [
+    "title",
+    "content",
+    "body",
+    "answer",
+    "summary",
+    "description",
+    "symptom_description",
+    "symptom_duration",
+    "additional_details",
+  ];
   textFields.forEach((key) => {
     if (sanitized[key]) {
       sanitized[key] = sanitizeText(sanitized[key]);
@@ -117,6 +136,19 @@ const STOP_WORDS = new Set([
   "will", "have", "has", "not", "are", "our", "can", "all", "how", "why",
   "more", "when", "what", "where", "who", "about", "each", "over",
 ]);
+const REGION_KEYWORDS = [
+  { label: "Kazakhstan", aliases: ["kazakhstan", "астана", "almaty", "алматы", "шымкент", "shymkent", "актобе", "aktobe", "атырау", "atyrau"] },
+  { label: "Russia", aliases: ["russia", "россия", "moscow", "москва"] },
+  { label: "United States", aliases: ["usa", "united states", "america", "new york", "nyc", "chicago"] },
+  { label: "United Kingdom", aliases: ["uk", "united kingdom", "england", "london"] },
+  { label: "Germany", aliases: ["germany", "berlin", "германия", "берлин"] },
+  { label: "Central Asia", aliases: ["uzbekistan", "kyrgyzstan", "tajikistan", "turkmenistan"] },
+];
+const SYMPTOM_KEYWORDS = [
+  "fever", "cough", "headache", "nausea", "vomit", "rash", "sore", "throat", "pain",
+  "fatigue", "dizziness", "diarrhea", "cold", "flu", "infection", "temperature", "breath",
+  "жар", "кашель", "голова", "боль", "горло", "сыпь", "тошнота", "рвота", "слабость",
+];
 
 const POST_PENDING_STATUS = "pending";
 const POST_VISIBLE_STATUS = "open";
@@ -328,6 +360,10 @@ function buildAiChatAnalytics() {
   const sessionCount = sessions.length;
   const queryCounts = new Map();
   const keywordCounts = new Map();
+  const severityDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  const keywordRecentCounts = new Map();
+  const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  let highRiskCount = 0;
 
   sessions.forEach((session) => {
     const question = String(session.question || "").trim();
@@ -338,7 +374,16 @@ function buildAiChatAnalytics() {
       session.keywords.forEach((keyword) => {
         if (!keyword) return;
         keywordCounts.set(keyword, (keywordCounts.get(keyword) || 0) + 1);
+        const createdAt = Number(new Date(session.created_at || 0));
+        if (Number.isFinite(createdAt) && createdAt >= oneWeekAgo) {
+          keywordRecentCounts.set(keyword, (keywordRecentCounts.get(keyword) || 0) + 1);
+        }
       });
+    }
+    const triageScore = Math.max(1, Math.min(5, Number(session.triage_score) || 1));
+    severityDistribution[triageScore] = (severityDistribution[triageScore] || 0) + 1;
+    if (triageScore >= 4) {
+      highRiskCount += 1;
     }
   });
 
@@ -352,10 +397,136 @@ function buildAiChatAnalytics() {
     .slice(0, 6)
     .map(([label, count]) => ({ label, mentions: count }));
 
+  const outbreakSignals = [...keywordRecentCounts.entries()]
+    .filter(([, count]) => count >= 3)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([label, count]) => ({ label, mentions: count }));
+
+  const highRiskRatio = sessionCount ? Number((highRiskCount / sessionCount).toFixed(2)) : 0;
+
   return {
     sessionCount,
     topQueries,
     commonKeywords,
+    severityDistribution,
+    outbreakSignals,
+    highRiskRatio,
+  };
+}
+
+function inferRegionFromSession(session) {
+  const content = sanitizeText(
+    `${String(session?.question || "")} ${(Array.isArray(session?.keywords) ? session.keywords.join(" ") : "")}`,
+  ).toLowerCase();
+  const matched = REGION_KEYWORDS.find((entry) =>
+    entry.aliases.some((alias) => content.includes(alias.toLowerCase())),
+  );
+  if (matched) return matched.label;
+  if (session?.language === "kk") return "Kazakhstan (inferred)";
+  if (session?.language === "ru") return "CIS (inferred)";
+  if (session?.language === "en") return "Global (inferred)";
+  return "Unknown";
+}
+
+function buildRegionalChatAnalytics() {
+  const sessions = Array.isArray(db?.ai_chat_sessions) ? db.ai_chat_sessions : [];
+  const regionMap = new Map();
+
+  sessions.forEach((session) => {
+    const region = inferRegionFromSession(session);
+    const bucket = regionMap.get(region) || {
+      region,
+      totalSessions: 0,
+      highRiskCount: 0,
+      severitySum: 0,
+      symptoms: new Map(),
+      languages: new Map(),
+    };
+    const triage = Math.max(1, Math.min(5, Number(session.triage_score) || 1));
+    bucket.totalSessions += 1;
+    bucket.severitySum += triage;
+    if (triage >= 4 || session.human_review_flag) {
+      bucket.highRiskCount += 1;
+    }
+    const lang = sanitizeText(String(session.language || "unknown")).toLowerCase();
+    if (lang) {
+      bucket.languages.set(lang, (bucket.languages.get(lang) || 0) + 1);
+    }
+
+    const words = [
+      ...extractSignificantWords(session.question || ""),
+      ...((Array.isArray(session.keywords) ? session.keywords : []).map((item) =>
+        sanitizeText(String(item || "")).toLowerCase().trim(),
+      )),
+    ];
+    words.forEach((word) => {
+      if (!word || !SYMPTOM_KEYWORDS.some((kw) => word.includes(kw) || kw.includes(word))) return;
+      bucket.symptoms.set(word, (bucket.symptoms.get(word) || 0) + 1);
+    });
+
+    regionMap.set(region, bucket);
+  });
+
+  return [...regionMap.values()]
+    .map((item) => ({
+      region: item.region,
+      sessionCount: item.totalSessions,
+      avgSeverity: item.totalSessions ? Number((item.severitySum / item.totalSessions).toFixed(2)) : 0,
+      highRiskRatio: item.totalSessions ? Number((item.highRiskCount / item.totalSessions).toFixed(2)) : 0,
+      topSymptoms: [...item.symptoms.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([symptom, mentions]) => ({ symptom, mentions })),
+      languageMix: [...item.languages.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4)
+        .map(([language, count]) => ({ language, count })),
+    }))
+    .sort((a, b) => (b.highRiskRatio - a.highRiskRatio) || (b.avgSeverity - a.avgSeverity) || (b.sessionCount - a.sessionCount));
+}
+
+function buildFallbackAdminChatReport(snapshot) {
+  const highestRiskRegion = snapshot.regionalInsights[0] || null;
+  const severeRegions = snapshot.regionalInsights
+    .filter((item) => item.avgSeverity >= 3.5 || item.highRiskRatio >= 0.35)
+    .slice(0, 5);
+  return {
+    summary: highestRiskRegion
+      ? `Highest chat-based risk signal is in ${highestRiskRegion.region} with avg severity ${highestRiskRegion.avgSeverity} and high-risk ratio ${highestRiskRegion.highRiskRatio}.`
+      : "Not enough anonymized chat data for a stable regional conclusion.",
+    executiveRiskLevel: severeRegions.length >= 3 ? "high" : severeRegions.length >= 1 ? "moderate" : "low",
+    globalSignals: [
+      `Analyzed ${snapshot.sessionCount} anonymized chat sessions.`,
+      `Global high-risk ratio: ${snapshot.highRiskRatio}.`,
+      `Most frequent chat keywords: ${snapshot.commonKeywords.slice(0, 5).map((item) => item.label).join(", ") || "none"}.`,
+    ],
+    regionalInsights: severeRegions.map((item) => ({
+      region: item.region,
+      riskLevel: item.avgSeverity >= 4 || item.highRiskRatio >= 0.5 ? "high" : "moderate",
+      summary: `Sessions: ${item.sessionCount}, avg severity: ${item.avgSeverity}, high-risk ratio: ${item.highRiskRatio}.`,
+      likelyDrivers: item.topSymptoms.slice(0, 4).map((entry) => entry.symptom),
+      recommendedActions: [
+        "Increase monitoring of incoming triage chats for this region.",
+        "Escalate uncertain/high-risk chat outcomes to human review faster.",
+      ],
+    })),
+    diseaseTrends: snapshot.topSymptoms.slice(0, 10).map((item) => ({
+      symptom: item.label,
+      trend: item.mentions >= 5 ? "rising" : "stable",
+      signalStrength: item.mentions,
+    })),
+    recommendedAdminActions: [
+      "Review high-risk chat transcripts flagged for human follow-up.",
+      "Cross-check chat symptom spikes with health news map events.",
+      "Tune triage prompts for symptoms with rapidly increasing frequency.",
+    ],
+    limitations: [
+      "Regional mapping is partially inferred from language and location keywords in anonymized text.",
+      "Findings are observational and not a clinical diagnosis.",
+    ],
+    confidence: snapshot.sessionCount >= 50 ? 78 : snapshot.sessionCount >= 20 ? 62 : 45,
+    generatedAt: new Date().toISOString(),
   };
 }
 
@@ -390,11 +561,104 @@ function extractStructuredResponse(rawText) {
 
   const report =
     parsed?.report && typeof parsed.report === "object" ? parsed.report : null;
+  const reviewMaker =
+    parsed?.reviewMaker && typeof parsed.reviewMaker === "object" ? parsed.reviewMaker : null;
+  const summary =
+    parsed?.summary && typeof parsed.summary === "object" ? parsed.summary : null;
 
   return {
     text: String(candidate || "").trim(),
     report,
+    reviewMaker,
+    summary,
     parsed,
+  };
+}
+
+function buildHealthNewsMapInsights(events, lookbackDays = 30) {
+  const now = Date.now();
+  const lookbackStart = now - lookbackDays * 24 * 60 * 60 * 1000;
+  const recent7Start = now - 7 * 24 * 60 * 60 * 1000;
+  const prev7Start = now - 14 * 24 * 60 * 60 * 1000;
+
+  const relevant = (events || []).filter((event) => {
+    const ts = Number(new Date(event.published_at || event.created_at || 0));
+    return Number.isFinite(ts) && ts >= lookbackStart;
+  });
+
+  const regionStats = new Map();
+  const symptomCounts = new Map();
+
+  relevant.forEach((event) => {
+    const region = String(event.region || "Unknown").trim() || "Unknown";
+    const ts = Number(new Date(event.published_at || event.created_at || 0));
+    const stat = regionStats.get(region) || {
+      region,
+      totalEvents: 0,
+      severitySum: 0,
+      recent7: 0,
+      previous7: 0,
+      sampleSymptoms: new Map(),
+    };
+    stat.totalEvents += 1;
+    stat.severitySum += Number(event.severity_level) || 0;
+    if (ts >= recent7Start) {
+      stat.recent7 += 1;
+    } else if (ts >= prev7Start) {
+      stat.previous7 += 1;
+    }
+
+    (Array.isArray(event.symptoms) ? event.symptoms : []).forEach((symptom) => {
+      const key = sanitizeText(String(symptom || "")).toLowerCase().trim();
+      if (!key) return;
+      symptomCounts.set(key, (symptomCounts.get(key) || 0) + 1);
+      stat.sampleSymptoms.set(key, (stat.sampleSymptoms.get(key) || 0) + 1);
+    });
+    regionStats.set(region, stat);
+  });
+
+  const regions = [...regionStats.values()].map((item) => {
+    const averageSeverity = item.totalEvents ? Number((item.severitySum / item.totalEvents).toFixed(2)) : 0;
+    const growthRatio = item.previous7 > 0
+      ? Number((item.recent7 / item.previous7).toFixed(2))
+      : item.recent7 > 0 ? 99 : 1;
+    const topSymptoms = [...item.sampleSymptoms.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([symptom]) => symptom);
+    return {
+      region: item.region,
+      totalEvents: item.totalEvents,
+      averageSeverity,
+      recent7: item.recent7,
+      previous7: item.previous7,
+      growthRatio,
+      topSymptoms,
+    };
+  });
+
+  const outbreaks = regions
+    .filter((region) => region.recent7 >= 2 && (region.growthRatio >= 1.8 || region.averageSeverity >= 4))
+    .sort((a, b) => (b.recent7 - a.recent7) || (b.averageSeverity - a.averageSeverity))
+    .slice(0, 10);
+
+  const anomalies = regions
+    .filter((region) => region.growthRatio >= 3 || (region.averageSeverity >= 4.5 && region.recent7 >= 1))
+    .sort((a, b) => b.growthRatio - a.growthRatio)
+    .slice(0, 10);
+
+  const topSymptoms = [...symptomCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+    .map(([symptom, mentions]) => ({ symptom, mentions }));
+
+  return {
+    lookbackDays,
+    eventCount: relevant.length,
+    outbreaks,
+    anomalies,
+    topSymptoms,
+    regions,
   };
 }
 
@@ -439,6 +703,8 @@ async function makeSupabaseChatRequest(payload) {
     data: parsed,
     text: structured.text,
     report: structured.report,
+    reviewMaker: structured.reviewMaker,
+    summary: structured.summary,
     parsed: structured.parsed ?? parsed,
   };
 }
@@ -450,6 +716,136 @@ function parseJsonSafe(value) {
   } catch {
     return null;
   }
+}
+
+function getUserMedicineNotificationPrefs(userId) {
+  const existing = db.medicine_notification_prefs.find((entry) => entry.user_id === userId);
+  if (existing) return existing;
+  const fallback = {
+    id: nanoid(),
+    user_id: userId,
+    email_enabled: true,
+    telegram_enabled: false,
+    telegram_chat_id: "",
+    remind_days_before: 30,
+    updated_at: new Date().toISOString(),
+  };
+  db.medicine_notification_prefs.push(fallback);
+  return fallback;
+}
+
+function trackMedicineHistory(action, medicine, userId, changes = null) {
+  if (!Array.isArray(db.medicine_history)) {
+    db.medicine_history = [];
+  }
+  db.medicine_history.push({
+    id: nanoid(),
+    user_id: userId,
+    medicine_id: medicine.id,
+    action,
+    medicine_name: sanitizeText(String(medicine.name || "")),
+    dosage: medicine.dosage || null,
+    quantity: Number(medicine.quantity) || 0,
+    expiration_date: medicine.expiration_date || null,
+    changes,
+    created_at: new Date().toISOString(),
+  });
+}
+
+async function sendExpiryNotification({ user, medicine, prefs, daysLeft }) {
+  const result = {
+    email: "skipped",
+    telegram: "skipped",
+  };
+  const safeName = sanitizeText(String(medicine.name || "Medicine"));
+  const expiryDate = medicine.expiration_date || "";
+  const message = `Qamqor reminder: "${safeName}" expires in ${daysLeft} day(s) on ${expiryDate}.`;
+
+  if (prefs.email_enabled) {
+    if (process.env.MEDICINE_EMAIL_WEBHOOK_URL) {
+      try {
+        await fetch(process.env.MEDICINE_EMAIL_WEBHOOK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: user.email,
+            subject: "Qamqor medicine expiry reminder",
+            message,
+            medicine: safeName,
+            expires_on: expiryDate,
+            days_left: daysLeft,
+          }),
+        });
+        result.email = "sent";
+      } catch (error) {
+        console.error("Email reminder failed", error);
+        result.email = "failed";
+      }
+    } else {
+      result.email = "configured-off";
+    }
+  }
+
+  if (prefs.telegram_enabled && prefs.telegram_chat_id) {
+    if (process.env.TELEGRAM_BOT_TOKEN) {
+      try {
+        const tgUrl = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`;
+        await fetch(tgUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: prefs.telegram_chat_id,
+            text: message,
+          }),
+        });
+        result.telegram = "sent";
+      } catch (error) {
+        console.error("Telegram reminder failed", error);
+        result.telegram = "failed";
+      }
+    } else {
+      result.telegram = "configured-off";
+    }
+  }
+
+  return result;
+}
+
+async function processMedicineExpiryNotificationsForUser(user) {
+  if (!user) return [];
+  const now = new Date();
+  const prefs = getUserMedicineNotificationPrefs(user.id);
+  const remindDays = Math.max(1, Math.min(120, Number(prefs.remind_days_before) || 30));
+  const userMedicines = db.medicines.filter((med) => med.user_id === user.id);
+  const triggered = [];
+
+  for (const medicine of userMedicines) {
+    const expiry = new Date(medicine.expiration_date);
+    if (Number.isNaN(expiry.getTime())) continue;
+    const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0 || daysLeft > remindDays) continue;
+
+    const dedupeKey = `${user.id}:${medicine.id}:${expiry.toISOString().slice(0, 10)}:${daysLeft}`;
+    const alreadySent = db.medicine_notifications.find((entry) => entry.dedupe_key === dedupeKey);
+    if (alreadySent) continue;
+
+    const delivery = await sendExpiryNotification({ user, medicine, prefs, daysLeft });
+    const notification = {
+      id: nanoid(),
+      user_id: user.id,
+      medicine_id: medicine.id,
+      medicine_name: sanitizeText(String(medicine.name || "")),
+      expiration_date: medicine.expiration_date,
+      days_left: daysLeft,
+      channels: delivery,
+      dedupe_key: dedupeKey,
+      created_at: new Date().toISOString(),
+    };
+    db.medicine_notifications.push(notification);
+    triggered.push(notification);
+  }
+
+  return triggered;
 }
 
 async function moderateForumContentWithAI(text) {
@@ -570,48 +966,94 @@ async function moderateForumTopicWithAI(text) {
   }
 }
 
-const systemPrompt = `You are a professional AI health assistant for Qamqor, a medical information platform. Your role is to provide helpful, accurate, and safety-focused health information.
+const systemPrompt = `You are a professional AI health assistant for Qamqor. Provide safe, cautious, medically-aware informational guidance. Never diagnose.
 
-CRITICAL GUIDELINES:
-1. NEVER provide medical diagnoses. You can only suggest possible conditions and recommend professional consultation.
-2. Always use cautious, non-definitive language like "may indicate", "could be related to", "consider discussing with a doctor".
-3. When risk seems high, strongly encourage immediate medical attention.
-4. Be empathetic but professional.
-5. Focus on education and awareness, not treatment recommendations.
+CRITICAL RULES:
+1. Never provide definitive diagnosis.
+2. Use cautious language.
+3. If risk is high or uncertain, recommend urgent professional care.
+4. Return ONLY valid JSON.
+5. Keep output concise, clinically useful, and structured.
 
-For each user query about symptoms, you MUST respond with a structured JSON report:
+For symptom-related requests, return:
 {
-  "response": "Your conversational response text here",
+  "response": "short explanation for user",
   "report": {
+    "severityScore": 1|2|3|4|5,
+    "assessmentExplanation": "brief explanation of why this score",
+    "possibleCauses": ["cause 1", "cause 2", "cause 3"],
+    "recommendations": ["step 1", "step 2", "step 3"],
+    "doctorAdvice": "advice about doctor visit or emergency care",
     "riskLevel": "low" | "medium" | "high",
-    "possibleConditions": ["condition1", "condition2", "condition3"],
-    "recommendations": ["recommendation1", "recommendation2", "recommendation3"],
-    "whenToSeeDoctor": "Specific guidance on when professional help is needed"
+    "possibleConditions": ["condition1", "condition2"],
+    "whenToSeeDoctor": "when to seek care"
+  },
+  "reviewMaker": {
+    "chiefComplaint": "main complaint",
+    "symptomTimeline": "timing and progression",
+    "reportedSymptoms": ["symptom 1", "symptom 2"],
+    "redFlags": ["red flag 1"],
+    "selfCareAttempted": ["what user already tried"],
+    "recommendedNextStep": "clear next step"
   }
 }
 
-Risk Level Guidelines:
-- LOW: Common symptoms that typically resolve on their own (mild headache, minor cold symptoms)
-- MEDIUM: Symptoms that warrant monitoring and possible doctor visit (persistent pain, moderate fever)
-- HIGH: Symptoms that require prompt medical attention (severe pain, difficulty breathing, chest pain)
+Severity scale meaning:
+1 = non-urgent
+2 = low risk
+3 = medium risk
+4 = elevated risk
+5 = potentially critical emergency
 
-If the user's message is a greeting or general question not about symptoms, respond conversationally without the report object.
+If message is non-medical greeting, still return JSON with only "response".`;
 
-IMPORTANT DISCLAIMER that must be understood: This platform provides informational support only and does not replace professional medical advice.`;
+const reviewMakerPrompt = `You are in AI Review Maker mode. Build a clean doctor-ready structured summary.
+Return ONLY valid JSON:
+{
+  "response": "short plain-language note for patient",
+  "reviewMaker": {
+    "chiefComplaint": "...",
+    "symptomTimeline": "...",
+    "reportedSymptoms": ["..."],
+    "redFlags": ["..."],
+    "selfCareAttempted": ["..."],
+    "recommendedNextStep": "...",
+    "doctorVisitPriority": "routine|soon|urgent|emergency"
+  },
+  "summary": {
+    "summaryText": "compact structured summary",
+    "possibleConditions": ["..."],
+    "recommendations": ["..."],
+    "whenToSeeDoctor": "...",
+    "keywords": ["..."]
+  }
+}`;
 
 async function loadDb() {
   try {
     const text = await fs.readFile(DB_PATH, "utf-8");
-    const parsed = JSON.parse(text);
+    const parsed = JSON.parse(text.replace(/^\uFEFF/, ""));
     parsed.ai_chat_evaluations = Array.isArray(parsed.ai_chat_evaluations) ? parsed.ai_chat_evaluations : [];
     parsed.ai_chat_sessions = Array.isArray(parsed.ai_chat_sessions) ? parsed.ai_chat_sessions : [];
+    parsed.doctor_reply_training_samples = Array.isArray(parsed.doctor_reply_training_samples) ? parsed.doctor_reply_training_samples : [];
+    parsed.two_factor_challenges = Array.isArray(parsed.two_factor_challenges) ? parsed.two_factor_challenges : [];
+    parsed.user_profiles = Array.isArray(parsed.user_profiles) ? parsed.user_profiles : [];
+    parsed.bookmarks = Array.isArray(parsed.bookmarks) ? parsed.bookmarks : [];
+    parsed.tutorial_status = Array.isArray(parsed.tutorial_status) ? parsed.tutorial_status : [];
     parsed.doctor_applications = Array.isArray(parsed.doctor_applications) ? parsed.doctor_applications : [];
     parsed.health_news_events = Array.isArray(parsed.health_news_events) ? parsed.health_news_events : [];
     parsed.medical_facilities = Array.isArray(parsed.medical_facilities) ? parsed.medical_facilities : [];
+    parsed.medicine_history = Array.isArray(parsed.medicine_history) ? parsed.medicine_history : [];
+    parsed.medicine_notifications = Array.isArray(parsed.medicine_notifications) ? parsed.medicine_notifications : [];
+    parsed.medicine_notification_prefs = Array.isArray(parsed.medicine_notification_prefs) ? parsed.medicine_notification_prefs : [];
     return parsed;
-  } catch {
-    await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
-    await fs.writeFile(DB_PATH, JSON.stringify(emptyDb, null, 2));
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
+      await fs.writeFile(DB_PATH, JSON.stringify(emptyDb, null, 2));
+      return JSON.parse(JSON.stringify(emptyDb));
+    }
+    console.error("Failed to load DB file. Starting with in-memory empty DB.", error);
     return JSON.parse(JSON.stringify(emptyDb));
   }
 }
@@ -630,6 +1072,7 @@ function sanitizeUser(user) {
   return {
     ...rest,
     banned: Boolean(user.banned),
+    two_factor_enabled: Boolean(user.two_factor_enabled),
     doctor_application_status: doctorApplicationStatus,
     doctor_verified: Boolean(doctorVerified),
     user_metadata: user.user_metadata || { display_name: user.displayName },
@@ -647,6 +1090,34 @@ function createToken(user) {
     JWT,
     { expiresIn: "7d" },
   );
+}
+
+function issueTwoFactorCode() {
+  return String(randomInt(100000, 999999));
+}
+
+async function sendTwoFactorCode(user, code, purpose = "login") {
+  const webhook = process.env.TWO_FACTOR_EMAIL_WEBHOOK_URL;
+  if (!webhook) {
+    return { delivery: "configured-off" };
+  }
+  try {
+    await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: user.email,
+        type: "two_factor_code",
+        purpose,
+        code,
+        expires_in_minutes: 10,
+      }),
+    });
+    return { delivery: "sent" };
+  } catch (error) {
+    console.error("2FA email webhook failed", error);
+    return { delivery: "failed" };
+  }
 }
 
 function getAuthHeader(req) {
@@ -743,32 +1214,41 @@ function logAdminAction(adminId, action, target_type = null, target_id = null, d
 
 function deriveTriageFromReport(report, responseText) {
   const normalizedRisk = String(report?.riskLevel || "").toLowerCase();
-  const scoreByRisk = {
-    low: 2,
-    medium: 3,
-    high: 4,
-  };
+  const scoreByRisk = { low: 2, medium: 3, high: 4 };
   const emergencyPattern = /(chest pain|cannot breathe|difficulty breathing|severe bleeding|loss of consciousness|stroke|seizure|suicide|self-harm|anaphylaxis|heart attack)/i;
-  const uncertaintyPattern = /(not sure|uncertain|cannot determine|insufficient|seek professional evaluation)/i;
-  const body = `${responseText || ""} ${report?.whenToSeeDoctor || ""}`;
-  let triageScore = scoreByRisk[normalizedRisk] || (report ? 3 : 1);
+  const uncertaintyPattern = /(not sure|uncertain|cannot determine|insufficient|unknown|seek professional evaluation)/i;
+  const body = `${responseText || ""} ${report?.whenToSeeDoctor || ""} ${report?.doctorAdvice || ""}`;
+  const reportScore = Number(report?.severityScore);
+  let triageScore = Number.isFinite(reportScore)
+    ? Math.max(1, Math.min(5, reportScore))
+    : (scoreByRisk[normalizedRisk] || (report ? 3 : 1));
   if (emergencyPattern.test(body)) {
     triageScore = 5;
   }
   const humanReviewFlag = triageScore >= 4 || !report || uncertaintyPattern.test(body);
   const triageLevelLabel = triageScore === 1
-    ? "non-urgent"
+    ? "situation is not urgent"
     : triageScore === 2
-      ? "low-risk"
+      ? "low risk level"
       : triageScore === 3
-        ? "moderate-risk"
+        ? "medium risk level"
         : triageScore === 4
-          ? "high-risk"
-          : "critical-risk";
+          ? "elevated risk"
+          : "potentially critical situation";
+  const humanReviewReason = triageScore >= 5
+    ? "Potential emergency indicators detected."
+    : triageScore >= 4
+      ? "Elevated risk requires professional review."
+      : !report
+        ? "Structured report missing."
+        : uncertaintyPattern.test(body)
+          ? "AI uncertainty detected."
+          : null;
   return {
     triageScore,
     triageLevelLabel,
     humanReviewFlag,
+    humanReviewReason,
   };
 }
 
@@ -817,9 +1297,22 @@ function createRouter() {
       app_metadata: { provider: "email", roles },
       created_at: new Date().toISOString(),
       banned: false,
+      two_factor_enabled: false,
       requested_role: role === "doctor" ? "doctor" : "user",
     };
     db.users.push(newUser);
+    db.user_profiles.push({
+      id: nanoid(),
+      user_id: newUser.id,
+      emergency_contact_name: null,
+      emergency_contact_phone: null,
+      blood_type: null,
+      allergies: [],
+      chronic_conditions: [],
+      medications: [],
+      notes: null,
+      updated_at: new Date().toISOString(),
+    });
     await persistDb();
     const token = createToken(newUser);
     return res.status(201).json({ user: sanitizeUser(newUser), token });
@@ -843,8 +1336,57 @@ function createRouter() {
       return res.status(403).json({ message: "Account is banned" });
     }
     ensureRoles(user);
+    if (user.two_factor_enabled) {
+      const code = issueTwoFactorCode();
+      const challenge = {
+        id: nanoid(),
+        user_id: user.id,
+        code,
+        purpose: "login",
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+        used: false,
+      };
+      db.two_factor_challenges = (db.two_factor_challenges || []).filter(
+        (item) => Number(new Date(item.expires_at || 0)) > Date.now() - 60 * 1000 && !item.used,
+      );
+      db.two_factor_challenges.push(challenge);
+      const delivery = await sendTwoFactorCode(user, code, "login");
+      await persistDb();
+      return res.status(202).json({
+        two_factor_required: true,
+        challenge_id: challenge.id,
+        delivery: delivery.delivery,
+        ...(delivery.delivery === "configured-off" ? { debug_code: code } : {}),
+      });
+    }
     await persistDb();
     const token = createToken(user);
+    return res.json({ user: sanitizeUser(user), token });
+  });
+
+  app.post("/api/auth/2fa/verify-login", async (req, res) => {
+    const challengeId = sanitizeText(String(req.body?.challenge_id || "")).trim();
+    const code = sanitizeText(String(req.body?.code || "")).trim();
+    if (!challengeId || !code) {
+      return res.status(400).json({ message: "challenge_id and code are required" });
+    }
+    const challenge = (db.two_factor_challenges || []).find((item) => item.id === challengeId);
+    if (!challenge || challenge.used) {
+      return res.status(400).json({ message: "Invalid or expired 2FA challenge" });
+    }
+    if (Number(new Date(challenge.expires_at || 0)) < Date.now()) {
+      return res.status(400).json({ message: "2FA code expired" });
+    }
+    if (String(challenge.code) !== code) {
+      return res.status(401).json({ message: "Invalid 2FA code" });
+    }
+    const user = db.users.find((entry) => entry.id === challenge.user_id);
+    if (!user) {
+      return res.status(404).json({ message: "User no longer exists" });
+    }
+    challenge.used = true;
+    const token = createToken(user);
+    await persistDb();
     return res.json({ user: sanitizeUser(user), token });
   });
 
@@ -855,6 +1397,166 @@ function createRouter() {
 
   app.post("/api/auth/logout", (req, res) => {
     return res.json({ success: true });
+  });
+
+  app.post("/api/auth/2fa/request-enable", requireAuth, async (req, res) => {
+    const code = issueTwoFactorCode();
+    const challenge = {
+      id: nanoid(),
+      user_id: req.user.id,
+      code,
+      purpose: "enable",
+      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      used: false,
+    };
+    db.two_factor_challenges = (db.two_factor_challenges || []).filter(
+      (item) => item.user_id !== req.user.id || item.purpose !== "enable" || !item.used,
+    );
+    db.two_factor_challenges.push(challenge);
+    const delivery = await sendTwoFactorCode(req.user, code, "enable");
+    await persistDb();
+    return res.json({
+      data: {
+        challenge_id: challenge.id,
+        delivery: delivery.delivery,
+        ...(delivery.delivery === "configured-off" ? { debug_code: code } : {}),
+      },
+    });
+  });
+
+  app.post("/api/auth/2fa/confirm-enable", requireAuth, async (req, res) => {
+    const challengeId = sanitizeText(String(req.body?.challenge_id || "")).trim();
+    const code = sanitizeText(String(req.body?.code || "")).trim();
+    const challenge = (db.two_factor_challenges || []).find(
+      (item) => item.id === challengeId && item.user_id === req.user.id && item.purpose === "enable",
+    );
+    if (!challenge || challenge.used || Number(new Date(challenge.expires_at || 0)) < Date.now()) {
+      return res.status(400).json({ message: "Invalid or expired enable challenge" });
+    }
+    if (String(challenge.code) !== code) {
+      return res.status(401).json({ message: "Invalid 2FA code" });
+    }
+    challenge.used = true;
+    req.user.two_factor_enabled = true;
+    await persistDb();
+    return res.json({ user: sanitizeUser(req.user) });
+  });
+
+  app.post("/api/auth/2fa/disable", requireAuth, async (req, res) => {
+    req.user.two_factor_enabled = false;
+    await persistDb();
+    return res.json({ user: sanitizeUser(req.user) });
+  });
+
+  app.get("/api/profile", requireAuth, (req, res) => {
+    let profile = (db.user_profiles || []).find((item) => item.user_id === req.user.id);
+    if (!profile) {
+      profile = {
+        id: nanoid(),
+        user_id: req.user.id,
+        emergency_contact_name: null,
+        emergency_contact_phone: null,
+        blood_type: null,
+        allergies: [],
+        chronic_conditions: [],
+        medications: [],
+        notes: null,
+        updated_at: new Date().toISOString(),
+      };
+      db.user_profiles.push(profile);
+    }
+    return res.json({ data: profile });
+  });
+
+  app.put("/api/profile", requireAuth, async (req, res) => {
+    const payload = sanitizeRequestBody(req.body || {});
+    let profile = (db.user_profiles || []).find((item) => item.user_id === req.user.id);
+    if (!profile) {
+      profile = { id: nanoid(), user_id: req.user.id };
+      db.user_profiles.push(profile);
+    }
+    profile.emergency_contact_name = payload.emergency_contact_name ? String(payload.emergency_contact_name).slice(0, 120) : null;
+    profile.emergency_contact_phone = payload.emergency_contact_phone ? String(payload.emergency_contact_phone).slice(0, 60) : null;
+    profile.blood_type = payload.blood_type ? String(payload.blood_type).slice(0, 8) : null;
+    profile.allergies = Array.isArray(payload.allergies) ? payload.allergies.map((item) => String(item).slice(0, 100)).slice(0, 30) : [];
+    profile.chronic_conditions = Array.isArray(payload.chronic_conditions) ? payload.chronic_conditions.map((item) => String(item).slice(0, 100)).slice(0, 30) : [];
+    profile.medications = Array.isArray(payload.medications) ? payload.medications.map((item) => String(item).slice(0, 100)).slice(0, 40) : [];
+    profile.notes = payload.notes ? String(payload.notes).slice(0, 1500) : null;
+    profile.updated_at = new Date().toISOString();
+    await persistDb();
+    return res.json({ data: profile });
+  });
+
+  app.get("/api/bookmarks", requireAuth, (req, res) => {
+    const items = (db.bookmarks || [])
+      .filter((item) => item.user_id === req.user.id)
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    return res.json({ data: items });
+  });
+
+  app.post("/api/bookmarks", requireAuth, async (req, res) => {
+    const payload = sanitizeRequestBody(req.body || {});
+    if (!payload.target_type || !payload.target_id || !payload.title) {
+      return res.status(400).json({ message: "target_type, target_id and title are required" });
+    }
+    const existing = (db.bookmarks || []).find(
+      (item) =>
+        item.user_id === req.user.id &&
+        item.target_type === String(payload.target_type) &&
+        item.target_id === String(payload.target_id),
+    );
+    if (existing) {
+      return res.json({ data: existing });
+    }
+    const bookmark = {
+      id: nanoid(),
+      user_id: req.user.id,
+      target_type: String(payload.target_type).slice(0, 40),
+      target_id: String(payload.target_id).slice(0, 120),
+      title: String(payload.title).slice(0, 180),
+      url: payload.url ? String(payload.url).slice(0, 400) : null,
+      metadata: payload.metadata && typeof payload.metadata === "object" ? payload.metadata : null,
+      created_at: new Date().toISOString(),
+    };
+    db.bookmarks.push(bookmark);
+    await persistDb();
+    return res.status(201).json({ data: bookmark });
+  });
+
+  app.delete("/api/bookmarks/:id", requireAuth, async (req, res) => {
+    const idx = (db.bookmarks || []).findIndex((item) => item.id === req.params.id && item.user_id === req.user.id);
+    if (idx === -1) {
+      return res.status(404).json({ message: "Bookmark not found" });
+    }
+    db.bookmarks.splice(idx, 1);
+    await persistDb();
+    return res.json({ success: true });
+  });
+
+  app.get("/api/tutorial/status", requireAuth, (req, res) => {
+    const status = (db.tutorial_status || []).find((item) => item.user_id === req.user.id) || {
+      user_id: req.user.id,
+      completed: false,
+      skipped: false,
+      completed_at: null,
+      updated_at: null,
+    };
+    return res.json({ data: status });
+  });
+
+  app.post("/api/tutorial/status", requireAuth, async (req, res) => {
+    const payload = sanitizeRequestBody(req.body || {});
+    let status = (db.tutorial_status || []).find((item) => item.user_id === req.user.id);
+    if (!status) {
+      status = { user_id: req.user.id };
+      db.tutorial_status.push(status);
+    }
+    status.completed = Boolean(payload.completed);
+    status.skipped = Boolean(payload.skipped);
+    status.completed_at = status.completed ? new Date().toISOString() : null;
+    status.updated_at = new Date().toISOString();
+    await persistDb();
+    return res.json({ data: status });
   });
 
   app.post("/api/doctor-applications", requireAuth, async (req, res) => {
@@ -881,6 +1583,27 @@ function createRouter() {
       review_note: null,
     };
     db.doctor_applications.push(application);
+    if (process.env.DOCTOR_APPLICATION_EMAIL_WEBHOOK_URL) {
+      try {
+        await fetch(process.env.DOCTOR_APPLICATION_EMAIL_WEBHOOK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "doctor_application_submitted",
+            submitted_at: application.submitted_at,
+            applicant_email: req.user.email,
+            applicant_name: application.full_name,
+            specialization: application.specialization,
+            country: application.country,
+            region: application.region,
+            workplace: application.workplace,
+            years_of_experience: application.years_of_experience,
+          }),
+        });
+      } catch (error) {
+        console.error("Doctor application email webhook failed", error);
+      }
+    }
     await persistDb();
     return res.status(201).json({ application });
   });
@@ -951,14 +1674,63 @@ function createRouter() {
     return res.json({ data: medicines });
   });
 
+  app.get("/api/medicines/history", requireAuth, (req, res) => {
+    const history = (db.medicine_history || [])
+      .filter((item) => item.user_id === req.user.id)
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+      .slice(0, 200);
+    return res.json({ data: history });
+  });
+
+  app.get("/api/medicines/notifications", requireAuth, (req, res) => {
+    const prefs = getUserMedicineNotificationPrefs(req.user.id);
+    const history = (db.medicine_notifications || [])
+      .filter((item) => item.user_id === req.user.id)
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+      .slice(0, 100);
+    return res.json({ prefs, history });
+  });
+
+  app.put("/api/medicines/notifications", requireAuth, async (req, res) => {
+    const prefs = getUserMedicineNotificationPrefs(req.user.id);
+    prefs.email_enabled = Boolean(req.body?.email_enabled);
+    prefs.telegram_enabled = Boolean(req.body?.telegram_enabled);
+    prefs.telegram_chat_id = sanitizeText(String(req.body?.telegram_chat_id || "")).slice(0, 120);
+    prefs.remind_days_before = Math.max(1, Math.min(120, Number(req.body?.remind_days_before) || 30));
+    prefs.updated_at = new Date().toISOString();
+    await persistDb();
+    return res.json({ prefs });
+  });
+
+  app.post("/api/medicines/notifications/run", requireAuth, async (req, res) => {
+    const triggered = await processMedicineExpiryNotificationsForUser(req.user);
+    await persistDb();
+    return res.json({ data: triggered, count: triggered.length });
+  });
+
   app.post("/api/medicines", requireAuth, async (req, res) => {
+    const payload = sanitizeRequestBody(req.body || {});
     const medicine = {
       id: nanoid(),
       user_id: req.user.id,
       created_at: new Date().toISOString(),
-      ...req.body,
+      name: sanitizeText(String(payload.name || "")).slice(0, 200),
+      purpose: payload.purpose ? sanitizeText(String(payload.purpose)).slice(0, 300) : null,
+      dosage: payload.dosage ? sanitizeText(String(payload.dosage)).slice(0, 200) : null,
+      quantity: Math.max(0, Number(payload.quantity) || 0),
+      form_type: sanitizeText(String(payload.form_type || "tablet")).slice(0, 40),
+      tags: Array.isArray(payload.tags)
+        ? payload.tags.map((tag) => sanitizeText(String(tag)).slice(0, 40)).slice(0, 12)
+        : [],
+      expiration_date: payload.expiration_date ? String(payload.expiration_date).slice(0, 20) : null,
+      notes: payload.notes ? sanitizeText(String(payload.notes)).slice(0, 1200) : null,
     };
+    if (!medicine.name || !medicine.expiration_date) {
+      return res.status(400).json({ message: "name and expiration_date are required" });
+    }
     db.medicines.push(medicine);
+    trackMedicineHistory("created", medicine, req.user.id);
+    await processMedicineExpiryNotificationsForUser(req.user);
     await persistDb();
     return res.status(201).json({ data: medicine });
   });
@@ -968,7 +1740,24 @@ function createRouter() {
     if (!medicine) {
       return res.status(404).json({ message: "Medicine not found" });
     }
-    Object.assign(medicine, req.body);
+    const payload = sanitizeRequestBody(req.body || {});
+    const before = { ...medicine };
+    Object.assign(medicine, {
+      ...medicine,
+      ...(payload.name != null ? { name: sanitizeText(String(payload.name)).slice(0, 200) } : {}),
+      ...(payload.purpose != null ? { purpose: payload.purpose ? sanitizeText(String(payload.purpose)).slice(0, 300) : null } : {}),
+      ...(payload.dosage != null ? { dosage: payload.dosage ? sanitizeText(String(payload.dosage)).slice(0, 200) : null } : {}),
+      ...(payload.quantity != null ? { quantity: Math.max(0, Number(payload.quantity) || 0) } : {}),
+      ...(payload.form_type != null ? { form_type: sanitizeText(String(payload.form_type)).slice(0, 40) } : {}),
+      ...(payload.tags != null ? { tags: Array.isArray(payload.tags) ? payload.tags.map((tag) => sanitizeText(String(tag)).slice(0, 40)).slice(0, 12) : [] } : {}),
+      ...(payload.expiration_date != null ? { expiration_date: String(payload.expiration_date).slice(0, 20) } : {}),
+      ...(payload.notes != null ? { notes: payload.notes ? sanitizeText(String(payload.notes)).slice(0, 1200) : null } : {}),
+    });
+    trackMedicineHistory("updated", medicine, req.user.id, {
+      previous_expiration_date: before.expiration_date || null,
+      previous_quantity: Number(before.quantity) || 0,
+    });
+    await processMedicineExpiryNotificationsForUser(req.user);
     await persistDb();
     return res.json({ data: medicine });
   });
@@ -978,21 +1767,80 @@ function createRouter() {
     if (index === -1) {
       return res.status(404).json({ message: "Medicine not found" });
     }
+    const medicine = db.medicines[index];
+    trackMedicineHistory("deleted", medicine, req.user.id);
     db.medicines.splice(index, 1);
     await persistDb();
     return res.json({ success: true });
   });
 
   app.get("/api/symptom-logs", requireAuth, (req, res) => {
-    const logs = db.symptom_logs.sort((a, b) => (new Date(b.symptom_date)) - (new Date(a.symptom_date)));
+    const logs = [...db.symptom_logs]
+      .filter((log) => log.user_id === req.user.id)
+      .sort((a, b) => (new Date(b.symptom_date)) - (new Date(a.symptom_date)));
     return res.json({ data: logs });
   });
 
   app.post("/api/symptom-logs", requireAuth, async (req, res) => {
+    const payload = sanitizeRequestBody(req.body || {});
+    const symptomDate = String(payload.symptom_date || "").slice(0, 20);
+    const symptoms = Array.isArray(payload.symptoms)
+      ? payload.symptoms
+        .map((item) => sanitizeText(String(item || "")).trim().slice(0, 80))
+        .filter(Boolean)
+        .slice(0, 20)
+      : [];
+    if (!symptomDate || symptoms.length === 0) {
+      return res.status(400).json({ message: "symptom_date and at least one symptom are required" });
+    }
+    const severity = Math.max(1, Math.min(10, Number(payload.severity) || 5));
+    const details = payload.details && typeof payload.details === "object" ? payload.details : {};
+    const normalizedDetails = {
+      fever: details.fever && typeof details.fever === "object"
+        ? {
+            temperature_c: Number.isFinite(Number(details.fever.temperature_c))
+              ? Number(Number(details.fever.temperature_c).toFixed(1))
+              : null,
+            measured_at_time: details.fever.measured_at_time
+              ? sanitizeText(String(details.fever.measured_at_time)).slice(0, 20)
+              : null,
+            medications: Array.isArray(details.fever.medications)
+              ? details.fever.medications
+                  .map((item) => sanitizeText(String(item || "")).trim().slice(0, 80))
+                  .filter(Boolean)
+                  .slice(0, 12)
+              : [],
+          }
+        : null,
+      headache: details.headache && typeof details.headache === "object"
+        ? {
+            pain_level: Number.isFinite(Number(details.headache.pain_level))
+              ? Math.max(1, Math.min(10, Number(details.headache.pain_level)))
+              : null,
+            duration_minutes: Number.isFinite(Number(details.headache.duration_minutes))
+              ? Math.max(0, Math.min(24 * 60, Number(details.headache.duration_minutes)))
+              : null,
+            triggers: Array.isArray(details.headache.triggers)
+              ? details.headache.triggers
+                  .map((item) => sanitizeText(String(item || "")).trim().slice(0, 80))
+                  .filter(Boolean)
+                  .slice(0, 12)
+              : [],
+          }
+        : null,
+    };
+
     const log = {
       id: nanoid(),
+      user_id: req.user.id,
+      symptom_date: symptomDate,
+      symptoms,
+      severity,
+      notes: payload.notes ? sanitizeText(String(payload.notes)).slice(0, 1200) : null,
+      mood: payload.mood ? sanitizeText(String(payload.mood)).slice(0, 40) : null,
+      sleep_hours: Number.isFinite(Number(payload.sleep_hours)) ? Math.max(0, Math.min(24, Number(payload.sleep_hours))) : null,
+      details: normalizedDetails,
       created_at: new Date().toISOString(),
-      ...req.body,
     };
     db.symptom_logs.push(log);
     await persistDb();
@@ -1000,7 +1848,7 @@ function createRouter() {
   });
 
   app.delete("/api/symptom-logs/:id", requireAuth, async (req, res) => {
-    const index = db.symptom_logs.findIndex((log) => log.id === req.params.id);
+    const index = db.symptom_logs.findIndex((log) => log.id === req.params.id && log.user_id === req.user.id);
     if (index === -1) {
       return res.status(404).json({ message: "Log not found" });
     }
@@ -1033,17 +1881,102 @@ function createRouter() {
     });
   });
 
+  app.post("/api/forum/question-improve", requireAuth, async (req, res) => {
+    const symptomDescription = sanitizeText(String(req.body?.symptom_description || "")).trim().slice(0, 2000);
+    const symptomDuration = sanitizeText(String(req.body?.symptom_duration || "")).trim().slice(0, 400);
+    const additionalDetails = sanitizeText(String(req.body?.additional_details || "")).trim().slice(0, 2500);
+    const language = sanitizeText(String(req.body?.language || "en")).slice(0, 10);
+
+    if (!symptomDescription) {
+      return res.status(400).json({ message: "symptom_description is required" });
+    }
+
+    const fallbackTitle = symptomDescription.split(/[.!?\n]/).map((item) => item.trim()).find(Boolean)?.slice(0, 80) || "Medical question";
+    const fallbackContent = [
+      `Symptoms: ${symptomDescription}`,
+      symptomDuration ? `Duration: ${symptomDuration}` : null,
+      additionalDetails ? `Additional details: ${additionalDetails}` : null,
+    ].filter(Boolean).join("\n");
+
+    if (!SUPABASE_FUNCTION_URL) {
+      return res.json({
+        data: {
+          title: fallbackTitle,
+          content: fallbackContent,
+        },
+      });
+    }
+
+    try {
+      const { parsed, text } = await makeSupabaseChatRequest({
+        model: "google/gemini-3-flash-preview",
+        stream: false,
+        messages: [
+          {
+            role: "system",
+            content: `You improve medical forum questions.
+Return ONLY valid JSON:
+{
+  "title": "short clear title",
+  "content": "structured question with symptoms, duration, and context"
+}
+Keep it factual. No diagnosis. Language: ${language}.`,
+          },
+          {
+            role: "user",
+            content: `Symptoms:\n${symptomDescription}\n\nDuration:\n${symptomDuration || "not provided"}\n\nAdditional details:\n${additionalDetails || "not provided"}`,
+          },
+        ],
+      });
+      const normalized = parsed && typeof parsed === "object" ? parsed : parseJsonSafe(text);
+      return res.json({
+        data: {
+          title: sanitizeText(String(normalized?.title || fallbackTitle)).slice(0, 160),
+          content: sanitizeText(String(normalized?.content || fallbackContent)).slice(0, 6000),
+        },
+      });
+    } catch (error) {
+      console.error("Forum question improvement failed", error);
+      return res.json({
+        data: {
+          title: fallbackTitle,
+          content: fallbackContent,
+        },
+      });
+    }
+  });
+
   app.post("/api/forum/posts", requireAuth, async (req, res) => {
     const cleaned = sanitizeRequestBody(req.body);
-    const topicModeration = await moderateForumTopicWithAI(`${req.body?.title || ""}\n${req.body?.content || ""}`);
+    const symptomDescription = sanitizeText(String(cleaned.symptom_description || "")).trim().slice(0, 2000);
+    const symptomDuration = sanitizeText(String(cleaned.symptom_duration || "")).trim().slice(0, 400);
+    const additionalDetails = sanitizeText(String(cleaned.additional_details || "")).trim().slice(0, 2500);
+    if (!symptomDescription) {
+      return res.status(400).json({ message: "Symptom description is required" });
+    }
+
+    const contentFromStructured = [
+      `Symptoms: ${symptomDescription}`,
+      symptomDuration ? `Duration: ${symptomDuration}` : null,
+      additionalDetails ? `Additional details: ${additionalDetails}` : null,
+    ].filter(Boolean).join("\n");
+    const normalizedContent = sanitizeText(String(cleaned.content || contentFromStructured)).slice(0, 6000);
+
+    const topicModeration = await moderateForumTopicWithAI(`${cleaned.title || ""}\n${normalizedContent}`);
     if (!topicModeration.healthRelated) {
       return res.status(422).json({
         message: HEALTH_ONLY_FORUM_MESSAGE,
         topicModeration,
       });
     }
-    const keywordFlagged = isBodyFlagged(req.body);
-    const aiModeration = await moderateForumContentWithAI(`${req.body?.title || ""}\n${req.body?.content || ""}`);
+    const keywordFlagged = isBodyFlagged({
+      title: cleaned.title || "",
+      content: normalizedContent,
+      symptom_description: symptomDescription,
+      symptom_duration: symptomDuration,
+      additional_details: additionalDetails,
+    });
+    const aiModeration = await moderateForumContentWithAI(`${cleaned.title || ""}\n${normalizedContent}`);
     const flagged = keywordFlagged || Boolean(aiModeration?.flagged);
     const postStatus = flagged ? POST_PENDING_STATUS : POST_VISIBLE_STATUS;
     const post = {
@@ -1054,7 +1987,15 @@ function createRouter() {
       ...(flagged ? { statusBeforeModeration: POST_VISIBLE_STATUS } : {}),
       views_count: 0,
       replies_count: 0,
-      ...cleaned,
+      title: sanitizeText(String(cleaned.title || "Medical question")).slice(0, 160),
+      content: normalizedContent,
+      tags: Array.isArray(cleaned.tags)
+        ? cleaned.tags.map((tag) => sanitizeText(String(tag || "")).toLowerCase().trim().slice(0, 40)).filter(Boolean).slice(0, 12)
+        : [],
+      is_urgent: Boolean(cleaned.is_urgent),
+      symptom_description: symptomDescription,
+      symptom_duration: symptomDuration || null,
+      additional_details: additionalDetails || null,
       flagged,
       moderation: aiModeration
         ? { source: "ai", ...aiModeration }
@@ -1114,6 +2055,25 @@ function createRouter() {
       post.flagged = true;
     } else if (reply.is_doctor_reply) {
       post.status = "answered";
+    }
+
+    if (reply.is_doctor_reply && !reply.flagged) {
+      if (!Array.isArray(db.doctor_reply_training_samples)) {
+        db.doctor_reply_training_samples = [];
+      }
+      db.doctor_reply_training_samples.push({
+        id: nanoid(),
+        source: "forum_doctor_reply",
+        created_at: new Date().toISOString(),
+        question: {
+          title: sanitizeText(String(post.title || "")).slice(0, 160),
+          symptom_description: sanitizeText(String(post.symptom_description || "")).slice(0, 500),
+          symptom_duration: sanitizeText(String(post.symptom_duration || "")).slice(0, 160),
+          tags: Array.isArray(post.tags) ? post.tags.slice(0, 8) : [],
+          is_urgent: Boolean(post.is_urgent),
+        },
+        doctor_answer: sanitizeText(String(reply.content || "")).slice(0, 2000),
+      });
     }
     await persistDb();
     return res.status(201).json({ data: reply });
@@ -1285,6 +2245,96 @@ function createRouter() {
     return res.json({ data: payload });
   });
 
+  app.post("/api/admin/analyze-chats", requireAuth, requireAdmin, async (req, res) => {
+    const analytics = buildAiChatAnalytics();
+    const regionalInsights = buildRegionalChatAnalytics();
+    const topSymptoms = analytics.commonKeywords;
+    const snapshot = {
+      generatedAt: new Date().toISOString(),
+      sessionCount: analytics.sessionCount,
+      highRiskRatio: analytics.highRiskRatio,
+      severityDistribution: analytics.severityDistribution,
+      commonKeywords: analytics.commonKeywords,
+      outbreakSignals: analytics.outbreakSignals,
+      topSymptoms,
+      regionalInsights,
+    };
+
+    if (!analytics.sessionCount) {
+      return res.status(400).json({ message: "No anonymized chat sessions available for analysis." });
+    }
+
+    let report = null;
+    if (SUPABASE_FUNCTION_URL) {
+      try {
+        const aiResult = await makeSupabaseChatRequest({
+          model: "google/gemini-3-flash-preview",
+          stream: false,
+          messages: [
+            {
+              role: "system",
+              content:
+                `You are an epidemiology-focused AI assistant generating an admin disease surveillance report.
+Use ONLY provided anonymized aggregate data.
+Return ONLY valid JSON with this exact shape:
+{
+  "summary": "short executive summary",
+  "executiveRiskLevel": "low|moderate|high|critical",
+  "globalSignals": ["..."],
+  "regionalInsights": [
+    {
+      "region": "...",
+      "riskLevel": "low|moderate|high|critical",
+      "summary": "...",
+      "likelyDrivers": ["..."],
+      "recommendedActions": ["..."]
+    }
+  ],
+  "diseaseTrends": [
+    { "symptom": "...", "trend": "rising|stable|declining", "signalStrength": 0 }
+  ],
+  "recommendedAdminActions": ["..."],
+  "limitations": ["..."],
+  "confidence": 0
+}
+Never include personal data. Never invent user identities.`,
+            },
+            {
+              role: "user",
+              content: JSON.stringify(snapshot).slice(0, 25000),
+            },
+          ],
+        });
+        report = aiResult.parsed && typeof aiResult.parsed === "object"
+          ? aiResult.parsed
+          : parseJsonSafe(aiResult.text);
+      } catch (error) {
+        console.error("Admin AI chat analysis failed; falling back to rule-based summary.", error);
+      }
+    }
+
+    const normalized = report && typeof report === "object"
+      ? {
+          ...buildFallbackAdminChatReport(snapshot),
+          ...report,
+          generatedAt: new Date().toISOString(),
+        }
+      : buildFallbackAdminChatReport(snapshot);
+
+    logAdminAction(
+      req.user.id,
+      "Ran anonymized AI chat analysis",
+      "ai_chat_sessions",
+      null,
+      {
+        sessionCount: analytics.sessionCount,
+        risk: normalized.executiveRiskLevel,
+      },
+    );
+    await persistDb();
+    return res.json({ data: { snapshot, report: normalized } });
+  });
+
   app.get("/api/admin/logs", requireAuth, (req, res) => {
     if (!req.user.roles.includes("admin")) {
       return res.status(403).json({ message: "Admins only" });
@@ -1347,6 +2397,13 @@ function createRouter() {
     return res.json({ data: events });
   });
 
+  app.get("/api/health-news-map-insights", (req, res) => {
+    const days = Math.max(7, Math.min(120, Number(req.query.days) || 30));
+    const events = [...(db.health_news_events || [])];
+    const insights = buildHealthNewsMapInsights(events, days);
+    return res.json({ data: insights });
+  });
+
   app.post("/api/admin/health-news-events", requireAuth, requireAdmin, async (req, res) => {
     const payload = sanitizeRequestBody(req.body || {});
     if (!payload.title || !payload.region || !payload.source_url) {
@@ -1392,6 +2449,57 @@ function createRouter() {
     }
   });
 
+  app.post("/api/ai/medicine-instruction-scan", requireAuth, async (req, res) => {
+    if (!SUPABASE_FUNCTION_URL) {
+      return res.status(503).json({ message: "AI assistant is unavailable." });
+    }
+    const { image, question = "", language = "en" } = req.body || {};
+    if (!image || typeof image !== "string") {
+      return res.status(400).json({ message: "Instruction image is required." });
+    }
+    const safeQuestion = sanitizeText(String(question || "")).slice(0, 800);
+    const truncatedImage = image.slice(0, 25000);
+
+    try {
+      const { parsed, text } = await makeSupabaseChatRequest({
+        model: "google/gemini-3-flash-preview",
+        stream: false,
+        messages: [
+          {
+            role: "system",
+            content: `You extract medicine instruction text from an uploaded image and explain it safely.
+Return ONLY JSON:
+{
+  "extractedText": "short extracted instruction text",
+  "plainExplanation": "simple explanation for user",
+  "warnings": ["warning 1", "warning 2"],
+  "answer": "answer to user question if provided"
+}
+Never diagnose. Encourage doctor/pharmacist consultation for uncertainty.
+Language: ${language}`,
+          },
+          {
+            role: "user",
+            content: `Instruction image (base64 data URL, truncated): ${truncatedImage}\n\nUser question: ${safeQuestion || "No specific question. Summarize instruction."}`,
+          },
+        ],
+      });
+
+      const data = parsed || parseJsonSafe(text) || {};
+      return res.json({
+        extractedText: sanitizeText(String(data.extractedText || text || "")).slice(0, 5000),
+        plainExplanation: sanitizeText(String(data.plainExplanation || "")).slice(0, 2000),
+        warnings: Array.isArray(data.warnings)
+          ? data.warnings.map((item) => sanitizeText(String(item)).slice(0, 220)).slice(0, 8)
+          : [],
+        answer: sanitizeText(String(data.answer || "")).slice(0, 2000),
+      });
+    } catch (error) {
+      console.error("Medicine instruction scan failed", error);
+      return res.status(502).json({ message: error instanceof Error ? error.message : "Instruction scan failed" });
+    }
+  });
+
   app.post("/api/ai/medical-chat", async (req, res) => {
     if (!SUPABASE_FUNCTION_URL) {
       return res.json({
@@ -1400,16 +2508,18 @@ function createRouter() {
       });
     }
 
-    const { messages, language = "en" } = req.body;
+    const { messages, language = "en", mode = "triage" } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ message: "Messages are required" });
     }
 
+    const isReviewMode = String(mode).toLowerCase() === "review-maker";
+    const modePrompt = isReviewMode ? reviewMakerPrompt : systemPrompt;
     const payloadMessages = [
       {
         role: "system",
-        content: `${systemPrompt}\n\nLanguage: ${language}`,
+        content: `${modePrompt}\n\nLanguage: ${language}`,
       },
       ...messages
         .map((message) => ({
@@ -1420,8 +2530,10 @@ function createRouter() {
 
     let responseText = "";
     let assistantReport = null;
+    let assistantReviewMaker = null;
+    let assistantSummary = null;
     try {
-      const { text, report } = await makeSupabaseChatRequest({
+      const { text, report, reviewMaker, summary } = await makeSupabaseChatRequest({
         messages: payloadMessages,
         language,
         model: "google/gemini-3-flash-preview",
@@ -1429,6 +2541,8 @@ function createRouter() {
       });
       responseText = text;
       assistantReport = report ?? null;
+      assistantReviewMaker = reviewMaker ?? null;
+      assistantSummary = summary ?? null;
     } catch (error) {
       console.error("Supabase chat error", error);
       const message = error instanceof Error ? error.message : "AI service unavailable";
@@ -1442,16 +2556,65 @@ function createRouter() {
     const sanitizedQuestion = sanitizeText(String(userMessage || "")).trim().slice(0, 400);
     const keywords = extractSignificantWords(userMessage).slice(0, 6);
     const triage = deriveTriageFromReport(assistantReport, responseText);
-    const structuredSummary = {
-      summaryText: sanitizeText(responseText).slice(0, 500),
-      possibleConditions: Array.isArray(assistantReport?.possibleConditions)
+    const doctorAdvice = assistantReport?.doctorAdvice
+      || assistantReport?.whenToSeeDoctor
+      || (triage.triageScore >= 4
+        ? "Seek urgent medical care and contact emergency services if symptoms worsen."
+        : "Consult a doctor if symptoms persist, worsen, or new warning signs appear.");
+    const assessmentExplanation = assistantReport?.assessmentExplanation
+      || "Initial triage is based on reported symptoms and potential red flags.";
+    const possibleCauses = Array.isArray(assistantReport?.possibleCauses)
+      ? assistantReport.possibleCauses.slice(0, 6)
+      : Array.isArray(assistantReport?.possibleConditions)
         ? assistantReport.possibleConditions.slice(0, 6)
-        : [],
+        : [];
+    const normalizedReport = {
+      riskLevel: assistantReport?.riskLevel || (triage.triageScore >= 4 ? "high" : triage.triageScore >= 3 ? "medium" : "low"),
+      severityScore: triage.triageScore,
+      assessmentExplanation: sanitizeText(String(assessmentExplanation)).slice(0, 400),
+      possibleCauses: possibleCauses.map((item) => sanitizeText(String(item)).slice(0, 120)),
       recommendations: Array.isArray(assistantReport?.recommendations)
-        ? assistantReport.recommendations.slice(0, 6)
+        ? assistantReport.recommendations.map((item) => sanitizeText(String(item)).slice(0, 160)).slice(0, 8)
         : [],
-      whenToSeeDoctor: assistantReport?.whenToSeeDoctor || "",
+      doctorAdvice: sanitizeText(String(doctorAdvice)).slice(0, 500),
+      possibleConditions: Array.isArray(assistantReport?.possibleConditions)
+        ? assistantReport.possibleConditions.map((item) => sanitizeText(String(item)).slice(0, 120)).slice(0, 6)
+        : [],
+      whenToSeeDoctor: sanitizeText(String(assistantReport?.whenToSeeDoctor || doctorAdvice)).slice(0, 500),
+    };
+
+    const normalizedReviewMaker = assistantReviewMaker
+      ? {
+          chiefComplaint: sanitizeText(String(assistantReviewMaker.chiefComplaint || "")).slice(0, 200),
+          symptomTimeline: sanitizeText(String(assistantReviewMaker.symptomTimeline || "")).slice(0, 300),
+          reportedSymptoms: Array.isArray(assistantReviewMaker.reportedSymptoms)
+            ? assistantReviewMaker.reportedSymptoms.map((item) => sanitizeText(String(item)).slice(0, 100)).slice(0, 10)
+            : [],
+          redFlags: Array.isArray(assistantReviewMaker.redFlags)
+            ? assistantReviewMaker.redFlags.map((item) => sanitizeText(String(item)).slice(0, 100)).slice(0, 10)
+            : [],
+          selfCareAttempted: Array.isArray(assistantReviewMaker.selfCareAttempted)
+            ? assistantReviewMaker.selfCareAttempted.map((item) => sanitizeText(String(item)).slice(0, 100)).slice(0, 8)
+            : [],
+          recommendedNextStep: sanitizeText(String(assistantReviewMaker.recommendedNextStep || "")).slice(0, 240),
+          doctorVisitPriority: sanitizeText(String(assistantReviewMaker.doctorVisitPriority || "")).slice(0, 24),
+        }
+      : null;
+
+    const structuredSummary = {
+      summaryText: sanitizeText(
+        String(assistantSummary?.summaryText || responseText || "Structured consultation summary"),
+      ).slice(0, 700),
+      possibleConditions: Array.isArray(assistantSummary?.possibleConditions)
+        ? assistantSummary.possibleConditions.slice(0, 6)
+        : normalizedReport.possibleConditions,
+      recommendations: Array.isArray(assistantSummary?.recommendations)
+        ? assistantSummary.recommendations.slice(0, 8)
+        : normalizedReport.recommendations,
+      whenToSeeDoctor: sanitizeText(String(assistantSummary?.whenToSeeDoctor || normalizedReport.whenToSeeDoctor)).slice(0, 400),
       keywords,
+      severityScore: triage.triageScore,
+      humanReviewFlag: triage.humanReviewFlag,
     };
 
     if (!Array.isArray(db.ai_chat_sessions)) {
@@ -1462,9 +2625,11 @@ function createRouter() {
       question: sanitizedQuestion,
       keywords,
       language,
+      mode: isReviewMode ? "review-maker" : "triage",
       response_summary: sanitizeText(responseText).slice(0, 400),
       triage_score: triage.triageScore,
       human_review_flag: triage.humanReviewFlag,
+      anonymized_symptoms: keywords,
       created_at: new Date().toISOString(),
     });
     await persistDb();
@@ -1472,10 +2637,60 @@ function createRouter() {
     const safeResponse = responseText || "AI assistant did not return a response.";
     return res.json({
       response: safeResponse,
-      report: assistantReport,
+      report: normalizedReport,
       triage,
       summary: structuredSummary,
+      reviewMaker: normalizedReviewMaker,
+      mode: isReviewMode ? "review-maker" : "triage",
     });
+  });
+
+  app.post("/api/ai/medical-summary", async (req, res) => {
+    if (!SUPABASE_FUNCTION_URL) {
+      return res.status(503).json({ message: "AI summary service is unavailable." });
+    }
+    const { messages, language = "en" } = req.body || {};
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ message: "Messages are required" });
+    }
+
+    const condensedTranscript = messages
+      .slice(-20)
+      .map((item) => `${item.role === "assistant" ? "Assistant" : "User"}: ${sanitizeText(String(item.content || ""))}`)
+      .join("\n");
+
+    try {
+      const { summary, reviewMaker, text } = await makeSupabaseChatRequest({
+        model: "google/gemini-3-flash-preview",
+        stream: false,
+        messages: [
+          {
+            role: "system",
+            content: `${reviewMakerPrompt}\nCreate a final compact medical summary for doctor handoff.\nLanguage: ${language}`,
+          },
+          {
+            role: "user",
+            content: condensedTranscript.slice(0, 9000),
+          },
+        ],
+      });
+
+      return res.json({
+        summary: summary || {
+          summaryText: sanitizeText(String(text || "Consultation summary.")).slice(0, 700),
+          possibleConditions: [],
+          recommendations: [],
+          whenToSeeDoctor: "",
+          keywords: [],
+        },
+        reviewMaker: reviewMaker || null,
+      });
+    } catch (error) {
+      console.error("Failed to create medical summary", error);
+      return res.status(502).json({
+        message: error instanceof Error ? error.message : "AI summary generation failed",
+      });
+    }
   });
 
   app.post("/api/ai/chat-evaluations", requireAuth, requireVerifiedDoctor, async (req, res) => {
@@ -1578,6 +2793,22 @@ out center;`;
         if (el.tags?.["addr:street"]) addressParts.push(el.tags["addr:street"]);
         if (el.tags?.["addr:housenumber"]) addressParts.push(el.tags["addr:housenumber"]);
         if (el.tags?.["addr:city"]) addressParts.push(el.tags["addr:city"]);
+        const specializationsRaw =
+          el.tags?.["healthcare:speciality"] ||
+          el.tags?.speciality ||
+          el.tags?.specialization ||
+          "";
+        const specializations = String(specializationsRaw)
+          .split(/[;,]/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .slice(0, 8);
+        const mainPhone = el.tags?.phone || el.tags?.["contact:phone"] || "";
+        const departments = {
+          reception: el.tags?.["contact:phone"] || mainPhone || "",
+          emergency: el.tags?.["emergency:phone"] || "",
+          pharmacy: el.tags?.["pharmacy:phone"] || "",
+        };
         return {
           id: `${el.type}-${el.id}`,
           name: el.tags?.name || "Место",
@@ -1589,10 +2820,11 @@ out center;`;
                 : "pharmacy",
           coordinates: [latlon.lon, latlon.lat],
           address: addressParts.join(", ") || el.tags?.village || el.tags?.city || "",
-          phone: el.tags?.phone || el.tags?.["contact:phone"] || "",
+          phone: mainPhone,
           hours: el.tags?.opening_hours || "—",
           website: el.tags?.website || el.tags?.url,
-          specializations: [],
+          specializations,
+          departments,
           doctorSummary: "",
         };
       })

@@ -49,13 +49,13 @@
     {
       "id": "hQP0NpIzABjD9Wg_KDbYD",
       "email": "sdfgdgfd@gmail.com",
-      "displayName": "ываыва",
+      "displayName": "С‹РІР°С‹РІР°",
       "passwordHash": "$2a$10$VXKazf6A8KX43HslPzhiauQSr4WQWhlhWcKEt5mvBVv/DL5e4YQdO",
       "roles": [
         "user"
       ],
       "user_metadata": {
-        "display_name": "ываыва"
+        "display_name": "С‹РІР°С‹РІР°"
       },
       "app_metadata": {
         "provider": "email",
@@ -64,6 +64,48 @@
         ]
       },
       "created_at": "2026-03-11T07:15:47.830Z",
+      "banned": false,
+      "requested_role": "doctor"
+    },
+    {
+      "id": "yDPCDEEPvaYitbzuxxd82",
+      "email": "sdfsdf@gmail.com",
+      "displayName": "С‹РІР°РІ",
+      "passwordHash": "$2a$10$4k5BRXPMcIezMFvFhgeyPejPemJ/Tg124TUNfMYkRWJ36V1dL9iCO",
+      "roles": [
+        "user"
+      ],
+      "user_metadata": {
+        "display_name": "С‹РІР°РІ"
+      },
+      "app_metadata": {
+        "provider": "email",
+        "roles": [
+          "user"
+        ]
+      },
+      "created_at": "2026-03-12T05:58:11.709Z",
+      "banned": false,
+      "requested_role": "doctor"
+    },
+    {
+      "id": "usboXfuemQ8lYm_4I1Bmp",
+      "email": "fkads@gmail.com",
+      "displayName": "fsdfsdf",
+      "passwordHash": "$2a$10$51ei0CoB7TTeaZTamhXL1.pQCOZ0kGftet1SHvgiDI/gJBu3CBNQa",
+      "roles": [
+        "user"
+      ],
+      "user_metadata": {
+        "display_name": "fsdfsdf"
+      },
+      "app_metadata": {
+        "provider": "email",
+        "roles": [
+          "user"
+        ]
+      },
+      "created_at": "2026-03-12T09:12:17.887Z",
       "banned": false,
       "requested_role": "doctor"
     }
@@ -85,16 +127,66 @@
       "reviewed_at": null,
       "reviewed_by": null,
       "review_note": null
+    },
+    {
+      "id": "mU_Rxuv1SW_KeVfFzaz9g",
+      "user_id": "yDPCDEEPvaYitbzuxxd82",
+      "full_name": "pofjsodfdsf",
+      "specialization": "dermatologist",
+      "license_number": "55-456457",
+      "bio": "РјСЏСѓ",
+      "country": "РљР°Р·Р°С…СЃС‚Р°РЅ",
+      "region": "Atyrauskaya oblast'",
+      "years_of_experience": 10,
+      "workplace": "Р°С‚С‹СЂР°Сѓ",
+      "status": "pending",
+      "submitted_at": "2026-03-12T05:58:11.721Z",
+      "reviewed_at": null,
+      "reviewed_by": null,
+      "review_note": null
+    },
+    {
+      "id": "V4stkX-WNCykwHQ5BuMlb",
+      "user_id": "usboXfuemQ8lYm_4I1Bmp",
+      "full_name": "sdfsdf",
+      "specialization": "dermatologist",
+      "license_number": "55-53456",
+      "bio": "dfgdg",
+      "country": "gdfg",
+      "region": "fgdfg",
+      "years_of_experience": 10,
+      "workplace": "fsdf",
+      "status": "pending",
+      "submitted_at": "2026-03-12T09:12:17.910Z",
+      "reviewed_at": null,
+      "reviewed_by": null,
+      "review_note": null
     }
   ],
-  "medicines": [],
+  "medicines": [
+    {
+      "id": "Qb18c3_J9Ca7kc0jAWdK2",
+      "user_id": "yDPCDEEPvaYitbzuxxd82",
+      "created_at": "2026-03-12T06:25:48.715Z",
+      "name": "fsdf",
+      "purpose": "gdfgdf",
+      "dosage": "fdgdf",
+      "quantity": 1,
+      "form_type": "tablet",
+      "tags": [
+        "sdfdg"
+      ],
+      "expiration_date": "2026-03-20",
+      "notes": null
+    }
+  ],
   "forum_posts": [
     {
       "id": "zgQCmKiabjmiUqzcJzueE",
       "user_id": "wE3IwfanCIXIiGScmeRHV",
       "created_at": "2026-02-12T14:33:59.611Z",
       "status": "open",
-      "views_count": 4,
+      "views_count": 6,
       "replies_count": 0,
       "title": "i have headache doctors help me",
       "content": "ive been ill for like 40 days by now ",
@@ -165,230 +257,305 @@
   "ai_chat_evaluations": [],
   "ai_chat_sessions": [
     {
-      "id": "4UUuMYVm7tq73QQ1kT7Sa",
-      "question": "привет брат",
+      "id": "-xmMWTshxaZfF0Q_Xm966",
+      "question": "РїСЂРёРІРµС‚ РјРѕРµ РёРјСЏ РђСЂР°С„Р°С‚ Сѓ РјРµРЅСЏ Р±РѕР»РёС‚ Р¶РѕРїР°",
       "keywords": [
-        "привет",
-        "брат"
-      ],
-      "language": "ru",
-      "response_summary": "",
-      "created_at": "2026-02-05T15:37:00.508Z"
-    },
-    {
-      "id": "gbmOMC1L6pgRZMISEEY_J",
-      "question": "привет",
-      "keywords": [
-        "привет"
-      ],
-      "language": "ru",
-      "response_summary": "",
-      "created_at": "2026-02-05T15:41:04.402Z"
-    },
-    {
-      "id": "RxPRIDTWgfg9Mhz1VgYH6",
-      "question": "привет",
-      "keywords": [
-        "привет"
-      ],
-      "language": "ru",
-      "response_summary": "",
-      "created_at": "2026-02-05T15:46:42.442Z"
-    },
-    {
-      "id": "rDo7fdQy4FRrWr7DwIvTK",
-      "question": "привет",
-      "keywords": [
-        "привет"
-      ],
-      "language": "ru",
-      "response_summary": "Здравствуйте! Я — ваш интеллектуальный помощник Qamqor. Я готов помочь вам разобраться в вопросах здоровья, симптомах и предоставить полезную медицинскую информацию. \n\nПожалуйста, помните: мои ответы носят ознакомительный характер и не являются диагнозом. \n\nЧем я могу вам помочь сегодня? Если вас что-то беспокоит, опишите свои симптомы.",
-      "created_at": "2026-02-05T15:50:11.239Z"
-    },
-    {
-      "id": "ig1jgFtFvNMZiEDmLwbNX",
-      "question": "привет",
-      "keywords": [
-        "привет"
-      ],
-      "language": "ru",
-      "response_summary": "Приветствую! Я на связи и готов помочь. Если у вас есть вопросы о здоровье, самочувствии или вы хотите узнать больше о каких-то симптомах, просто напишите мне об этом.\n\nЧем я могу быть полезен для вас сегодня?",
-      "created_at": "2026-02-05T15:50:22.361Z"
-    },
-    {
-      "id": "EcQdzGGIj9XiL7ZPUbban",
-      "question": "кыс",
-      "keywords": [
-        "кыс"
-      ],
-      "language": "ru",
-      "response_summary": "Здравствуйте! Я готов помочь вам, как медицинский ассистент платформы Qamqor.\n\nПохоже, ваше сообщение прервалось. Вы хотели написать про «одышку» (көкірек қысу) или какое-то другое ощущение сдавленности?\n\nПожалуйста, опишите подробнее:\n1. Где именно вы чувствуете давление или стеснение (в груди, в горле, в голове)?\n2. Сопровождается ли это другими симптомами (боль, нехватка воздуха, головокружение",
-      "created_at": "2026-02-05T15:57:06.652Z"
-    },
-    {
-      "id": "q47FGU_CQUeZkU9qlKLAm",
-      "question": "",
-      "keywords": [],
-      "language": "ru",
-      "response_summary": "Здравствуйте! Я — ваш медицинский ИИ-ассистент платформы Qamqor. Я готов помочь вам разобраться в вопросах здоровья и предоставить необходимую информацию. Пожалуйста, опишите, что вас беспокоит, и я подготовлю для вас структурированный отчет.\n\n**Важное напоминание:** Этот сервис носит исключительно информационный характер и не заменяет профессиональную медицинскую консультацию, диагностику или леч",
-      "created_at": "2026-02-05T16:01:20.446Z"
-    },
-    {
-      "id": "eTsS-7sMc5-9Jc_Pqx-RZ",
-      "question": "",
-      "keywords": [],
-      "language": "ru",
-      "response_summary": "{\n  \"response\": \"Здравствуйте! Мне жаль, что вы столкнулись с головной болью. Чтобы лучше понять ситуацию, важно обратить внимание на характер боли (давящая, пульсирующая или острая), её локализацию и наличие сопутствующих симптомов, таких как тошнота или чувствительность к свету. Головная боль может быть вызвана множеством факторов — от переутомления до сосудистых изменений.\",\n  \"report\": {\n    \"",
-      "created_at": "2026-02-05T16:01:34.917Z"
-    },
-    {
-      "id": "Y0SrTKs3f5lKhARk0jmGY",
-      "question": "у меня сильно болит горлоэ",
-      "keywords": [
-        "меня",
-        "сильно",
-        "болит",
-        "горлоэ"
-      ],
-      "language": "ru",
-      "response_summary": "Мне очень жаль, что вы столкнулись с сильной болью в горле. Это может быть очень изматывающим состоянием. Сильная боль часто указывает на активный воспалительный процесс, который может быть вызван как вирусной, так и бактериальной инфекцией. Важно следить за общим состоянием и не заниматься самолечением, так как некоторые причины (например, ангина) требуют специфической терапии под контролем врача",
-      "created_at": "2026-02-05T16:03:56.068Z"
-    },
-    {
-      "id": "DHSZx5-7cx8tVY7nkt4Tj",
-      "question": "как ты брат",
-      "keywords": [
-        "как",
-        "брат"
-      ],
-      "language": "ru",
-      "response_summary": "Привет! Как искусственный интеллект, я чувствую себя отлично и всегда готов помочь вам с поиском медицинской информации. Спасибо за заботу!\n\nЧем я могу быть полезен вам сегодня? Если у вас есть вопросы по поводу здоровья или каких-либо симптомов, я постараюсь предоставить вам справочную информацию.\n\n*Напоминаю, что данный сервис носит информационный характер и не заменяет консультацию врача.*",
-      "created_at": "2026-02-09T04:59:43.435Z"
-    },
-    {
-      "id": "VbnXDYjz_K-8tFEai4S96",
-      "question": "приветэ",
-      "keywords": [
-        "приветэ"
-      ],
-      "language": "ru",
-      "response_summary": "{\"id\":\"gen-1770613914-48MMbeYkb0ERW53Xgkhd\",\"provider\":\"Google\",\"model\":\"google/gemini-3-flash-preview\",\"object\":\"chat.completion\",\"created\":1770613914,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Привет! Я медицинский AI-ассистент платформы Qamqor. Я готов помочь вам разобраться в симптомах и предоставить полез",
-      "created_at": "2026-02-09T05:11:56.916Z"
-    },
-    {
-      "id": "uI8GGVRr15QOhPGTo5lXg",
-      "question": "привет как ты брат",
-      "keywords": [
-        "привет",
-        "как",
-        "брат"
-      ],
-      "language": "ru",
-      "response_summary": "{\"id\":\"gen-1770613930-01sFTWS0DUDIHVoaW9qK\",\"provider\":\"Google\",\"model\":\"google/gemini-3-flash-preview\",\"object\":\"chat.completion\",\"created\":1770613930,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Привет! Я — интеллектуальный ассистент платформы Qamqor. Я чувствую себя отлично и готов помочь вам разобраться в во",
-      "created_at": "2026-02-09T05:12:12.957Z"
-    },
-    {
-      "id": "n0yiBsX_4OP8J6VotEDgT",
-      "question": "привет",
-      "keywords": [
-        "привет"
-      ],
-      "language": "ru",
-      "response_summary": "Привет! Я — ваш интеллектуальный помощник Qamqor. Я здесь, чтобы предоставить вам полезную информацию о здоровье, помочь разобраться в симптомах и подсказать, на что стоит обратить внимание.\n\nПожалуйста, помните, что моя помощь носит исключительно информационный характер и не заменяет консультацию профессионального врача.\n\nЧем я могу вам помочь сегодня? Вы можете описать беспокоящие вас симптомы и",
-      "created_at": "2026-02-09T05:19:48.691Z"
-    },
-    {
-      "id": "7rrMMLPpC9mKzOtDaVq4I",
-      "question": "привет",
-      "keywords": [
-        "привет"
-      ],
-      "language": "ru",
-      "response_summary": "{\n  \"response\": \"Мне жаль, что вы столкнулись с болью в горле. Этот симптом часто встречается при различных состояниях — от легкого раздражения до инфекционных заболеваний. Важно следить за общим состоянием, температурой и наличием других симптомов. В большинстве случаев боль в горле проходит самостоятельно при соблюдении питьевого режима и отдыха, однако иногда она может требовать медицинского вм",
-      "created_at": "2026-02-09T05:20:01.936Z"
-    },
-    {
-      "id": "YEYPIBHQQw8VTt2JNeWMH",
-      "question": "привет",
-      "keywords": [
-        "привет"
-      ],
-      "language": "ru",
-      "response_summary": "Здравствуйте! Я — медицинский ИИ-ассистент платформы Qamqor. Я готов помочь вам разобраться в симптомах, предоставить справочную информацию о заболеваниях и подсказать, на что стоит обратить внимание.\n\nПожалуйста, помните: мои ответы носят ознакомительный характер и не являются диагнозом. Если вас что-то беспокоит, я помогу структурировать информацию для визита к врачу.\n\nЧем я могу вам помочь сего",
-      "created_at": "2026-02-09T05:21:48.883Z"
-    },
-    {
-      "id": "5SqlYYcDpviL_2ImH7Ho_",
-      "question": "привет",
-      "keywords": [
-        "привет"
-      ],
-      "language": "ru",
-      "response_summary": "{\n  \"response\": \"Мне жаль, что вы столкнулись с болью в горле. Этот симптом часто встречается при различных состояниях и может варьироваться от легкого раздражения до серьезного воспаления. Важно обратить внимание на сопутствующие признаки, такие как температура, наличие налета на миндалинах или затрудненное глотание. Подобные симптомы могут быть вызваны вирусной инфекцией, бактериальным поражение",
-      "created_at": "2026-02-09T05:21:56.797Z"
-    },
-    {
-      "id": "migF5XjkzP27oJNZxUtyN",
-      "question": "у меня болит горло что делать",
-      "keywords": [
-        "меня",
-        "болит",
-        "горло",
-        "что",
-        "делать"
-      ],
-      "language": "ru",
-      "response_summary": "Здравствуйте! Мне очень жаль, что вы столкнулись с болью в горле – это всегда неприятное состояние. Боль в горле может быть вызвана как обычным ОРВИ, так и бактериальными инфекциями, поэтому важно следить за сопутствующими симптомами. Пожалуйста, помните, что эта информация носит ознакомительный характер и не является диагнозом. Вам следует обеспечить себе покой и пить больше теплой жидкости, пока",
-      "created_at": "2026-02-09T05:22:14.658Z"
-    },
-    {
-      "id": "jQMpCKCWRPinWh494goZ4",
-      "question": "привет",
-      "keywords": [
-        "привет"
+        "РїСЂРёРІРµС‚",
+        "РјРѕРµ",
+        "РёРјСЏ",
+        "Р°СЂР°С„Р°С‚",
+        "РјРµРЅСЏ",
+        "Р±РѕР»РёС‚"
       ],
       "language": "en",
-      "response_summary": "Hello! I am your AI health assistant for Qamqor. How can I help you today? If you are experiencing any symptoms or have health-related questions, please feel free to share them.\n\n*Disclaimer: This platform provides informational support only and does not replace professional medical advice.*",
-      "created_at": "2026-02-12T13:51:03.819Z"
+      "response_summary": "Hello, Arafat. I'm sorry to hear you're experiencing discomfort. Pain in the rectal or anal area can be caused by several different factors, ranging from minor irritations to conditions that require more specific treatment. It is important to monitor your symptoms closely, especially if you notice any changes in bowel habits or bleeding.",
+      "triage_score": 3,
+      "human_review_flag": false,
+      "created_at": "2026-03-12T05:55:47.697Z"
     },
     {
-      "id": "SKEOwtEghRqyWZCztAW5v",
-      "question": "привет",
+      "id": "_6zCYtCj_AhpDtQ56DYCc",
+      "question": "РїСЂРёРІРµС‚ Сѓ РјРµРЅСЏ Р±РѕР»РёС‚ РіРѕР»РѕРІР°",
       "keywords": [
-        "привет"
+        "РїСЂРёРІРµС‚",
+        "РјРµРЅСЏ",
+        "Р±РѕР»РёС‚",
+        "РіРѕР»РѕРІР°"
       ],
       "language": "en",
-      "response_summary": "Hello! I am your AI health assistant for Qamqor. How can I help you today? Whether you have questions about specific symptoms, general health information, or wellness tips, I'm here to provide educational support.\n\nPlease remember that I provide informational support only and do not replace professional medical advice. If you are experiencing a medical emergency, please contact your local emergenc",
-      "created_at": "2026-03-10T05:33:59.460Z"
-    },
-    {
-      "id": "QFFTRfUdv6s8BycZ0pDIM",
-      "question": "привет",
-      "keywords": [
-        "привет"
+      "mode": "triage",
+      "response_summary": "Having a headache can be caused by many factors, ranging from stress to underlying health conditions. It is important to monitor the type of pain and any associated symptoms.",
+      "triage_score": 2,
+      "human_review_flag": false,
+      "anonymized_symptoms": [
+        "РїСЂРёРІРµС‚",
+        "РјРµРЅСЏ",
+        "Р±РѕР»РёС‚",
+        "РіРѕР»РѕРІР°"
       ],
-      "language": "en",
-      "response_summary": "Hello! I am Qamqor's AI health assistant. I am here to provide you with helpful, safety-focused health information and educational support.\n\nHow can I help you today? Please feel free to describe any symptoms you are experiencing or ask a general health question. \n\n*Disclaimer: This platform provides informational support only and does not replace professional medical advice, diagnosis, or treatme",
-      "triage_score": 1,
-      "human_review_flag": true,
-      "created_at": "2026-03-11T07:14:57.044Z"
+      "created_at": "2026-03-12T09:09:51.291Z"
     },
     {
-      "id": "2zrzxYInuraPdy8RthpiM",
-      "question": "привет как ты",
+      "id": "WmWJxVta03LS2lTNyhQcE",
+      "question": "брат как ты",
       "keywords": [
-        "привет",
+        "брат",
         "как"
       ],
       "language": "en",
-      "response_summary": "Hello! I'm doing well, thank you for asking. I am your Qamqor AI health assistant, here to provide you with helpful health information and educational support.\n\nHow can I assist you today? If you have any questions about symptoms or health topics you'd like to discuss, feel free to share.\n\n***\n\n*Disclaimer: This platform provides informational support only and does not replace professional medical",
+      "mode": "triage",
+      "response_summary": "Hello! I am your Qamqor AI health assistant, ready to help you with any health-related questions or symptom assessments. How are you feeling today?",
       "triage_score": 1,
       "human_review_flag": true,
-      "created_at": "2026-03-11T07:17:43.339Z"
+      "anonymized_symptoms": [
+        "брат",
+        "как"
+      ],
+      "created_at": "2026-03-13T04:29:07.010Z"
+    },
+    {
+      "id": "TJvEqYoIJ3xSO3sSeGLcP",
+      "question": "брат пожалуйста не давай абильмансуру себя мучать",
+      "keywords": [
+        "брат",
+        "пожалуйста",
+        "давай",
+        "абильмансуру",
+        "себя",
+        "мучать"
+      ],
+      "language": "en",
+      "mode": "triage",
+      "response_summary": "I am here to provide professional, health-related information and support. If you or someone else is in a situation involving physical harm, distress, or a mental health crisis, please reach out for immediate professional help or contact emergency services.",
+      "triage_score": 1,
+      "human_review_flag": true,
+      "anonymized_symptoms": [
+        "брат",
+        "пожалуйста",
+        "давай",
+        "абильмансуру",
+        "себя",
+        "мучать"
+      ],
+      "created_at": "2026-03-13T04:30:33.766Z"
     }
   ],
-  "admin_logs": [],
+  "admin_logs": [
+    {
+      "id": "3ZVR1tOCbqxWlpqCEwMl1",
+      "admin_id": "wE3IwfanCIXIiGScmeRHV",
+      "action": "Ran anonymized AI chat analysis",
+      "target_type": "ai_chat_sessions",
+      "target_id": null,
+      "details": {
+        "sessionCount": 2,
+        "risk": "low"
+      },
+      "created_at": "2026-03-12T09:45:30.294Z"
+    },
+    {
+      "id": "phDnapC2e1uprP_x8yLLW",
+      "admin_id": "wE3IwfanCIXIiGScmeRHV",
+      "action": "Ran anonymized AI chat analysis",
+      "target_type": "ai_chat_sessions",
+      "target_id": null,
+      "details": {
+        "sessionCount": 4,
+        "risk": "low"
+      },
+      "created_at": "2026-03-13T05:46:05.540Z"
+    },
+    {
+      "id": "2BclwTEVPRozqbAZvVNKL",
+      "admin_id": "wE3IwfanCIXIiGScmeRHV",
+      "action": "Ran anonymized AI chat analysis",
+      "target_type": "ai_chat_sessions",
+      "target_id": null,
+      "details": {
+        "sessionCount": 4,
+        "risk": "low"
+      },
+      "created_at": "2026-03-13T05:46:15.617Z"
+    }
+  ],
   "health_articles": [],
-  "health_news_events": [],
-  "medical_facilities": []
+  "health_news_events": [
+    {
+      "id": "hne-astana-1",
+      "title": "Increased flu-like symptoms in Astana district",
+      "region": "Astana",
+      "country": "Kazakhstan",
+      "summary": "Clinics report increased fever and sore throat cases in the last week.",
+      "symptoms": [
+        "fever",
+        "sore throat",
+        "fatigue"
+      ],
+      "severity_level": 3,
+      "source_url": "https://example.org/health-news/astana-flu",
+      "latitude": 51.1283,
+      "longitude": 71.4306,
+      "published_at": "2026-03-10T09:00:00.000Z",
+      "created_at": "2026-03-10T09:10:00.000Z",
+      "created_by": "wE3IwfanCIXIiGScmeRHV"
+    },
+    {
+      "id": "hne-almaty-1",
+      "title": "Spike in gastrointestinal complaints in Almaty",
+      "region": "Almaty",
+      "country": "Kazakhstan",
+      "summary": "Short-term rise in nausea and stomach pain cases detected.",
+      "symptoms": [
+        "nausea",
+        "stomach pain",
+        "vomiting"
+      ],
+      "severity_level": 4,
+      "source_url": "https://example.org/health-news/almaty-gi",
+      "latitude": 43.222,
+      "longitude": 76.9286,
+      "published_at": "2026-03-09T12:00:00.000Z",
+      "created_at": "2026-03-09T12:20:00.000Z",
+      "created_by": "wE3IwfanCIXIiGScmeRHV"
+    },
+    {
+      "id": "hne-shymkent-1",
+      "title": "Unusual rash reports among school-age children",
+      "region": "Shymkent",
+      "country": "Kazakhstan",
+      "summary": "Local pediatric units flagged a cluster of mild-to-moderate skin rash cases.",
+      "symptoms": [
+        "rash",
+        "itching",
+        "low fever"
+      ],
+      "severity_level": 3,
+      "source_url": "https://example.org/health-news/shymkent-rash",
+      "latitude": 42.3242,
+      "longitude": 69.5901,
+      "published_at": "2026-03-08T07:30:00.000Z",
+      "created_at": "2026-03-08T07:35:00.000Z",
+      "created_by": "wE3IwfanCIXIiGScmeRHV"
+    },
+    {
+      "id": "hne-atyrau-1",
+      "title": "Respiratory symptom growth in Atyrau region",
+      "region": "Atyrau",
+      "country": "Kazakhstan",
+      "summary": "Emergency departments observed more cough and shortness-of-breath visits.",
+      "symptoms": [
+        "cough",
+        "shortness of breath",
+        "chest discomfort"
+      ],
+      "severity_level": 4,
+      "source_url": "https://example.org/health-news/atyrau-respiratory",
+      "latitude": 47.0945,
+      "longitude": 51.9238,
+      "published_at": "2026-03-11T06:00:00.000Z",
+      "created_at": "2026-03-11T06:30:00.000Z",
+      "created_by": "wE3IwfanCIXIiGScmeRHV"
+    },
+    {
+      "id": "hne-aktobe-1",
+      "title": "Localized headache and dizziness trend",
+      "region": "Aktobe",
+      "country": "Kazakhstan",
+      "summary": "Primary care clinics recorded repeated headache-related visits.",
+      "symptoms": [
+        "headache",
+        "dizziness"
+      ],
+      "severity_level": 2,
+      "source_url": "https://example.org/health-news/aktobe-headache",
+      "latitude": 50.2839,
+      "longitude": 57.1669,
+      "published_at": "2026-03-07T14:00:00.000Z",
+      "created_at": "2026-03-07T14:20:00.000Z",
+      "created_by": "wE3IwfanCIXIiGScmeRHV"
+    },
+    {
+      "id": "hne-astana-2",
+      "title": "Second-week increase in fever in Astana",
+      "region": "Astana",
+      "country": "Kazakhstan",
+      "summary": "Sustained growth in high-fever outpatient visits this week.",
+      "symptoms": [
+        "fever",
+        "body aches"
+      ],
+      "severity_level": 4,
+      "source_url": "https://example.org/health-news/astana-fever-week2",
+      "latitude": 51.145,
+      "longitude": 71.437,
+      "published_at": "2026-03-12T08:00:00.000Z",
+      "created_at": "2026-03-12T08:10:00.000Z",
+      "created_by": "wE3IwfanCIXIiGScmeRHV"
+    }
+  ],
+  "medical_facilities": [],
+  "medicine_history": [
+    {
+      "id": "lKHtPolFRfTjfZgmhAtMS",
+      "user_id": "yDPCDEEPvaYitbzuxxd82",
+      "medicine_id": "Qb18c3_J9Ca7kc0jAWdK2",
+      "action": "created",
+      "medicine_name": "fsdf",
+      "dosage": "fdgdf",
+      "quantity": 1,
+      "expiration_date": "2026-03-20",
+      "changes": null,
+      "created_at": "2026-03-12T06:25:48.715Z"
+    }
+  ],
+  "medicine_notifications": [
+    {
+      "id": "N7J278gw-9IdHCSCKbdXm",
+      "user_id": "yDPCDEEPvaYitbzuxxd82",
+      "medicine_id": "Qb18c3_J9Ca7kc0jAWdK2",
+      "medicine_name": "fsdf",
+      "expiration_date": "2026-03-20",
+      "days_left": 8,
+      "channels": {
+        "email": "configured-off",
+        "telegram": "skipped"
+      },
+      "dedupe_key": "yDPCDEEPvaYitbzuxxd82:Qb18c3_J9Ca7kc0jAWdK2:2026-03-20:8",
+      "created_at": "2026-03-12T06:25:48.715Z"
+    }
+  ],
+  "medicine_notification_prefs": [
+    {
+      "id": "dUyLUh9Ht8O-RJaSH8Y01",
+      "user_id": "yDPCDEEPvaYitbzuxxd82",
+      "email_enabled": true,
+      "telegram_enabled": false,
+      "telegram_chat_id": "",
+      "remind_days_before": 30,
+      "updated_at": "2026-03-12T06:23:59.807Z"
+    },
+    {
+      "id": "OgKWhD-THNYKzUPEhqgLF",
+      "user_id": "usboXfuemQ8lYm_4I1Bmp",
+      "email_enabled": true,
+      "telegram_enabled": false,
+      "telegram_chat_id": "",
+      "remind_days_before": 30,
+      "updated_at": "2026-03-12T09:25:56.436Z"
+    },
+    {
+      "id": "gE30Sf0Ojh2b6vUxj2cbg",
+      "user_id": "wE3IwfanCIXIiGScmeRHV",
+      "email_enabled": true,
+      "telegram_enabled": false,
+      "telegram_chat_id": "",
+      "remind_days_before": 30,
+      "updated_at": "2026-03-13T04:29:25.995Z"
+    }
+  ],
+  "doctor_reply_training_samples": [],
+  "two_factor_challenges": [],
+  "user_profiles": [],
+  "bookmarks": [],
+  "tutorial_status": []
 }

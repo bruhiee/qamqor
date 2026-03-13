@@ -36,12 +36,25 @@ import { useLanguage } from "@/contexts/useLanguage";
 
 interface SymptomLog {
   id: string;
+  user_id?: string;
   symptom_date: string;
   symptoms: string[];
   severity: number;
   notes: string | null;
   mood: string | null;
   sleep_hours: number | null;
+  details?: {
+    fever?: {
+      temperature_c?: number | null;
+      measured_at_time?: string | null;
+      medications?: string[];
+    } | null;
+    headache?: {
+      pain_level?: number | null;
+      duration_minutes?: number | null;
+      triggers?: string[];
+    } | null;
+  } | null;
   created_at: string;
 }
 
@@ -50,6 +63,16 @@ const commonSymptoms = [
   "Sore throat", "Body aches", "Dizziness", "Congestion",
   "Stomach pain", "Back pain", "Anxiety", "Insomnia"
 ];
+
+const isFeverSymptom = (label: string) => {
+  const value = label.toLowerCase();
+  return value.includes("fever") || value.includes("temperature") || value.includes("temp");
+};
+
+const isHeadacheSymptom = (label: string) => {
+  const value = label.toLowerCase();
+  return value.includes("headache") || value.includes("migraine") || value.includes("head pain");
+};
 
 export default function SymptomTracker() {
   const { t } = useLanguage();
@@ -67,6 +90,12 @@ export default function SymptomTracker() {
     mood: "okay",
     sleepHours: 7,
     customSymptom: "",
+    feverTemperature: "",
+    feverMeasurementTime: "",
+    feverMedications: "",
+    headachePainLevel: 5,
+    headacheDurationMinutes: "",
+    headacheTriggers: "",
   });
   const moodOptions = [
     { value: "great", label: t.moodGreat, icon: Smile, color: "text-success" },
@@ -98,6 +127,42 @@ export default function SymptomTracker() {
       return;
     }
 
+    const hasFever = formData.symptoms.some(isFeverSymptom);
+    const hasHeadache = formData.symptoms.some(isHeadacheSymptom);
+    const details: Record<string, unknown> = {};
+
+    if (hasFever) {
+      const tempValue = formData.feverTemperature ? Number(formData.feverTemperature) : null;
+      if (tempValue != null && (Number.isNaN(tempValue) || tempValue < 30 || tempValue > 45)) {
+        toast.error("Temperature should be between 30°C and 45°C");
+        return;
+      }
+      details.fever = {
+        temperature_c: tempValue,
+        measured_at_time: formData.feverMeasurementTime || null,
+        medications: formData.feverMedications
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      };
+    }
+
+    if (hasHeadache) {
+      const duration = formData.headacheDurationMinutes ? Number(formData.headacheDurationMinutes) : null;
+      if (duration != null && (Number.isNaN(duration) || duration < 0 || duration > 1440)) {
+        toast.error("Headache duration should be between 0 and 1440 minutes");
+        return;
+      }
+      details.headache = {
+        pain_level: formData.headachePainLevel,
+        duration_minutes: duration,
+        triggers: formData.headacheTriggers
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      };
+    }
+
     try {
       await apiFetch("/symptom-logs", {
         method: "POST",
@@ -108,6 +173,7 @@ export default function SymptomTracker() {
           notes: formData.notes || null,
           mood: formData.mood,
           sleep_hours: formData.sleepHours,
+          details,
         },
       });
 
@@ -141,6 +207,12 @@ export default function SymptomTracker() {
       mood: "okay",
       sleepHours: 7,
       customSymptom: "",
+      feverTemperature: "",
+      feverMeasurementTime: "",
+      feverMedications: "",
+      headachePainLevel: 5,
+      headacheDurationMinutes: "",
+      headacheTriggers: "",
     });
     setIsAddDialogOpen(false);
   };
@@ -200,6 +272,9 @@ export default function SymptomTracker() {
         : t.trendStable
     : t.notAvailable;
 
+  const hasFeverSelected = formData.symptoms.some(isFeverSymptom);
+  const hasHeadacheSelected = formData.symptoms.some(isHeadacheSymptom);
+
   // Get unique symptoms from recent logs for frequency chart
   const symptomFrequency = logs.reduce((acc, log) => {
     log.symptoms.forEach((s) => {
@@ -211,6 +286,25 @@ export default function SymptomTracker() {
   const topSymptoms = Object.entries(symptomFrequency)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
+
+  const feverSeries = [...logs]
+    .map((log) => ({
+      date: log.symptom_date,
+      value: log.details?.fever?.temperature_c,
+    }))
+    .filter((item): item is { date: string; value: number } => Number.isFinite(item.value))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(-10);
+
+  const headacheSeries = [...logs]
+    .map((log) => ({
+      date: log.symptom_date,
+      pain: log.details?.headache?.pain_level,
+      duration: log.details?.headache?.duration_minutes,
+    }))
+    .filter((item): item is { date: string; pain: number; duration?: number | null } => Number.isFinite(item.pain))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(-10);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -300,6 +394,82 @@ export default function SymptomTracker() {
                         </div>
                       )}
                     </div>
+
+                    {hasFeverSelected && (
+                      <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/30">
+                        <p className="text-sm font-semibold">Fever Tracking</p>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <div>
+                            <Label>Temperature (°C)</Label>
+                            <Input
+                              type="number"
+                              min={30}
+                              max={45}
+                              step={0.1}
+                              placeholder="e.g. 38.4"
+                              value={formData.feverTemperature}
+                              onChange={(e) => setFormData({ ...formData, feverTemperature: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <Label>Measurement Time</Label>
+                            <Input
+                              type="time"
+                              value={formData.feverMeasurementTime}
+                              onChange={(e) => setFormData({ ...formData, feverMeasurementTime: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label>Medicines Taken</Label>
+                          <Input
+                            placeholder="Paracetamol, Ibuprofen"
+                            value={formData.feverMedications}
+                            onChange={(e) => setFormData({ ...formData, feverMedications: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {hasHeadacheSelected && (
+                      <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/30">
+                        <p className="text-sm font-semibold">Headache Tracking</p>
+                        <div>
+                          <Label className="mb-3 block">
+                            Pain Level: <span className="font-bold">{formData.headachePainLevel}/10</span>
+                          </Label>
+                          <Slider
+                            value={[formData.headachePainLevel]}
+                            onValueChange={(v) => setFormData({ ...formData, headachePainLevel: v[0] })}
+                            min={1}
+                            max={10}
+                            step={1}
+                            className="py-2"
+                          />
+                        </div>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <div>
+                            <Label>Duration (minutes)</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={1440}
+                              placeholder="e.g. 90"
+                              value={formData.headacheDurationMinutes}
+                              onChange={(e) => setFormData({ ...formData, headacheDurationMinutes: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <Label>Possible Triggers</Label>
+                            <Input
+                              placeholder="Stress, dehydration, screen time"
+                              value={formData.headacheTriggers}
+                              onChange={(e) => setFormData({ ...formData, headacheTriggers: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Severity */}
                     <div>
@@ -479,6 +649,64 @@ export default function SymptomTracker() {
             </motion.div>
           )}
 
+          {(feverSeries.length > 0 || headacheSeries.length > 0) && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-card rounded-xl border border-border p-5 mb-8"
+            >
+              <h3 className="font-display font-semibold mb-4">Adaptive Symptom Metrics</h3>
+              {feverSeries.length > 0 && (
+                <div className="mb-5">
+                  <p className="text-sm font-medium mb-2">Temperature timeline</p>
+                  <div className="space-y-2">
+                    {feverSeries.map((point) => {
+                      const ratio = Math.max(0, Math.min(1, ((point.value - 35) / 6)));
+                      return (
+                        <div key={`fever-${point.date}-${point.value}`} className="flex items-center gap-3">
+                          <span className="text-xs text-muted-foreground w-20">
+                            {new Date(point.date).toLocaleDateString()}
+                          </span>
+                          <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-blue-400 via-amber-400 to-red-500"
+                              style={{ width: `${Math.max(8, ratio * 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium w-14 text-right">{point.value.toFixed(1)}°C</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {headacheSeries.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Headache timeline</p>
+                  <div className="space-y-2">
+                    {headacheSeries.map((point) => (
+                      <div key={`headache-${point.date}-${point.pain}`} className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground w-20">
+                          {new Date(point.date).toLocaleDateString()}
+                        </span>
+                        <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-emerald-400 to-rose-500"
+                            style={{ width: `${Math.max(8, (point.pain / 10) * 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-medium w-20 text-right">
+                          pain {point.pain}/10
+                          {point.duration ? ` · ${point.duration}m` : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
           {/* Logs List */}
           <div className="space-y-3">
             <h3 className="font-display font-semibold">{t.recentLogs}</h3>
@@ -547,6 +775,38 @@ export default function SymptomTracker() {
                           </div>
                           {log.notes && (
                             <p className="text-sm text-muted-foreground">{log.notes}</p>
+                          )}
+                          {(log.details?.fever || log.details?.headache) && (
+                            <div className="mt-3 grid sm:grid-cols-2 gap-2 text-xs">
+                              {log.details?.fever && (
+                                <div className="rounded-lg border border-border bg-muted/40 p-2">
+                                  <p className="font-medium mb-1">Fever details</p>
+                                  {Number.isFinite(log.details.fever.temperature_c) && (
+                                    <p>Temperature: {Number(log.details.fever.temperature_c).toFixed(1)}°C</p>
+                                  )}
+                                  {log.details.fever.measured_at_time && (
+                                    <p>Measured: {log.details.fever.measured_at_time}</p>
+                                  )}
+                                  {log.details.fever.medications && log.details.fever.medications.length > 0 && (
+                                    <p>Medicines: {log.details.fever.medications.join(", ")}</p>
+                                  )}
+                                </div>
+                              )}
+                              {log.details?.headache && (
+                                <div className="rounded-lg border border-border bg-muted/40 p-2">
+                                  <p className="font-medium mb-1">Headache details</p>
+                                  {Number.isFinite(log.details.headache.pain_level) && (
+                                    <p>Pain: {log.details.headache.pain_level}/10</p>
+                                  )}
+                                  {Number.isFinite(log.details.headache.duration_minutes) && (
+                                    <p>Duration: {log.details.headache.duration_minutes} min</p>
+                                  )}
+                                  {log.details.headache.triggers && log.details.headache.triggers.length > 0 && (
+                                    <p>Triggers: {log.details.headache.triggers.join(", ")}</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                         <Button

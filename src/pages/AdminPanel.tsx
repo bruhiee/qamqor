@@ -109,6 +109,9 @@ interface AnalyticsAiChatData {
   sessionCount: number;
   topQueries: AnalyticsTopic[];
   commonKeywords: AnalyticsTopic[];
+  severityDistribution?: Record<string, number>;
+  outbreakSignals?: AnalyticsTopic[];
+  highRiskRatio?: number;
 }
 
 interface AnalyticsMedicineData {
@@ -124,6 +127,44 @@ interface AnalyticsPayload {
   aiConsultant: AnalyticsAiData;
   medicineCabinet: AnalyticsMedicineData;
   aiChat: AnalyticsAiChatData;
+}
+
+interface AdminAiRegionalInsight {
+  region: string;
+  riskLevel: "low" | "moderate" | "high" | "critical";
+  summary: string;
+  likelyDrivers: string[];
+  recommendedActions: string[];
+}
+
+interface AdminAiDiseaseTrend {
+  symptom: string;
+  trend: "rising" | "stable" | "declining";
+  signalStrength: number;
+}
+
+interface AdminAiReport {
+  summary: string;
+  executiveRiskLevel: "low" | "moderate" | "high" | "critical";
+  globalSignals: string[];
+  regionalInsights: AdminAiRegionalInsight[];
+  diseaseTrends: AdminAiDiseaseTrend[];
+  recommendedAdminActions: string[];
+  limitations: string[];
+  confidence: number;
+  generatedAt: string;
+}
+
+interface AdminAiSnapshot {
+  generatedAt: string;
+  sessionCount: number;
+  highRiskRatio: number;
+  severityDistribution: Record<string, number>;
+}
+
+interface AdminAiAnalysisResponse {
+  snapshot: AdminAiSnapshot;
+  report: AdminAiReport;
 }
 
 interface DoctorApplication {
@@ -163,6 +204,9 @@ export default function AdminPanel() {
   const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<AdminAiAnalysisResponse | null>(null);
+  const [aiAnalysisLoading, setAiAnalysisLoading] = useState(false);
+  const [aiAnalysisError, setAiAnalysisError] = useState<string | null>(null);
   const [doctorApplications, setDoctorApplications] = useState<DoctorApplication[]>([]);
   const [doctorApplicationsLoading, setDoctorApplicationsLoading] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -232,6 +276,34 @@ export default function AdminPanel() {
       setAnalyticsError(t.error);
     } finally {
       setAnalyticsLoading(false);
+    }
+  };
+
+  const handleAnalyzeChats = async () => {
+    setAiAnalysisLoading(true);
+    setAiAnalysisError(null);
+    try {
+      const { data } = await apiFetch<{ data: AdminAiAnalysisResponse }>("/admin/analyze-chats", {
+        method: "POST",
+        body: {},
+      });
+      setAiAnalysis(data);
+      toast({
+        title: t.success,
+        description: "AI report generated from anonymized chat data.",
+      });
+      fetchAnalytics();
+      fetchLogs();
+    } catch (error) {
+      console.error("Error running AI chat analysis:", error);
+      setAiAnalysisError(error instanceof Error ? error.message : t.error);
+      toast({
+        title: t.error,
+        description: "Failed to generate AI report.",
+        variant: "destructive",
+      });
+    } finally {
+      setAiAnalysisLoading(false);
     }
   };
 
@@ -471,10 +543,91 @@ export default function AdminPanel() {
             {/* Analytics (Aggregated Only) */}
             <TabsContent value="analytics">
               <div className="bg-card rounded-xl border border-border p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <BarChart3 className="w-5 h-5 text-primary" />
-                  <h3 className="font-medium">{t.aggregatedData}</h3>
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-primary" />
+                    <h3 className="font-medium">{t.aggregatedData}</h3>
+                  </div>
+                  <Button
+                    onClick={handleAnalyzeChats}
+                    disabled={aiAnalysisLoading}
+                    className="gap-2"
+                    variant="destructive"
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    {aiAnalysisLoading ? "Analyzing..." : "Analyze Anonymized Chats"}
+                  </Button>
                 </div>
+
+                {aiAnalysisError && (
+                  <p className="mb-4 text-sm text-destructive">{aiAnalysisError}</p>
+                )}
+
+                {aiAnalysis?.report && (
+                  <div className="mb-6 p-4 rounded-xl border border-destructive/30 bg-destructive/5 space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-semibold">AI Epidemiology Report</p>
+                      <Badge variant="destructive" className="uppercase">
+                        {aiAnalysis.report.executiveRiskLevel}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{aiAnalysis.report.summary}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Sessions: {aiAnalysis.snapshot.sessionCount} · High-risk ratio: {aiAnalysis.snapshot.highRiskRatio}
+                      {" · "}
+                      Confidence: {aiAnalysis.report.confidence}%
+                    </p>
+
+                    <div>
+                      <p className="text-xs font-medium mb-2">Global Signals</p>
+                      <div className="space-y-1">
+                        {aiAnalysis.report.globalSignals.slice(0, 6).map((item, index) => (
+                          <p key={`${item}-${index}`} className="text-xs text-muted-foreground">• {item}</p>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-medium mb-2">Regional Insights</p>
+                      <div className="grid md:grid-cols-2 gap-3">
+                        {aiAnalysis.report.regionalInsights.slice(0, 6).map((region, index) => (
+                          <div key={`${region.region}-${index}`} className="p-3 rounded-lg bg-background border border-border">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-sm font-medium">{region.region}</p>
+                              <Badge variant={region.riskLevel === "high" || region.riskLevel === "critical" ? "destructive" : "secondary"}>
+                                {region.riskLevel}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{region.summary}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-medium mb-2">Symptom Trends</p>
+                      <div className="flex flex-wrap gap-2">
+                        {aiAnalysis.report.diseaseTrends.slice(0, 10).map((trend, index) => (
+                          <Badge key={`${trend.symptom}-${index}`} variant={trend.trend === "rising" ? "destructive" : "outline"}>
+                            {trend.symptom}: {trend.trend} ({trend.signalStrength})
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-medium mb-2">Recommended Admin Actions</p>
+                      <div className="space-y-1">
+                        {aiAnalysis.report.recommendedAdminActions.slice(0, 6).map((item, index) => (
+                          <p key={`${item}-${index}`} className="text-xs text-muted-foreground">• {item}</p>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Generated: {new Date(aiAnalysis.report.generatedAt).toLocaleString()}
+                    </p>
+                  </div>
+                )}
 
                 {analyticsLoading ? (
                   <div className="text-center py-10 text-muted-foreground">{t.loading}</div>
@@ -646,6 +799,28 @@ export default function AdminPanel() {
                               analytics.aiChat.commonKeywords.map((keyword) => (
                                 <Badge key={keyword.label} variant="secondary">
                                   {keyword.label}: {keyword.mentions}
+                                </Badge>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <p className="text-xs text-muted-foreground">Severity distribution (1-5)</p>
+                          <p className="text-xs text-muted-foreground">
+                            {Object.entries(analytics.aiChat.severityDistribution || {})
+                              .map(([level, count]) => `${level}: ${count}`)
+                              .join(" · ") || "No data"}
+                          </p>
+                        </div>
+                        <div className="mt-3">
+                          <p className="text-xs text-muted-foreground">Potential outbreak signals (anonymized)</p>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {(analytics.aiChat.outbreakSignals || []).length === 0 ? (
+                              <p className="text-xs text-muted-foreground">No strong clusters detected.</p>
+                            ) : (
+                              (analytics.aiChat.outbreakSignals || []).map((signal) => (
+                                <Badge key={signal.label} variant="destructive">
+                                  {signal.label}: {signal.mentions}
                                 </Badge>
                               ))
                             )}

@@ -11,7 +11,9 @@ import {
   Sparkles,
   RefreshCw,
   Globe,
-  AlertTriangle
+  AlertTriangle,
+  FileDown,
+  Brain
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -31,6 +33,8 @@ interface Article {
   date: string;
   readTime: string;
   category: string;
+  libraryType: "health-blog" | "symptom-guide" | "knowledge-base" | "medical-dictionary";
+  tags: string[];
   image: string;
   content: string[];
   contentKz?: string[];
@@ -65,6 +69,8 @@ const articles: Article[] = [
     date: "2024-01-15",
     readTime: "8 min",
     category: "Cardiology",
+    libraryType: "knowledge-base",
+    tags: ["heart", "cardiology", "prevention", "exercise"],
     content: [
       "The heart is a muscle that works around the clock to deliver oxygen-rich blood throughout the body; high blood pressure, high cholesterol, smoking, diabetes, and inactivity are the most common risk factors for heart disease.",
       "Regular exercise, a Mediterranean-style diet rich in vegetables, lean proteins, and whole grains, and maintaining a healthy weight help lower blood pressure and inflammation.",
@@ -104,6 +110,8 @@ const articles: Article[] = [
     date: "2024-01-10",
     readTime: "6 min",
     category: "Wellness",
+    libraryType: "health-blog",
+    tags: ["sleep", "recovery", "wellness", "stress"],
     content: [
       "Sleep supports brain clearance, hormone balance, and immune defense; chronic disruptions raise inflammation and worsen mood.",
       "Stick to a consistent bedtime, dim screens at least an hour before sleep, and keep the bedroom cool, dark, and quiet.",
@@ -143,6 +151,8 @@ const articles: Article[] = [
     date: "2024-01-05",
     readTime: "10 min",
     category: "Nutrition",
+    libraryType: "symptom-guide",
+    tags: ["nutrition", "diet", "hydration", "activity"],
     content: [
       "Understanding macronutrients — carbohydrates, proteins, and fats — helps you build meals that support steady energy and satiety.",
       "Hydration matters as much as nutrition; choose mostly water, limit sugary beverages, and respond to your body's thirst cues.",
@@ -154,6 +164,468 @@ const articles: Article[] = [
       "Заменяйте обработанные продукты цельными ингредиентами, изучайте этикетки на соль и сахар и контролируйте размеры порций."
     ],
     image: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400"
+  },
+  {
+    id: "4",
+    title: "Medical Terms Dictionary: Essential Words for Patients",
+    summary: "A plain-language mini dictionary of common medical terms you may hear during consultations.",
+    keyTakeaways: [
+      "Diagnosis means identifying the condition based on symptoms and tests",
+      "Prognosis is the expected course or outcome of a condition",
+      "Contraindication means a reason to avoid a treatment or medicine"
+    ],
+    author: "Editorial Medical Team",
+    date: "2024-02-01",
+    readTime: "5 min",
+    category: "Medical Dictionary",
+    libraryType: "medical-dictionary",
+    tags: ["dictionary", "terms", "patient-education", "health-literacy"],
+    content: [
+      "Diagnosis: the process clinicians use to identify what may be causing your symptoms.",
+      "Prognosis: an estimate of how a disease may progress over time.",
+      "Contraindication: a condition or factor that makes a treatment unsafe for a person."
+    ],
+    image: "https://images.unsplash.com/photo-1530497610245-94d3c16cda28?w=400"
+  },
+  {
+    id: "5",
+    title: "Blood Pressure 101: How to Measure and Interpret Numbers",
+    summary: "Learn what systolic and diastolic values mean, how to measure blood pressure correctly at home, and when to seek care.",
+    keyTakeaways: [
+      "Use a validated arm cuff and rest for 5 minutes before checking",
+      "Track readings at the same time each day for trends",
+      "Very high readings with symptoms require urgent care"
+    ],
+    author: "Dr. Elena Park",
+    date: "2024-02-14",
+    readTime: "7 min",
+    category: "Cardiology",
+    libraryType: "symptom-guide",
+    tags: ["blood pressure", "hypertension", "monitoring", "heart"],
+    content: [
+      "Blood pressure has two numbers: systolic pressure when the heart contracts and diastolic pressure when it relaxes between beats.",
+      "For accurate home readings, avoid caffeine and smoking for 30 minutes, sit with feet flat, and keep the cuff at heart level.",
+      "Bring your blood pressure log to appointments so your clinician can adjust lifestyle or treatment plans based on patterns, not a single reading."
+    ],
+    image: "https://images.unsplash.com/photo-1631815588090-d4bfec5b1ccb?w=400"
+  },
+  {
+    id: "6",
+    title: "Understanding Fever in Children and Adults",
+    summary: "A practical guide to fever thresholds, warning signs, hydration, and safe home care before a clinic visit.",
+    keyTakeaways: [
+      "Fever is often a sign of immune response, not always dangerous",
+      "Hydration and symptom comfort are key in home care",
+      "Seek urgent help for breathing issues, confusion, or dehydration"
+    ],
+    author: "Dr. Omar Rakhimov",
+    date: "2024-02-20",
+    readTime: "8 min",
+    category: "Family Medicine",
+    libraryType: "symptom-guide",
+    tags: ["fever", "infection", "children", "home care"],
+    content: [
+      "Fever commonly reflects the body fighting infection; the overall clinical picture matters more than one number.",
+      "Use age-appropriate dosing for fever reducers, encourage fluids, and monitor urine output, alertness, and breathing.",
+      "Call emergency services if severe symptoms appear, including stiff neck, persistent vomiting, seizure, or altered consciousness."
+    ],
+    image: "https://images.unsplash.com/photo-1584515933487-779824d29309?w=400"
+  },
+  {
+    id: "7",
+    title: "Managing Type 2 Diabetes Day by Day",
+    summary: "Build a daily diabetes routine around nutrition, activity, glucose checks, and medication adherence.",
+    keyTakeaways: [
+      "Small daily habits improve long-term glucose control",
+      "Consistent meals and movement help reduce glucose spikes",
+      "Foot checks and eye exams prevent complications"
+    ],
+    author: "Dr. Linda Gomez",
+    date: "2024-02-26",
+    readTime: "9 min",
+    category: "Endocrinology",
+    libraryType: "knowledge-base",
+    tags: ["diabetes", "glucose", "nutrition", "prevention"],
+    content: [
+      "Type 2 diabetes management combines medication, food planning, activity, stress control, and regular lab follow-up.",
+      "Aim for realistic changes: shorter post-meal walks, regular sleep, and balanced plates with fiber and lean protein.",
+      "Prevent complications by checking feet daily, scheduling retinal exams, and discussing kidney and cholesterol monitoring with your clinician."
+    ],
+    image: "https://images.unsplash.com/photo-1579154204601-01588f351e67?w=400"
+  },
+  {
+    id: "8",
+    title: "Migraine or Tension Headache: How to Tell the Difference",
+    summary: "Recognize key patterns of common headaches and learn when red flags suggest urgent evaluation.",
+    keyTakeaways: [
+      "Migraine often includes nausea, light sensitivity, or aura",
+      "Tension headaches are usually pressure-like and bilateral",
+      "Sudden worst-ever headache needs emergency assessment"
+    ],
+    author: "Dr. Priya Anand",
+    date: "2024-03-02",
+    readTime: "6 min",
+    category: "Neurology",
+    libraryType: "symptom-guide",
+    tags: ["headache", "migraine", "neurology", "symptoms"],
+    content: [
+      "Migraines can be pulsating, one-sided, and linked to nausea or sensitivity to light and sound, while tension headaches feel like a tight band.",
+      "Track triggers such as sleep debt, dehydration, skipped meals, stress, and hormonal changes to reduce attack frequency.",
+      "Seek urgent care for thunderclap headache, neurologic deficits, fever with neck stiffness, or head injury."
+    ],
+    image: "https://images.unsplash.com/photo-1477332552946-cfb384aeaf1c?w=400"
+  },
+  {
+    id: "9",
+    title: "Respiratory Symptoms: Cough, Wheeze, and Shortness of Breath",
+    summary: "Understand common respiratory symptoms and identify warning patterns that should not be ignored.",
+    keyTakeaways: [
+      "Duration and trigger patterns help narrow likely causes",
+      "Shortness of breath at rest can indicate serious illness",
+      "Pulse oximetry is useful but does not replace clinical exam"
+    ],
+    author: "Dr. Jacob Miller",
+    date: "2024-03-07",
+    readTime: "8 min",
+    category: "Pulmonology",
+    libraryType: "knowledge-base",
+    tags: ["cough", "asthma", "breathing", "lungs"],
+    content: [
+      "Respiratory complaints can result from infections, asthma, allergies, reflux, or chronic lung disease, so history and exam are essential.",
+      "Note whether symptoms worsen with exercise, cold air, smoke exposure, or nighttime patterns to help with diagnosis.",
+      "Emergency care is needed for chest pain, blue lips, severe breathlessness, confusion, or rapidly worsening symptoms."
+    ],
+    image: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=400"
+  },
+  {
+    id: "10",
+    title: "Gut Health Basics: Bloating, Constipation, and IBS",
+    summary: "A practical introduction to common digestive complaints and structured self-monitoring before doctor visits.",
+    keyTakeaways: [
+      "Fiber and hydration improve bowel regularity",
+      "Food and stress diaries can reveal symptom triggers",
+      "Blood in stool or unexplained weight loss are red flags"
+    ],
+    author: "Dr. Hannah Reed",
+    date: "2024-03-13",
+    readTime: "7 min",
+    category: "Gastroenterology",
+    libraryType: "health-blog",
+    tags: ["digestion", "ibs", "bloating", "nutrition"],
+    content: [
+      "Digestive symptoms are common and often multifactorial, involving diet, gut motility, stress, and microbiome balance.",
+      "Increase fiber gradually, drink enough water, and use symptom diaries to identify foods or situations linked to discomfort.",
+      "See a clinician promptly for persistent vomiting, severe abdominal pain, fever, rectal bleeding, or unexplained weight loss."
+    ],
+    image: "https://images.unsplash.com/photo-1559757175-08f7b7f6aaf2?w=400"
+  },
+  {
+    id: "11",
+    title: "Mental Health Check-In: Recognizing Burnout Early",
+    summary: "Understand the signs of burnout and build a recovery plan with boundaries, sleep, and professional support.",
+    keyTakeaways: [
+      "Burnout affects mood, sleep, focus, and physical energy",
+      "Recovery requires workload and lifestyle changes",
+      "Persistent hopelessness needs urgent mental health support"
+    ],
+    author: "Dr. Aisha Karim",
+    date: "2024-03-18",
+    readTime: "6 min",
+    category: "Mental Health",
+    libraryType: "health-blog",
+    tags: ["burnout", "stress", "mental health", "sleep"],
+    content: [
+      "Burnout often appears as emotional exhaustion, reduced effectiveness, cynicism, irritability, and physical fatigue.",
+      "Structured routines, clear boundaries, social support, and therapy can improve resilience and reduce symptom recurrence.",
+      "If thoughts of self-harm or severe depression are present, contact emergency services or crisis support immediately."
+    ],
+    image: "https://images.unsplash.com/photo-1493836512294-502baa1986e2?w=400"
+  },
+  {
+    id: "12",
+    title: "Allergy Season Survival Guide",
+    summary: "Reduce allergy symptoms using environmental controls, medication timing, and trigger forecasting.",
+    keyTakeaways: [
+      "Pollen exposure can be lowered with simple home routines",
+      "Preventive treatment works better than late treatment",
+      "Breathing difficulty may indicate severe allergic reaction"
+    ],
+    author: "Dr. Eric Choi",
+    date: "2024-03-24",
+    readTime: "5 min",
+    category: "Immunology",
+    libraryType: "symptom-guide",
+    tags: ["allergy", "pollen", "rhinitis", "prevention"],
+    content: [
+      "Seasonal allergies cause sneezing, itching, watery eyes, and congestion, often worse on high pollen days.",
+      "Shower after outdoor exposure, keep windows closed during peak pollen times, and consider HEPA filtration indoors.",
+      "Use antihistamines or nasal therapies as advised; seek urgent care for wheezing, swelling, or breathing compromise."
+    ],
+    image: "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=400"
+  },
+  {
+    id: "13",
+    title: "First Signs of Dehydration and How to Rehydrate Safely",
+    summary: "Learn to spot dehydration early and choose effective fluid replacement strategies.",
+    keyTakeaways: [
+      "Thirst, dark urine, and dizziness are common early signs",
+      "Oral rehydration can be more effective than plain water alone",
+      "Children and older adults dehydrate faster"
+    ],
+    author: "Dr. Matthew Silva",
+    date: "2024-03-29",
+    readTime: "5 min",
+    category: "Emergency Basics",
+    libraryType: "symptom-guide",
+    tags: ["dehydration", "fluids", "heat", "first aid"],
+    content: [
+      "Mild dehydration can cause fatigue, headache, dry mouth, and reduced urine output, especially during heat or illness.",
+      "Use oral rehydration solutions after vomiting or diarrhea; take small frequent sips instead of large volumes at once.",
+      "Get immediate care for confusion, fainting, inability to keep fluids down, or signs of severe dehydration."
+    ],
+    image: "https://images.unsplash.com/photo-1523362628745-0c100150b504?w=400"
+  },
+  {
+    id: "14",
+    title: "Understanding Laboratory Tests: CBC, CRP, and Glucose",
+    summary: "A patient-friendly explanation of common lab tests and how to discuss results with your doctor.",
+    keyTakeaways: [
+      "One abnormal result does not always mean disease",
+      "Trends over time are often more informative than single values",
+      "Interpretation depends on symptoms and medical history"
+    ],
+    author: "Dr. Kevin Stone",
+    date: "2024-04-04",
+    readTime: "8 min",
+    category: "Diagnostics",
+    libraryType: "knowledge-base",
+    tags: ["labs", "cbc", "crp", "glucose"],
+    content: [
+      "Complete blood count helps evaluate infection, anemia, and platelet status, while CRP reflects inflammation patterns.",
+      "Glucose and HbA1c provide complementary information about current and long-term sugar regulation.",
+      "Review all results with context: medications, hydration, recent illness, and baseline values can affect interpretation."
+    ],
+    image: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=400"
+  },
+  {
+    id: "15",
+    title: "Women's Health: Tracking Cycle-Related Symptoms",
+    summary: "Use symptom tracking to better understand menstrual patterns, pain, and hormonal changes.",
+    keyTakeaways: [
+      "Cycle tracking can improve diagnosis of recurrent symptoms",
+      "Severe pain is common but not always normal",
+      "Irregular bleeding should be evaluated clinically"
+    ],
+    author: "Dr. Natalia Sokolova",
+    date: "2024-04-10",
+    readTime: "7 min",
+    category: "Gynecology",
+    libraryType: "health-blog",
+    tags: ["women's health", "cycle", "pain", "tracking"],
+    content: [
+      "Recording cycle length, bleeding intensity, mood changes, and pain allows more precise conversations with healthcare professionals.",
+      "Lifestyle factors like sleep, stress, and exercise can influence symptoms and should be included in your tracking log.",
+      "Seek care for very heavy bleeding, severe pain unresponsive to usual measures, or cycles that become persistently irregular."
+    ],
+    image: "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=400"
+  },
+  {
+    id: "16",
+    title: "Joint Pain Guide: Inflammation vs Overuse",
+    summary: "Differentiate mechanical pain from inflammatory patterns and choose safe first-line management.",
+    keyTakeaways: [
+      "Morning stiffness duration can suggest inflammatory causes",
+      "Load management and movement aid recovery in overuse injuries",
+      "Hot swollen joints with fever require urgent evaluation"
+    ],
+    author: "Dr. Robert Kline",
+    date: "2024-04-16",
+    readTime: "7 min",
+    category: "Rheumatology",
+    libraryType: "knowledge-base",
+    tags: ["joint pain", "arthritis", "inflammation", "mobility"],
+    content: [
+      "Joint pain may result from strain, degeneration, autoimmune inflammation, or infection, each requiring different treatment strategies.",
+      "Gentle motion, graded strengthening, and temporary load reduction often help mechanical pain recover faster.",
+      "Do not delay care if a joint becomes acutely red, hot, and swollen, especially with fever or inability to bear weight."
+    ],
+    image: "https://images.unsplash.com/photo-1512678080530-7760d81faba6?w=400"
+  },
+  {
+    id: "17",
+    title: "Skin Rash Basics: What Photos Can and Cannot Tell",
+    summary: "Understand the limits of visual self-assessment and when in-person dermatology review is needed.",
+    keyTakeaways: [
+      "Rash appearance changes with skin tone and lighting",
+      "Itch, pain, fever, and spread pattern are key context clues",
+      "Rapid swelling or breathing issues may signal emergency allergy"
+    ],
+    author: "Dr. Melissa Tran",
+    date: "2024-04-21",
+    readTime: "6 min",
+    category: "Dermatology",
+    libraryType: "symptom-guide",
+    tags: ["rash", "skin", "allergy", "dermatology"],
+    content: [
+      "Photos can help track progression, but diagnosis requires history, physical exam, and sometimes laboratory tests.",
+      "Document onset, new products, medications, recent infections, and exposure history to improve diagnostic accuracy.",
+      "Seek urgent care for facial swelling, mucosal lesions, high fever, rapidly spreading rash, or breathing symptoms."
+    ],
+    image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400"
+  },
+  {
+    id: "18",
+    title: "Vaccination Q&A: Timing, Side Effects, and Myths",
+    summary: "A clear guide to vaccine schedules, expected reactions, and when post-vaccination symptoms need attention.",
+    keyTakeaways: [
+      "Mild side effects are common and usually short-lived",
+      "Vaccination protects both individuals and communities",
+      "Severe reactions are rare but require immediate treatment"
+    ],
+    author: "Dr. Daniel Foster",
+    date: "2024-04-27",
+    readTime: "8 min",
+    category: "Preventive Medicine",
+    libraryType: "knowledge-base",
+    tags: ["vaccination", "prevention", "immunity", "public health"],
+    content: [
+      "Vaccines train immune memory to recognize serious infections and reduce disease severity, hospitalization, and complications.",
+      "Common reactions include arm soreness, mild fever, and fatigue; these usually resolve within one to two days.",
+      "Discuss timing, pregnancy, chronic conditions, and prior reactions with your clinician to personalize recommendations."
+    ],
+    image: "https://images.unsplash.com/photo-1600959907703-125ba1374a12?w=400"
+  },
+  {
+    id: "19",
+    title: "Medical Dictionary: Triage, Comorbidity, and Acute Care",
+    summary: "Key terms frequently used in emergency and hospital settings explained in plain language.",
+    keyTakeaways: [
+      "Triage prioritizes patients by urgency and risk",
+      "Comorbidity means multiple conditions present together",
+      "Acute care focuses on immediate short-term treatment"
+    ],
+    author: "Editorial Medical Team",
+    date: "2024-05-03",
+    readTime: "4 min",
+    category: "Medical Dictionary",
+    libraryType: "medical-dictionary",
+    tags: ["dictionary", "triage", "hospital", "terms"],
+    content: [
+      "Triage: a structured process used to decide which patients need immediate care first.",
+      "Comorbidity: the presence of one or more additional health conditions alongside a primary diagnosis.",
+      "Acute care: short-term medical treatment for sudden or severe illness and injury."
+    ],
+    image: "https://images.unsplash.com/photo-1516549655669-df83a0774514?w=400"
+  },
+  {
+    id: "20",
+    title: "Medical Dictionary: Screening, Sensitivity, and Specificity",
+    summary: "Understand core screening concepts that appear in test recommendations and result interpretation.",
+    keyTakeaways: [
+      "Screening detects risk before symptoms appear",
+      "Sensitivity measures true positive detection",
+      "Specificity measures true negative identification"
+    ],
+    author: "Editorial Medical Team",
+    date: "2024-05-08",
+    readTime: "4 min",
+    category: "Medical Dictionary",
+    libraryType: "medical-dictionary",
+    tags: ["dictionary", "screening", "diagnostics", "health literacy"],
+    content: [
+      "Screening: testing people without symptoms to identify disease risk early.",
+      "Sensitivity: how well a test correctly identifies people who have a condition.",
+      "Specificity: how well a test correctly identifies people who do not have a condition."
+    ],
+    image: "https://images.unsplash.com/photo-1579154204601-01588f351e67?w=400"
+  },
+  {
+    id: "21",
+    title: "Back Pain at Work: Ergonomics and Recovery",
+    summary: "Prevent and reduce office-related back pain using posture, breaks, and progressive strengthening.",
+    keyTakeaways: [
+      "Prolonged static posture increases pain risk",
+      "Micro-breaks and movement snacks reduce stiffness",
+      "Neurologic deficits require urgent assessment"
+    ],
+    author: "Dr. Irene Volkova",
+    date: "2024-05-14",
+    readTime: "6 min",
+    category: "Musculoskeletal",
+    libraryType: "health-blog",
+    tags: ["back pain", "ergonomics", "exercise", "workplace"],
+    content: [
+      "Most office-related back pain improves with movement, load management, and targeted strength work rather than prolonged rest.",
+      "Adjust chair height, monitor level, and keyboard position to keep a neutral spine and reduce repetitive strain.",
+      "Seek immediate medical care for new weakness, numbness in saddle area, or bowel and bladder control changes."
+    ],
+    image: "https://images.unsplash.com/photo-1584467735871-8f7f2d3d6f54?w=400"
+  },
+  {
+    id: "22",
+    title: "Antibiotics: When They Help and When They Do Not",
+    summary: "Learn why antibiotics are essential for bacterial infections but ineffective for most viral illnesses.",
+    keyTakeaways: [
+      "Antibiotics do not treat colds or most flu cases",
+      "Incomplete courses increase resistance risk",
+      "Side effects should be reported early"
+    ],
+    author: "Dr. Samuel Greene",
+    date: "2024-05-20",
+    readTime: "7 min",
+    category: "Infectious Disease",
+    libraryType: "knowledge-base",
+    tags: ["antibiotics", "infection", "resistance", "medication safety"],
+    content: [
+      "Antibiotics target bacteria, not viruses, so unnecessary use offers little benefit and can cause harm.",
+      "Take medications exactly as prescribed and never share leftovers, since dosing and drug choice are diagnosis-specific.",
+      "Contact your clinician if you develop rash, severe diarrhea, persistent fever, or no improvement after expected time."
+    ],
+    image: "https://images.unsplash.com/photo-1582719471384-894fbb16e074?w=400"
+  },
+  {
+    id: "23",
+    title: "Healthy Aging: Preventive Care After 50",
+    summary: "A preventive roadmap covering mobility, cognition, vaccination, bone health, and screening priorities.",
+    keyTakeaways: [
+      "Strength and balance training lowers fall risk",
+      "Routine screening supports early detection",
+      "Social connection improves physical and mental outcomes"
+    ],
+    author: "Dr. Grace Liu",
+    date: "2024-05-27",
+    readTime: "9 min",
+    category: "Geriatrics",
+    libraryType: "health-blog",
+    tags: ["aging", "prevention", "screening", "mobility"],
+    content: [
+      "Healthy aging is built on preventive habits: exercise, sleep, nutrition, vaccination, and regular medication review.",
+      "Prioritize resistance training, balance work, vision checks, and home safety modifications to reduce injury risk.",
+      "Discuss age-appropriate cancer screening, bone density, hearing, and memory concerns with your healthcare team."
+    ],
+    image: "https://images.unsplash.com/photo-1513151233558-d860c5398176?w=400"
+  },
+  {
+    id: "24",
+    title: "Medical Dictionary: Chronic, Remission, and Relapse",
+    summary: "Common long-term care terms explained for patients and families navigating ongoing treatment.",
+    keyTakeaways: [
+      "Chronic conditions last months or years",
+      "Remission means reduced or absent disease activity",
+      "Relapse means symptoms or disease activity return"
+    ],
+    author: "Editorial Medical Team",
+    date: "2024-06-02",
+    readTime: "4 min",
+    category: "Medical Dictionary",
+    libraryType: "medical-dictionary",
+    tags: ["dictionary", "chronic care", "terms", "patient education"],
+    content: [
+      "Chronic: a condition that persists for a long period and often needs ongoing management.",
+      "Remission: a phase when disease signs are minimal or absent, though follow-up may still be required.",
+      "Relapse: the return of symptoms or disease activity after improvement."
+    ],
+    image: "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=400"
   }
 ];
 
@@ -234,15 +706,51 @@ export default function HealthArticles() {
   const [language, setLanguage] = useState<"en" | "ru" | "kz">("en");
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [currentFactIndex, setCurrentFactIndex] = useState(0);
+  const [activeCategory, setActiveCategory] = useState<"all" | Article["libraryType"]>("all");
+  const [activeTag, setActiveTag] = useState<string>("all");
   const copy = articlePageCopy[language];
+
+  const categoryLabels =
+    language === "ru"
+      ? {
+          all: "Все",
+          "health-blog": "Блог о здоровье",
+          "symptom-guide": "Руководство по симптомам",
+          "knowledge-base": "База медицинских знаний",
+          "medical-dictionary": "Словарь медицинских терминов",
+        }
+      : language === "kz"
+        ? {
+            all: "Барлығы",
+            "health-blog": "Денсаулық блогы",
+            "symptom-guide": "Симптом нұсқаулығы",
+            "knowledge-base": "Медициналық білім базасы",
+            "medical-dictionary": "Медициналық терминдер сөздігі",
+          }
+        : {
+            all: "All",
+            "health-blog": "Health Blog",
+            "symptom-guide": "Symptom Guide",
+            "knowledge-base": "Medical Knowledge Base",
+            "medical-dictionary": "Medical Dictionary",
+          };
+
+  const allTags = Array.from(new Set(articles.flatMap((article) => article.tags))).sort();
 
   const filteredArticles = articles.filter((article) => {
     const title = language === "ru" ? article.titleRu : language === "kz" ? article.titleKz : article.title;
     const summary = language === "ru" ? article.summaryRu : language === "kz" ? article.summaryKz : article.summary;
+    const categoryMatch = activeCategory === "all" || article.libraryType === activeCategory;
+    const tagMatch = activeTag === "all" || article.tags.includes(activeTag);
     return (
-      (title?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
-      (summary?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
-      article.category.toLowerCase().includes(searchQuery.toLowerCase())
+      categoryMatch &&
+      tagMatch &&
+      (
+        (title?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
+        (summary?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
+        article.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        article.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
     );
   });
 
@@ -279,6 +787,31 @@ export default function HealthArticles() {
 
   const nextFact = () => {
     setCurrentFactIndex((prev) => (prev + 1) % healthFacts.length);
+  };
+
+  const downloadArticleAsPdf = (article: Article) => {
+    const win = window.open("", "_blank", "width=900,height=700");
+    if (!win) return;
+    const html = `
+      <html>
+      <head><title>${getTitle(article)}</title></head>
+      <body style="font-family: Arial, sans-serif; padding: 24px; line-height: 1.5;">
+        <h1>${getTitle(article)}</h1>
+        <p><strong>Category:</strong> ${article.category}</p>
+        <p><strong>Author:</strong> ${article.author}</p>
+        <p><strong>Date:</strong> ${article.date}</p>
+        <p>${getSummary(article)}</p>
+        ${getContent(article).map((paragraph) => `<p>${paragraph}</p>`).join("")}
+        <h3>${copy.keyTakeaways}</h3>
+        <ul>${getTakeaways(article).map((item) => `<li>${item}</li>`).join("")}</ul>
+      </body>
+      </html>
+    `;
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
   };
 
   const languageLabels = {
@@ -379,6 +912,44 @@ export default function HealthArticles() {
                    className="pl-10"
                  />
             </div>
+            <div className="flex flex-wrap gap-2 mt-4">
+              {(
+                ["all", "health-blog", "symptom-guide", "knowledge-base", "medical-dictionary"] as const
+              ).map((category) => (
+                <Button
+                  key={category}
+                  variant={activeCategory === category ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveCategory(category)}
+                >
+                  {categoryLabels[category]}
+                </Button>
+              ))}
+            </div>
+            <div className="mt-4">
+              <p className="text-xs text-muted-foreground mb-2">
+                {language === "ru" ? "Популярные теги" : language === "kz" ? "Танымал тегтер" : "Popular tags"}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={activeTag === "all" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveTag("all")}
+                >
+                  All
+                </Button>
+                {allTags.map((tag) => (
+                  <Button
+                    key={tag}
+                    variant={activeTag === tag ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setActiveTag(tag)}
+                  >
+                    #{tag}
+                  </Button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Articles Grid */}
@@ -421,6 +992,13 @@ export default function HealthArticles() {
                       {article.readTime}
                     </div>
                   </div>
+                  <div className="flex flex-wrap gap-1 mt-3">
+                    {article.tags.slice(0, 3).map((tag) => (
+                      <span key={tag} className="text-[11px] px-2 py-0.5 rounded-full bg-muted">
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -432,6 +1010,27 @@ export default function HealthArticles() {
               <p className="text-muted-foreground">{copy.noArticles}</p>
             </div>
           )}
+
+          <div className="mt-10 bg-card border border-border rounded-xl p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <Brain className="w-5 h-5 text-primary" />
+              <h3 className="font-display text-xl font-semibold">
+                {language === "ru" ? "Медицинские викторины (планируется)" : language === "kz" ? "Медициналық викториналар (жоспарлануда)" : "Medical Quizzes (Planned)"}
+              </h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              {language === "ru"
+                ? "Скоро пользователи смогут проверять знания о здоровье и распространённых медицинских мифах."
+                : language === "kz"
+                  ? "Жақында пайдаланушылар денсаулық және кең таралған медициналық мифтер бойынша білімін тексере алады."
+                  : "Soon users will be able to test their knowledge about health and common medical myths."}
+            </p>
+            <div className="grid md:grid-cols-3 gap-3 text-sm">
+              <div className="p-3 rounded-lg bg-muted">Nutrition myths quiz</div>
+              <div className="p-3 rounded-lg bg-muted">Sleep and recovery quiz</div>
+              <div className="p-3 rounded-lg bg-muted">Symptom awareness quiz</div>
+            </div>
+          </div>
 
           {/* Article Detail Modal */}
           <AnimatePresence>
@@ -512,9 +1111,19 @@ export default function HealthArticles() {
                         <User className="w-4 h-4" />
                         {selectedArticle.author}
                       </div>
-                       <Button onClick={() => setSelectedArticle(null)}>
-                         {copy.close}
-                       </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          className="gap-2"
+                          onClick={() => downloadArticleAsPdf(selectedArticle)}
+                        >
+                          <FileDown className="w-4 h-4" />
+                          {language === "ru" ? "Скачать PDF" : language === "kz" ? "PDF жүктеу" : "Download PDF"}
+                        </Button>
+                        <Button onClick={() => setSelectedArticle(null)}>
+                          {copy.close}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </motion.div>

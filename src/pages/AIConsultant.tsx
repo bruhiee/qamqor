@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+﻿import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,15 +38,20 @@ import { Link } from "react-router-dom";
 
 interface AIReport {
   riskLevel: "low" | "medium" | "high";
+  severityScore?: number;
+  assessmentExplanation?: string;
+  possibleCauses?: string[];
   possibleConditions: string[];
   recommendations: string[];
   whenToSeeDoctor: string;
+  doctorAdvice?: string;
 }
 
 interface AITriage {
   triageScore: number;
   triageLevelLabel: string;
   humanReviewFlag: boolean;
+  humanReviewReason?: string | null;
 }
 
 interface AISummary {
@@ -55,6 +60,18 @@ interface AISummary {
   recommendations: string[];
   whenToSeeDoctor: string;
   keywords: string[];
+  severityScore?: number;
+  humanReviewFlag?: boolean;
+}
+
+interface AIReviewMaker {
+  chiefComplaint?: string;
+  symptomTimeline?: string;
+  reportedSymptoms?: string[];
+  redFlags?: string[];
+  selfCareAttempted?: string[];
+  recommendedNextStep?: string;
+  doctorVisitPriority?: string;
 }
 
 interface Message {
@@ -66,6 +83,8 @@ interface Message {
   report?: AIReport;
   triage?: AITriage;
   summary?: AISummary;
+  reviewMaker?: AIReviewMaker | null;
+  mode?: "triage" | "review-maker";
 }
 
 export default function AIConsultant() {
@@ -78,16 +97,20 @@ export default function AIConsultant() {
       id: "welcome",
       role: "assistant",
       content: language === 'ru' 
-        ? "Здравствуйте! Я ваш ИИ-помощник по здоровью на базе продвинутого ИИ. Я помогу вам понять ваши симптомы и предоставлю общую информацию о здоровье. Вы можете ввести симптомы, загрузить изображение или использовать голосовой ввод. Чем могу помочь?"
+        ? "Р—РґСЂР°РІСЃС‚РІСѓР№С‚Рµ! РЇ РІР°С€ РР-РїРѕРјРѕС‰РЅРёРє РїРѕ Р·РґРѕСЂРѕРІСЊСЋ РЅР° Р±Р°Р·Рµ РїСЂРѕРґРІРёРЅСѓС‚РѕРіРѕ РР. РЇ РїРѕРјРѕРіСѓ РІР°Рј РїРѕРЅСЏС‚СЊ РІР°С€Рё СЃРёРјРїС‚РѕРјС‹ Рё РїСЂРµРґРѕСЃС‚Р°РІР»СЋ РѕР±С‰СѓСЋ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ Р·РґРѕСЂРѕРІСЊРµ. Р’С‹ РјРѕР¶РµС‚Рµ РІРІРµСЃС‚Рё СЃРёРјРїС‚РѕРјС‹, Р·Р°РіСЂСѓР·РёС‚СЊ РёР·РѕР±СЂР°Р¶РµРЅРёРµ РёР»Рё РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ РіРѕР»РѕСЃРѕРІРѕР№ РІРІРѕРґ. Р§РµРј РјРѕРіСѓ РїРѕРјРѕС‡СЊ?"
         : language === 'kk'
-        ? "Сәлеметсіз бе! Мен сіздің ЖИ денсаулық көмекшіңізбін. Мен симптомдарыңызды түсінуге және жалпы денсаулық туралы ақпарат беруге көмектесемін. Симптомдарды жаза аласыз, сурет жүктей аласыз немесе дауыспен енгізуді қолдана аласыз. Сізге қалай көмектесе аламын?"
+        ? "РЎУ™Р»РµРјРµС‚СЃС–Р· Р±Рµ! РњРµРЅ СЃС–Р·РґС–ТЈ Р–Р РґРµРЅСЃР°СѓР»С‹Т› РєУ©РјРµРєС€С–ТЈС–Р·Р±С–РЅ. РњРµРЅ СЃРёРјРїС‚РѕРјРґР°СЂС‹ТЈС‹Р·РґС‹ С‚ТЇСЃС–РЅСѓРіРµ Р¶У™РЅРµ Р¶Р°Р»РїС‹ РґРµРЅСЃР°СѓР»С‹Т› С‚СѓСЂР°Р»С‹ Р°Т›РїР°СЂР°С‚ Р±РµСЂСѓРіРµ РєУ©РјРµРєС‚РµСЃРµРјС–РЅ. РЎРёРјРїС‚РѕРјРґР°СЂРґС‹ Р¶Р°Р·Р° Р°Р»Р°СЃС‹Р·, СЃСѓСЂРµС‚ Р¶ТЇРєС‚РµР№ Р°Р»Р°СЃС‹Р· РЅРµРјРµСЃРµ РґР°СѓС‹СЃРїРµРЅ РµРЅРіС–Р·СѓРґС– Т›РѕР»РґР°РЅР° Р°Р»Р°СЃС‹Р·. РЎС–Р·РіРµ Т›Р°Р»Р°Р№ РєУ©РјРµРєС‚РµСЃРµ Р°Р»Р°РјС‹РЅ?"
         : "Hello! I'm your AI health assistant powered by advanced AI. I'm here to help you understand your symptoms and provide general health information. You can type your symptoms, upload an image, or use voice input. How can I assist you today?",
       timestamp: new Date(),
     }
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isFinalizingSummary, setIsFinalizingSummary] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [mode, setMode] = useState<"triage" | "review-maker">("triage");
+  const [finalSummary, setFinalSummary] = useState<AISummary | null>(null);
+  const [finalReviewMaker, setFinalReviewMaker] = useState<AIReviewMaker | null>(null);
   const [isEvaluationOpen, setIsEvaluationOpen] = useState(false);
   const [doctorEvaluation, setDoctorEvaluation] = useState({
     urgencyAssessmentCorrectness: "",
@@ -101,7 +124,7 @@ export default function AIConsultant() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isDoctorUser = Boolean(user && isDoctor());
 
-  const evaluationLabels = {
+  const evaluationLabelMap = {
     en: {
       title: "Doctor QA Evaluation",
       subtitle: "Rate this chat from 1 to 100 and add notes if needed.",
@@ -114,33 +137,36 @@ export default function AIConsultant() {
       submit: "Submit Evaluation",
     },
     ru: {
-      title: "Оценка чата врачом",
-      subtitle: "Поставьте оценку от 1 до 100 и при необходимости оставьте комментарий.",
-      urgencyAssessmentCorrectness: "Корректность оценки срочности",
-      safetyOfRecommendations: "Безопасность рекомендаций",
-      handlingOfUncertainty: "Работа с неопределённостью",
-      consistencyAcrossSimilarCases: "Согласованность в похожих случаях",
-      notes: "Комментарий (необязательно)",
-      notesPlaceholder: "При необходимости поясните свою оценку...",
-      submit: "Отправить оценку",
+      title: "РћС†РµРЅРєР° С‡Р°С‚Р° РІСЂР°С‡РѕРј",
+      subtitle: "РџРѕСЃС‚Р°РІСЊС‚Рµ РѕС†РµРЅРєСѓ РѕС‚ 1 РґРѕ 100 Рё РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё РѕСЃС‚Р°РІСЊС‚Рµ РєРѕРјРјРµРЅС‚Р°СЂРёР№.",
+      urgencyAssessmentCorrectness: "РљРѕСЂСЂРµРєС‚РЅРѕСЃС‚СЊ РѕС†РµРЅРєРё СЃСЂРѕС‡РЅРѕСЃС‚Рё",
+      safetyOfRecommendations: "Р‘РµР·РѕРїР°СЃРЅРѕСЃС‚СЊ СЂРµРєРѕРјРµРЅРґР°С†РёР№",
+      handlingOfUncertainty: "Р Р°Р±РѕС‚Р° СЃ РЅРµРѕРїСЂРµРґРµР»С‘РЅРЅРѕСЃС‚СЊСЋ",
+      consistencyAcrossSimilarCases: "РЎРѕРіР»Р°СЃРѕРІР°РЅРЅРѕСЃС‚СЊ РІ РїРѕС…РѕР¶РёС… СЃР»СѓС‡Р°СЏС…",
+      notes: "РљРѕРјРјРµРЅС‚Р°СЂРёР№ (РЅРµРѕР±СЏР·Р°С‚РµР»СЊРЅРѕ)",
+      notesPlaceholder: "РџСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё РїРѕСЏСЃРЅРёС‚Рµ СЃРІРѕСЋ РѕС†РµРЅРєСѓ...",
+      submit: "РћС‚РїСЂР°РІРёС‚СЊ РѕС†РµРЅРєСѓ",
     },
     kk: {
-      title: "Дәрігердің чат бағасы",
-      subtitle: "Чатты 1-ден 100-ге дейін бағалап, қажет болса түсініктеме қосыңыз.",
-      urgencyAssessmentCorrectness: "Шұғылдықты бағалау дұрыстығы",
-      safetyOfRecommendations: "Ұсыныстардың қауіпсіздігі",
-      handlingOfUncertainty: "Белгісіздікпен жұмыс",
-      consistencyAcrossSimilarCases: "Ұқсас жағдайлардағы бірізділік",
-      notes: "Түсініктеме (міндетті емес)",
-      notesPlaceholder: "Қажет болса бағаңызды түсіндіріңіз...",
-      submit: "Бағаны жіберу",
+      title: "Р”У™СЂС–РіРµСЂРґС–ТЈ С‡Р°С‚ Р±Р°Т“Р°СЃС‹",
+      subtitle: "Р§Р°С‚С‚С‹ 1-РґРµРЅ 100-РіРµ РґРµР№С–РЅ Р±Р°Т“Р°Р»Р°Рї, Т›Р°Р¶РµС‚ Р±РѕР»СЃР° С‚ТЇСЃС–РЅС–РєС‚РµРјРµ Т›РѕСЃС‹ТЈС‹Р·.",
+      urgencyAssessmentCorrectness: "РЁТ±Т“С‹Р»РґС‹Т›С‚С‹ Р±Р°Т“Р°Р»Р°Сѓ РґТ±СЂС‹СЃС‚С‹Т“С‹",
+      safetyOfRecommendations: "Т°СЃС‹РЅС‹СЃС‚Р°СЂРґС‹ТЈ Т›Р°СѓС–РїСЃС–Р·РґС–РіС–",
+      handlingOfUncertainty: "Р‘РµР»РіС–СЃС–Р·РґС–РєРїРµРЅ Р¶Т±РјС‹СЃ",
+      consistencyAcrossSimilarCases: "Т°Т›СЃР°СЃ Р¶Р°Т“РґР°Р№Р»Р°СЂРґР°Т“С‹ Р±С–СЂС–Р·РґС–Р»С–Рє",
+      notes: "РўТЇСЃС–РЅС–РєС‚РµРјРµ (РјС–РЅРґРµС‚С‚С– РµРјРµСЃ)",
+      notesPlaceholder: "ТљР°Р¶РµС‚ Р±РѕР»СЃР° Р±Р°Т“Р°ТЈС‹Р·РґС‹ С‚ТЇСЃС–РЅРґС–СЂС–ТЈС–Р·...",
+      submit: "Р‘Р°Т“Р°РЅС‹ Р¶С–Р±РµСЂСѓ",
     },
-  }[language];
+  };
+
+  const evaluationLabels =
+    evaluationLabelMap[language as keyof typeof evaluationLabelMap] ?? evaluationLabelMap.en;
 
   const openEvaluationLabel = language === "ru"
-    ? "Оценить чат"
+    ? "РћС†РµРЅРёС‚СЊ С‡Р°С‚"
     : language === "kk"
-      ? "Чатты бағалау"
+      ? "Р§Р°С‚С‚С‹ Р±Р°Т“Р°Р»Р°Сѓ"
       : "Evaluate Chat";
 
   const scrollToBottom = () => {
@@ -151,12 +177,16 @@ export default function AIConsultant() {
     scrollToBottom();
   }, [messages]);
 
-  const exportSummaryAsPdf = (message: Message) => {
+  const exportSummaryAsPdf = (message?: Message, summaryOverride?: AISummary | null, reviewOverride?: AIReviewMaker | null) => {
     const win = window.open("", "_blank", "width=900,height=700");
     if (!win) return;
-    const triageLine = message.triage
+    const triageLine = message?.triage
       ? `Triage: ${message.triage.triageScore}/5 (${message.triage.triageLevelLabel})`
+      : summaryOverride?.severityScore
+        ? `Triage: ${summaryOverride.severityScore}/5`
       : "";
+    const summary = summaryOverride || message?.summary || null;
+    const review = reviewOverride || message?.reviewMaker || null;
     const content = `
       <html>
       <head><title>Qamqor AI Summary</title></head>
@@ -165,13 +195,18 @@ export default function AIConsultant() {
         <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
         <p><strong>${triageLine}</strong></p>
         <h3>Assistant Response</h3>
-        <p>${(message.content || "").replace(/\n/g, "<br/>")}</p>
+        <p>${(message?.content || summary?.summaryText || "").replace(/\n/g, "<br/>")}</p>
         <h3>Possible Conditions</h3>
-        <p>${message.summary?.possibleConditions?.join(", ") || "-"}</p>
+        <p>${summary?.possibleConditions?.join(", ") || "-"}</p>
         <h3>Recommendations</h3>
-        <p>${message.summary?.recommendations?.join("; ") || "-"}</p>
+        <p>${summary?.recommendations?.join("; ") || "-"}</p>
         <h3>When To See Doctor</h3>
-        <p>${message.summary?.whenToSeeDoctor || "-"}</p>
+        <p>${summary?.whenToSeeDoctor || "-"}</p>
+        <h3>AI Review Maker</h3>
+        <p><strong>Chief complaint:</strong> ${review?.chiefComplaint || "-"}</p>
+        <p><strong>Timeline:</strong> ${review?.symptomTimeline || "-"}</p>
+        <p><strong>Red flags:</strong> ${review?.redFlags?.join(", ") || "-"}</p>
+        <p><strong>Next step:</strong> ${review?.recommendedNextStep || "-"}</p>
         <h3>Medical Disclaimer</h3>
         <p>This summary is informational and does not replace professional medical diagnosis.</p>
       </body>
@@ -217,12 +252,20 @@ export default function AIConsultant() {
         content: currentInput,
       });
 
-      const data = await apiFetch<{ response?: string; report?: AIReport; triage?: AITriage; summary?: AISummary }>("/ai/medical-chat", {
+      const data = await apiFetch<{
+        response?: string;
+        report?: AIReport;
+        triage?: AITriage;
+        summary?: AISummary;
+        reviewMaker?: AIReviewMaker;
+        mode?: "triage" | "review-maker";
+      }>("/ai/medical-chat", {
         method: "POST",
         body: {
           messages: messageHistory,
           image: currentImage,
           language,
+          mode,
         },
       });
 
@@ -234,9 +277,17 @@ export default function AIConsultant() {
         report: data.report,
         triage: data.triage,
         summary: data.summary,
+        reviewMaker: data.reviewMaker ?? null,
+        mode: data.mode || mode,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+      if (data.summary) {
+        setFinalSummary(data.summary);
+      }
+      if (data.reviewMaker) {
+        setFinalReviewMaker(data.reviewMaker);
+      }
     } catch (error) {
       console.error("Error calling AI:", error);
       const errorMessage: Message = {
@@ -248,6 +299,40 @@ export default function AIConsultant() {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const finalizeSummary = async () => {
+    const history = messages
+      .filter((m) => m.id !== "welcome")
+      .map((m) => ({ role: m.role, content: m.content }));
+    if (history.length === 0) {
+      return;
+    }
+    setIsFinalizingSummary(true);
+    try {
+      const data = await apiFetch<{ summary?: AISummary; reviewMaker?: AIReviewMaker }>("/ai/medical-summary", {
+        method: "POST",
+        body: { messages: history, language },
+      });
+      if (data.summary) {
+        setFinalSummary(data.summary);
+      }
+      if (data.reviewMaker) {
+        setFinalReviewMaker(data.reviewMaker);
+      }
+      toast({
+        title: "Summary ready",
+        description: "Structured summary generated for doctor visit.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: t.error,
+        description: error instanceof Error ? error.message : t.errorOccurred,
+      });
+    } finally {
+      setIsFinalizingSummary(false);
     }
   };
 
@@ -286,9 +371,9 @@ export default function AIConsultant() {
         variant: "destructive",
         title: t.error,
         description: language === "ru"
-          ? "Укажите корректные оценки от 1 до 100 для всех критериев."
+          ? "РЈРєР°Р¶РёС‚Рµ РєРѕСЂСЂРµРєС‚РЅС‹Рµ РѕС†РµРЅРєРё РѕС‚ 1 РґРѕ 100 РґР»СЏ РІСЃРµС… РєСЂРёС‚РµСЂРёРµРІ."
           : language === "kk"
-            ? "Барлық критерийлер үшін 1-ден 100-ге дейін дұрыс баға енгізіңіз."
+            ? "Р‘Р°СЂР»С‹Т› РєСЂРёС‚РµСЂРёР№Р»РµСЂ ТЇС€С–РЅ 1-РґРµРЅ 100-РіРµ РґРµР№С–РЅ РґТ±СЂС‹СЃ Р±Р°Т“Р° РµРЅРіС–Р·С–ТЈС–Р·."
             : "Please enter valid scores from 1 to 100 for all criteria.",
       });
       return;
@@ -317,9 +402,9 @@ export default function AIConsultant() {
       toast({
         title: t.success,
         description: language === "ru"
-          ? "Оценка сохранена."
+          ? "РћС†РµРЅРєР° СЃРѕС…СЂР°РЅРµРЅР°."
           : language === "kk"
-            ? "Баға сақталды."
+            ? "Р‘Р°Т“Р° СЃР°Т›С‚Р°Р»РґС‹."
             : "Evaluation saved.",
       });
     } catch (error) {
@@ -351,6 +436,24 @@ export default function AIConsultant() {
     }
   };
 
+  const getSeverityLabel = (score?: number) => {
+    switch (score) {
+      case 1: return "1 вЂ” Situation is not urgent";
+      case 2: return "2 вЂ” Low risk level";
+      case 3: return "3 вЂ” Medium risk level";
+      case 4: return "4 вЂ” Elevated risk";
+      case 5: return "5 вЂ” Potentially critical";
+      default: return "Not assessed";
+    }
+  };
+
+  const getSeverityColor = (score?: number) => {
+    if (!score) return "bg-muted text-muted-foreground border-border";
+    if (score <= 2) return "bg-success/10 text-success border-success/30";
+    if (score === 3) return "bg-warning/10 text-warning border-warning/30";
+    return "bg-destructive/10 text-destructive border-destructive/30";
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
@@ -370,6 +473,33 @@ export default function AIConsultant() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <div className="hidden md:flex items-center gap-1 rounded-lg border border-border p-1">
+                  <Button
+                    size="sm"
+                    variant={mode === "triage" ? "default" : "ghost"}
+                    className={mode === "triage" ? "medical-gradient" : ""}
+                    onClick={() => setMode("triage")}
+                  >
+                    AI Triage
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={mode === "review-maker" ? "default" : "ghost"}
+                    className={mode === "review-maker" ? "medical-gradient" : ""}
+                    onClick={() => setMode("review-maker")}
+                  >
+                    AI Review Maker
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={finalizeSummary}
+                  disabled={isLoading || isFinalizingSummary || messages.length < 2}
+                >
+                  {isFinalizingSummary ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Finalize Summary
+                </Button>
                 {isDoctorUser && (
                   <Dialog open={isEvaluationOpen} onOpenChange={setIsEvaluationOpen}>
                     <DialogTrigger asChild>
@@ -497,12 +627,15 @@ export default function AIConsultant() {
                         transition={{ delay: 0.2 }}
                         className="mt-3 bg-card border border-border rounded-xl p-4 space-y-4"
                       >
-                        {/* Risk Level */}
-                        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${getRiskColor(message.report.riskLevel)}`}>
+                        {/* Severity 1-5 */}
+                        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${getSeverityColor(message.triage?.triageScore || message.report.severityScore)}`}>
                           <Shield className="w-4 h-4" />
                           <span className="text-sm font-medium">
-                            {getRiskLabel(message.report.riskLevel)}
+                            {getSeverityLabel(message.triage?.triageScore || message.report.severityScore)}
                           </span>
+                        </div>
+                        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ml-2 ${getRiskColor(message.report.riskLevel)}`}>
+                          <span className="text-sm font-medium">{getRiskLabel(message.report.riskLevel)}</span>
                         </div>
                         {message.triage && (
                           <div className="mt-2 text-xs text-muted-foreground">
@@ -512,17 +645,23 @@ export default function AIConsultant() {
                         {message.triage?.humanReviewFlag && (
                           <div className="mt-2 bg-destructive/10 border border-destructive/30 rounded-lg p-2 text-xs text-destructive">
                             Human Review Flag: consult a licensed doctor as soon as possible.
+                            {message.triage.humanReviewReason ? ` Reason: ${message.triage.humanReviewReason}` : ""}
+                          </div>
+                        )}
+                        {message.report.assessmentExplanation && (
+                          <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                            <p className="text-xs text-muted-foreground">{message.report.assessmentExplanation}</p>
                           </div>
                         )}
 
-                        {/* Possible Conditions */}
+                        {/* Possible Causes */}
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <Stethoscope className="w-4 h-4 text-primary" />
-                            <span className="text-sm font-medium">{t.possibleConditions}</span>
+                            <span className="text-sm font-medium">Possible causes</span>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            {message.report.possibleConditions.map((condition, i) => (
+                            {(message.report.possibleCauses?.length ? message.report.possibleCauses : message.report.possibleConditions).map((condition, i) => (
                               <span key={i} className="text-xs bg-muted px-2 py-1 rounded-full">
                                 {condition}
                               </span>
@@ -546,17 +685,26 @@ export default function AIConsultant() {
                           </ul>
                         </div>
 
-                        {/* When to See Doctor */}
+                        {/* Doctor Advice */}
                         <div className="bg-warning/10 border border-warning/20 rounded-lg p-3">
                           <div className="flex items-center gap-2 mb-1">
                             <AlertTriangle className="w-4 h-4 text-warning" />
                             <span className="text-sm font-medium text-warning">{t.whenToSeeDoctor}</span>
                           </div>
-                          <p className="text-xs text-muted-foreground">{message.report.whenToSeeDoctor}</p>
+                          <p className="text-xs text-muted-foreground">{message.report.doctorAdvice || message.report.whenToSeeDoctor}</p>
                         </div>
 
+                        {message.reviewMaker && (
+                          <div className="bg-muted/60 border border-border rounded-lg p-3 space-y-1">
+                            <p className="text-xs font-semibold">AI Review Maker</p>
+                            {message.reviewMaker.chiefComplaint ? <p className="text-xs text-muted-foreground">Chief complaint: {message.reviewMaker.chiefComplaint}</p> : null}
+                            {message.reviewMaker.symptomTimeline ? <p className="text-xs text-muted-foreground">Timeline: {message.reviewMaker.symptomTimeline}</p> : null}
+                            {message.reviewMaker.recommendedNextStep ? <p className="text-xs text-muted-foreground">Next step: {message.reviewMaker.recommendedNextStep}</p> : null}
+                          </div>
+                        )}
+
                         {/* Find Care Button */}
-                        {message.report.riskLevel !== "low" && (
+                        {(message.triage?.triageScore || 1) >= 3 && (
                           <Link to="/map">
                             <Button variant="outline" size="sm" className="w-full gap-2">
                               <MapPin className="w-4 h-4" />
@@ -568,7 +716,7 @@ export default function AIConsultant() {
                           variant="outline"
                           size="sm"
                           className="w-full"
-                          onClick={() => exportSummaryAsPdf(message)}
+                          onClick={() => exportSummaryAsPdf(message, message.summary, message.reviewMaker)}
                         >
                           Export Summary (PDF)
                         </Button>
@@ -611,6 +759,31 @@ export default function AIConsultant() {
             <div ref={messagesEndRef} />
           </div>
 
+          {finalSummary && (
+            <div className="mb-3 bg-card border border-border rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold">Final Structured Summary</h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportSummaryAsPdf(undefined, finalSummary, finalReviewMaker)}
+                >
+                  Save as PDF
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">{finalSummary.summaryText}</p>
+              <p className="text-xs"><span className="font-medium">Possible conditions:</span> {finalSummary.possibleConditions.join(", ") || "-"}</p>
+              <p className="text-xs"><span className="font-medium">Recommendations:</span> {finalSummary.recommendations.join("; ") || "-"}</p>
+              <p className="text-xs"><span className="font-medium">Doctor advice:</span> {finalSummary.whenToSeeDoctor || "-"}</p>
+              {finalSummary.severityScore ? (
+                <p className="text-xs"><span className="font-medium">Severity:</span> {finalSummary.severityScore}/5</p>
+              ) : null}
+              {finalSummary.humanReviewFlag ? (
+                <p className="text-xs text-destructive">Human Review Flag is active.</p>
+              ) : null}
+            </div>
+          )}
+
           {/* Selected Image Preview */}
           {selectedImage && (
             <div className="relative inline-block mb-2">
@@ -628,6 +801,24 @@ export default function AIConsultant() {
 
           {/* Input Area */}
           <div className="border-t border-border pt-4">
+            <div className="md:hidden flex items-center gap-2 mb-3">
+              <Button
+                size="sm"
+                variant={mode === "triage" ? "default" : "outline"}
+                className={mode === "triage" ? "medical-gradient" : ""}
+                onClick={() => setMode("triage")}
+              >
+                AI Triage
+              </Button>
+              <Button
+                size="sm"
+                variant={mode === "review-maker" ? "default" : "outline"}
+                className={mode === "review-maker" ? "medical-gradient" : ""}
+                onClick={() => setMode("review-maker")}
+              >
+                AI Review Maker
+              </Button>
+            </div>
             <div className="flex items-center gap-2">
               <input
                 type="file"
@@ -676,3 +867,4 @@ export default function AIConsultant() {
     </div>
   );
 }
+

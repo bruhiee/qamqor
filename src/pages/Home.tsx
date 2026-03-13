@@ -24,6 +24,15 @@ import { useLanguage } from "@/contexts/useLanguage";
 export default function Home() {
   const { t } = useLanguage();
 
+  const reveal = {
+    hidden: { opacity: 0, y: 18 },
+    show: (index: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.55, ease: "easeOut", delay: 0.08 * index },
+    }),
+  };
+
   const features = [
     {
       icon: Bot,
@@ -71,7 +80,7 @@ export default function Home() {
 
   const stats = [
     { value: "24/7", label: t.aiAvailable },
-    { value: "3+", label: t.languages },
+    { value: "7+", label: t.languages },
     { value: "✓", label: t.safePrivate },
     { value: "✓", label: t.freeToUse },
   ];
@@ -81,7 +90,7 @@ export default function Home() {
       <Navbar />
       
       {/* Hero Section */}
-      <section className="relative pt-24 pb-16 md:pt-32 md:pb-24 hero-gradient overflow-hidden">
+      <section className="relative pt-24 pb-16 md:pt-32 md:pb-24 hero-gradient overflow-hidden aurora-panel">
         {/* Background decorations */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl" />
@@ -94,7 +103,7 @@ export default function Home() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
               className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-2 mb-6"
             >
               <Sparkles className="w-4 h-4" />
@@ -104,7 +113,7 @@ export default function Home() {
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
+              transition={{ duration: 0.7, delay: 0.08, ease: "easeOut" }}
               className="font-display text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight"
             >
               {t.heroTitle1}
@@ -115,7 +124,7 @@ export default function Home() {
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
+              transition={{ duration: 0.7, delay: 0.16, ease: "easeOut" }}
               className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto"
             >
               {t.heroDescription}
@@ -124,18 +133,18 @@ export default function Home() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
+              transition={{ duration: 0.7, delay: 0.24, ease: "easeOut" }}
               className="flex flex-col sm:flex-row items-center justify-center gap-4"
             >
               <Link to="/consultant">
-                <Button size="lg" className="medical-gradient shadow-medical hover:shadow-glow transition-all duration-300 gap-2 text-base px-8">
+                <Button size="lg" className="medical-gradient shadow-medical hover:shadow-glow button-glow transition-all duration-500 gap-2 text-base px-8 hover:-translate-y-0.5">
                   <Bot className="w-5 h-5" />
                   {t.startConsultation}
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               </Link>
               <Link to="/articles">
-                <Button size="lg" variant="outline" className="gap-2 text-base px-8">
+                <Button size="lg" variant="outline" className="gap-2 text-base px-8 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary/5">
                   <BookOpen className="w-5 h-5" />
                   {t.exploreArticles}
                 </Button>
@@ -146,7 +155,7 @@ export default function Home() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
+              transition={{ duration: 0.7, delay: 0.32, ease: "easeOut" }}
               className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-16 max-w-2xl mx-auto"
             >
               {stats.map((stat, index) => (
@@ -164,10 +173,10 @@ export default function Home() {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.5 }}
+            transition={{ duration: 0.75, delay: 0.36, ease: "easeOut" }}
             className="mt-16 relative max-w-4xl mx-auto"
           >
-            <div className="relative bg-card rounded-2xl shadow-xl border border-border overflow-hidden">
+            <div className="relative glass-lift rounded-2xl shadow-xl overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-12 bg-muted/50 flex items-center px-4 gap-2">
                 <div className="w-3 h-3 rounded-full bg-destructive/60" />
                 <div className="w-3 h-3 rounded-full bg-warning/60" />
@@ -224,15 +233,15 @@ export default function Home() {
             
             {/* Floating elements */}
             <motion.div
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              animate={{ y: [0, -10, 0], rotate: [0, 4, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               className="absolute -top-6 -right-6 w-16 h-16 bg-card rounded-xl shadow-lg border border-border flex items-center justify-center"
             >
               <Heart className="w-8 h-8 text-medical-pulse animate-heartbeat" />
             </motion.div>
             <motion.div
-              animate={{ y: [0, 10, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              animate={{ y: [0, 10, 0], rotate: [0, -5, 0] }}
+              transition={{ duration: 4.6, repeat: Infinity, ease: "easeInOut" }}
               className="absolute -bottom-6 -left-6 w-14 h-14 bg-card rounded-xl shadow-lg border border-border flex items-center justify-center"
             >
               <Brain className="w-7 h-7 text-primary" />
@@ -268,13 +277,15 @@ export default function Home() {
               return (
                 <motion.div
                   key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
+                  variants={reveal}
+                  initial="hidden"
+                  whileInView="show"
+                  custom={index}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  whileHover={{ y: -8 }}
                 >
                   <Link to={feature.link}>
-                    <div className="group h-full bg-card hover:bg-card/80 rounded-2xl p-6 border border-border hover:border-primary/30 hover:shadow-medical transition-all duration-300">
+                    <div className="group h-full glass-lift rounded-2xl p-6">
                       <div className={`w-12 h-12 rounded-xl ${feature.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
                         <Icon className="w-6 h-6" />
                       </div>
@@ -414,7 +425,7 @@ export default function Home() {
                   {t.ctaDesc}
                 </p>
                 <Link to="/auth">
-                  <Button size="lg" className="medical-gradient shadow-medical hover:shadow-glow transition-all duration-300 gap-2 text-base px-8">
+                  <Button size="lg" className="medical-gradient shadow-medical hover:shadow-glow button-glow transition-all duration-500 gap-2 text-base px-8 hover:-translate-y-0.5">
                     {t.getStartedFree}
                     <ArrowRight className="w-4 h-4" />
                   </Button>

@@ -14,6 +14,7 @@ export type AuthUser = {
   created_at: string;
   doctor_application_status?: "pending" | "approved" | "rejected" | null;
   doctor_verified?: boolean;
+  two_factor_enabled?: boolean;
 };
 
 export interface AuthContextType {
@@ -25,7 +26,16 @@ export interface AuthContextType {
     displayName?: string,
     role?: "user" | "doctor",
   ) => Promise<{ error: string | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string) => Promise<{
+    error: string | null;
+    twoFactorRequired?: boolean;
+    challengeId?: string | null;
+    debugCode?: string | null;
+  }>;
+  verifyTwoFactor: (challengeId: string, code: string) => Promise<{ error: string | null }>;
+  requestTwoFactorEnable: () => Promise<{ error: string | null; challengeId?: string | null; debugCode?: string | null }>;
+  confirmTwoFactorEnable: (challengeId: string, code: string) => Promise<{ error: string | null }>;
+  disableTwoFactor: () => Promise<{ error: string | null }>;
   signOut: () => void;
 }
 

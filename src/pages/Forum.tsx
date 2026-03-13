@@ -23,6 +23,8 @@ import {
   Send,
   X,
   Trash,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -40,6 +42,9 @@ interface ForumPost {
   user_id: string;
   title: string;
   content: string;
+  symptom_description?: string;
+  symptom_duration?: string | null;
+  additional_details?: string | null;
   tags: string[];
   is_urgent: boolean;
   status: string;
@@ -68,6 +73,7 @@ export default function Forum() {
   const { user } = useAuth();
   const { isAdmin, isModerator } = useUserRoles();
   const { toast } = useToast();
+  const canReplyAsDoctor = Boolean(user && (user.doctor_verified || user.roles.includes("admin")));
 
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,8 +85,12 @@ export default function Forum() {
   // New post form
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
+  const [symptomDescription, setSymptomDescription] = useState("");
+  const [symptomDuration, setSymptomDuration] = useState("");
+  const [additionalDetails, setAdditionalDetails] = useState("");
   const [newTags, setNewTags] = useState<string[]>([]);
   const [isUrgent, setIsUrgent] = useState(false);
+  const [improvingQuestion, setImprovingQuestion] = useState(false);
 
   // Reply form
   const [replyContent, setReplyContent] = useState("");
@@ -159,7 +169,7 @@ export default function Forum() {
   };
 
   const handleCreatePost = async () => {
-    if (!user || !newTitle.trim() || !newContent.trim()) return;
+    if (!user || !newTitle.trim() || !symptomDescription.trim()) return;
 
     try {
       await apiFetch("/forum/posts", {
@@ -167,6 +177,9 @@ export default function Forum() {
         body: {
           title: newTitle,
           content: newContent,
+          symptom_description: symptomDescription,
+          symptom_duration: symptomDuration,
+          additional_details: additionalDetails,
           tags: newTags,
           is_urgent: isUrgent,
         },
@@ -176,6 +189,9 @@ export default function Forum() {
       setNewPostOpen(false);
       setNewTitle("");
       setNewContent("");
+      setSymptomDescription("");
+      setSymptomDuration("");
+      setAdditionalDetails("");
       setNewTags([]);
       setIsUrgent(false);
       fetchPosts();
@@ -186,6 +202,37 @@ export default function Forum() {
         description: error instanceof Error ? error.message : t.error,
         variant: "destructive",
       });
+    }
+  };
+
+  const handleImproveQuestion = async () => {
+    if (!symptomDescription.trim()) {
+      toast({
+        title: t.error,
+        description: "Describe symptoms first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setImprovingQuestion(true);
+    try {
+      const { data } = await apiFetch<{ data: { title: string; content: string } }>("/forum/question-improve", {
+        method: "POST",
+        body: {
+          symptom_description: symptomDescription,
+          symptom_duration: symptomDuration,
+          additional_details: additionalDetails,
+          language,
+        },
+      });
+      if (data?.title) setNewTitle(data.title);
+      if (data?.content) setNewContent(data.content);
+      toast({ title: t.success, description: "Question improved with AI." });
+    } catch (error) {
+      console.error("Question improvement failed:", error);
+      toast({ title: t.error, variant: "destructive" });
+    } finally {
+      setImprovingQuestion(false);
     }
   };
 
@@ -283,14 +330,50 @@ export default function Forum() {
                       />
                     </div>
                     <div>
-                      <Label>{t.questionDetails}</Label>
+                      <Label>Symptom Description</Label>
+                      <Textarea
+                        value={symptomDescription}
+                        onChange={(e) => setSymptomDescription(e.target.value)}
+                        placeholder={t.typeSymptoms}
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <Label>Symptom Duration</Label>
+                      <Input
+                        value={symptomDuration}
+                        onChange={(e) => setSymptomDuration(e.target.value)}
+                        placeholder="e.g. 3 days, 2 weeks"
+                      />
+                    </div>
+                    <div>
+                      <Label>Additional Details</Label>
+                      <Textarea
+                        value={additionalDetails}
+                        onChange={(e) => setAdditionalDetails(e.target.value)}
+                        placeholder="Triggers, medications tried, related conditions..."
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <Label>{t.questionDetails} (Final message)</Label>
                       <Textarea
                         value={newContent}
                         onChange={(e) => setNewContent(e.target.value)}
-                        placeholder={t.typeSymptoms}
+                        placeholder="Final structured question text shown in forum..."
                         rows={4}
                       />
                     </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full gap-2"
+                      onClick={handleImproveQuestion}
+                      disabled={improvingQuestion}
+                    >
+                      {improvingQuestion ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      Improve with AI
+                    </Button>
                     <div>
                       <Label>{t.selectTags}</Label>
                       <div className="flex flex-wrap gap-2 mt-2">
@@ -430,6 +513,17 @@ export default function Forum() {
                     </div>
 
                     <p className="text-muted-foreground mb-4">{selectedPost.content}</p>
+                    {selectedPost.symptom_description && (
+                      <div className="mb-4 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                        <p><span className="font-medium">Symptoms:</span> {selectedPost.symptom_description}</p>
+                        {selectedPost.symptom_duration && (
+                          <p><span className="font-medium">Duration:</span> {selectedPost.symptom_duration}</p>
+                        )}
+                        {selectedPost.additional_details && (
+                          <p><span className="font-medium">Details:</span> {selectedPost.additional_details}</p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="flex flex-wrap gap-2 mb-6">
                       {selectedPost.tags.map(tag => (
@@ -495,25 +589,35 @@ export default function Forum() {
                       {/* Reply Form */}
                       {user && (
                         <div className="space-y-3">
+                          <p className="text-xs text-muted-foreground">
+                            Only verified doctors can publish answers.
+                          </p>
                           <Textarea
                             value={replyContent}
                             onChange={(e) => setReplyContent(e.target.value)}
                             placeholder={t.writeReply}
                             rows={3}
+                            disabled={!canReplyAsDoctor}
                           />
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <Switch
                                 checked={replyAnonymously}
                                 onCheckedChange={setReplyAnonymously}
+                                disabled={!canReplyAsDoctor}
                               />
                               <Label className="text-sm">{t.replyAnonymously}</Label>
                             </div>
-                            <Button onClick={handleReply} className="gap-2">
+                            <Button onClick={handleReply} className="gap-2" disabled={!canReplyAsDoctor}>
                               <Send className="w-4 h-4" />
                               {t.reply}
                             </Button>
                           </div>
+                          {!canReplyAsDoctor && (
+                            <p className="text-xs text-destructive">
+                              Doctor verification required to answer in forum.
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>

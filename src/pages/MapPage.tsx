@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+﻿import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { motion } from "framer-motion";
@@ -16,7 +16,10 @@ import {
   X,
   Globe,
   ExternalLink,
-  Loader2
+  Loader2,
+  TrendingUp,
+  Activity,
+  AlertTriangle
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { useLanguage } from "@/contexts/useLanguage";
@@ -32,6 +35,7 @@ interface MedicalFacility {
   hours: string;
   website?: string;
   specializations?: string[];
+  departments?: Record<string, string>;
   doctorSummary?: string;
   distance?: number;
 }
@@ -46,6 +50,27 @@ interface HealthNewsEvent {
   severity_level: number;
   source_url: string;
   published_at: string;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+interface HealthNewsRegionInsight {
+  region: string;
+  totalEvents: number;
+  averageSeverity: number;
+  recent7: number;
+  previous7: number;
+  growthRatio: number;
+  topSymptoms: string[];
+}
+
+interface HealthNewsMapInsights {
+  lookbackDays: number;
+  eventCount: number;
+  outbreaks: HealthNewsRegionInsight[];
+  anomalies: HealthNewsRegionInsight[];
+  topSymptoms: Array<{ symptom: string; mentions: number }>;
+  regions: HealthNewsRegionInsight[];
 }
 
 // Global medical facilities database
@@ -71,6 +96,11 @@ const globalFacilities: MedicalFacility[] = [
     hours: "24/7",
     website: "https://cityhospital.kz",
     specializations: ["Emergency", "Surgery", "Cardiology"],
+    departments: {
+      reception: "+7 (7172) 70-00-00",
+      emergency: "+7 (7172) 70-00-01",
+      cardiology: "+7 (7172) 70-00-25",
+    },
     doctorSummary: "Staffed with 150+ qualified physicians including specialists in emergency medicine, cardiology, and general surgery.",
   },
   {
@@ -82,6 +112,10 @@ const globalFacilities: MedicalFacility[] = [
     phone: "+7 (7172) 32-45-67",
     hours: "Mon-Sat: 8:00 - 20:00",
     specializations: ["General Practice", "Pediatrics", "Dermatology"],
+    departments: {
+      reception: "+7 (7172) 32-45-67",
+      pediatrics: "+7 (7172) 32-45-70",
+    },
     doctorSummary: "A team of experienced family doctors and pediatricians providing comprehensive care for all ages.",
   },
   {
@@ -159,6 +193,11 @@ const globalFacilities: MedicalFacility[] = [
     hours: "24/7",
     website: "https://nycgeneral.org",
     specializations: ["Emergency", "Cardiology", "Oncology", "Pediatrics"],
+    departments: {
+      reception: "+1 (212) 555-0100",
+      emergency: "+1 (212) 555-0101",
+      oncology: "+1 (212) 555-0133",
+    },
     doctorSummary: "World-renowned medical center with over 2000 physicians and cutting-edge research facilities.",
   },
   {
@@ -202,6 +241,10 @@ const globalFacilities: MedicalFacility[] = [
     hours: "24/7",
     website: "https://guysandstthomas.nhs.uk",
     specializations: ["Emergency", "Cardiology", "Transplant"],
+    departments: {
+      reception: "+44 20 7188 7188",
+      emergency: "+44 20 7188 5100",
+    },
   },
   {
     id: "uk-2",
@@ -216,10 +259,10 @@ const globalFacilities: MedicalFacility[] = [
   // Germany - Berlin
   {
     id: "de-1",
-    name: "Charité Hospital",
+    name: "CharitГ© Hospital",
     type: "hospital",
     coordinates: [13.3777, 52.5252],
-    address: "Charitéplatz 1, Berlin",
+    address: "CharitГ©platz 1, Berlin",
     phone: "+49 30 450 50",
     hours: "24/7",
     website: "https://charite.de",
@@ -240,7 +283,7 @@ const globalFacilities: MedicalFacility[] = [
     name: "Berlin City Clinic",
     type: "clinic",
     coordinates: [13.4049, 52.5201],
-    address: "Friedrichstraße 10, Berlin",
+    address: "FriedrichstraГџe 10, Berlin",
     phone: "+49 30 1234 5678",
     hours: "Mon-Fri: 8:00 - 18:00",
     specializations: ["General Practice", "Internal Medicine"],
@@ -286,6 +329,10 @@ const globalFacilities: MedicalFacility[] = [
     phone: "+7 (495) 600-07-07",
     hours: "24/7",
     specializations: ["Emergency", "Surgery", "Trauma"],
+    departments: {
+      reception: "+7 (495) 600-07-07",
+      trauma: "+7 (495) 600-07-17",
+    },
     doctorSummary: "Leading emergency research hospital handling complex trauma and disaster cases.",
   },
 ];
@@ -296,35 +343,61 @@ const typeConfig = {
   clinic: { icon: Stethoscope, color: "#8B5CF6", label: "clinic" as const },
 };
 
+const cityPresets: Array<{ label: string; coords: [number, number] }> = [
+  { label: "Astana", coords: [71.4306, 51.1283] },
+  { label: "Almaty", coords: [76.9286, 43.2220] },
+  { label: "Shymkent", coords: [69.5901, 42.3242] },
+  { label: "New York", coords: [-73.9857, 40.7484] },
+  { label: "London", coords: [-0.1276, 51.5074] },
+  { label: "Berlin", coords: [13.4049, 52.5200] },
+];
+
 export default function MapPage() {
   const { t } = useLanguage();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
+  const newsMarkers = useRef<mapboxgl.Marker[]>([]);
   const userMarker = useRef<mapboxgl.Marker | null>(null);
   const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
   const [routeInfo, setRouteInfo] = useState("");
   const routeSourceId = "route-source";
   const [selectedFacility, setSelectedFacility] = useState<MedicalFacility | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilters, setActiveFilters] = useState<string[]>(["pharmacy"]);
+  const [activeFilters, setActiveFilters] = useState<string[]>(["pharmacy", "hospital", "clinic"]);
+  const [specializationQuery, setSpecializationQuery] = useState("");
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(false);
   const [facilities, setFacilities] = useState<MedicalFacility[]>(globalFacilities);
   const [nearbyPharmacies, setNearbyPharmacies] = useState<MedicalFacility[]>([]);
   const [radiusKm, setRadiusKm] = useState(50);
   const [healthNewsEvents, setHealthNewsEvents] = useState<HealthNewsEvent[]>([]);
+  const [healthNewsInsights, setHealthNewsInsights] = useState<HealthNewsMapInsights | null>(null);
+  const [selectedNewsEvent, setSelectedNewsEvent] = useState<HealthNewsEvent | null>(null);
+  const [selectedCity, setSelectedCity] = useState("Astana");
 
   const filteredFacilities = useMemo(
-    () =>
-      facilities.filter(
-        (f) =>
-          activeFilters.includes(f.type) &&
-          (f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            f.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            f.specializations?.some((s) => s.toLowerCase().includes(searchQuery.toLowerCase())))
-      ),
-    [facilities, activeFilters, searchQuery]
+    () => {
+      const normalizedSearch = searchQuery.toLowerCase().trim();
+      const normalizedSpecialization = specializationQuery.toLowerCase().trim();
+      const maxDistance = radiusKm;
+      const filtered = facilities.filter((f) => {
+        const textMatch =
+          !normalizedSearch ||
+          f.name.toLowerCase().includes(normalizedSearch) ||
+          f.address.toLowerCase().includes(normalizedSearch) ||
+          f.specializations?.some((s) => s.toLowerCase().includes(normalizedSearch));
+        const specializationMatch =
+          !normalizedSpecialization ||
+          f.specializations?.some((s) => s.toLowerCase().includes(normalizedSpecialization));
+        const typeMatch = activeFilters.includes(f.type);
+        const distanceMatch =
+          f.distance == null || f.distance <= maxDistance;
+        return textMatch && specializationMatch && typeMatch && distanceMatch;
+      });
+      return filtered.sort((a, b) => (a.distance ?? Number.MAX_SAFE_INTEGER) - (b.distance ?? Number.MAX_SAFE_INTEGER));
+    },
+    [facilities, activeFilters, searchQuery, specializationQuery, radiusKm]
   );
 
   // Calculate distance between two coordinates
@@ -382,7 +455,7 @@ export default function MapPage() {
           type: "line",
           source: routeSourceId,
           layout: { "line-cap": "round", "line-join": "round" },
-          paint: { "line-color": "#1FA37A", "line-width": 6, "line-opacity": 0.9 },
+          paint: { "line-color": "#1FA37A", "line-width": 7, "line-opacity": 0.9 },
         });
       }
       if (!map.current.getLayer("route-glow")) {
@@ -391,7 +464,7 @@ export default function MapPage() {
           type: "line",
           source: routeSourceId,
           layout: { "line-cap": "round", "line-join": "round" },
-          paint: { "line-color": "#10B981", "line-width": 12, "line-opacity": 0.4 },
+          paint: { "line-color": "#10B981", "line-width": 16, "line-opacity": 0.35 },
         });
       }
       const bounds = new mapboxgl.LngLatBounds(user, user);
@@ -450,7 +523,7 @@ export default function MapPage() {
         drawRoute(route.geometry, userLocation);
         const distanceKm = route.distance ? route.distance / 1000 : 0;
         const durationMin = route.duration ? Math.round(route.duration / 60) : 0;
-        setRouteInfo(`Distance ${distanceKm.toFixed(1)} km · ≈${durationMin} min`);
+        setRouteInfo(`Distance ${distanceKm.toFixed(1)} km В· в‰€${durationMin} min`);
       } catch (error) {
         console.warn("Route error", error);
         setRouteInfo("Не удалось проложить маршрут");
@@ -496,6 +569,28 @@ export default function MapPage() {
     }
   };
 
+  const focusCity = async (cityLabel: string) => {
+    const preset = cityPresets.find((item) => item.label === cityLabel);
+    if (!preset) return;
+    setSelectedCity(cityLabel);
+    setUserLocation(preset.coords);
+    await loadFacilities(preset.coords, radiusKm);
+    if (map.current) {
+      map.current.flyTo({
+        center: preset.coords,
+        zoom: 12,
+        duration: 1300,
+      });
+      if (userMarker.current) {
+        userMarker.current.setLngLat(preset.coords);
+      } else {
+        userMarker.current = new mapboxgl.Marker({ color: "#ef4444" })
+          .setLngLat(preset.coords)
+          .addTo(map.current);
+      }
+    }
+  };
+
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
@@ -519,6 +614,8 @@ export default function MapPage() {
     }), "top-right");
 
     return () => {
+      newsMarkers.current.forEach((marker) => marker.remove());
+      newsMarkers.current = [];
       map.current?.remove();
       map.current = null;
     };
@@ -533,7 +630,9 @@ export default function MapPage() {
     const loadHealthNews = async () => {
       try {
         const { data } = await apiFetch<{ data: HealthNewsEvent[] }>("/health-news-events");
-        setHealthNewsEvents((data || []).slice(0, 6));
+        setHealthNewsEvents(data || []);
+        const insights = await apiFetch<{ data: HealthNewsMapInsights }>("/health-news-map-insights?days=30");
+        setHealthNewsInsights(insights.data || null);
       } catch (error) {
         console.warn("Failed to load health news map events", error);
       }
@@ -581,18 +680,19 @@ export default function MapPage() {
       el.className = "custom-marker";
       el.innerHTML = `
         <div style="
-          width: 40px;
-          height: 40px;
+          width: 54px;
+          height: 54px;
           background: ${config.color};
-          border-radius: 50%;
+          clip-path: polygon(25% 6%, 75% 6%, 94% 50%, 75% 94%, 25% 94%, 6% 50%);
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 4px 12px ${config.color}40;
+          box-shadow: 0 8px 22px ${config.color}55;
           cursor: pointer;
-          transition: transform 0.2s;
+          border: 2px solid #ffffff;
+          transition: transform 0.25s ease, filter 0.25s ease;
         ">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             ${facility.type === "pharmacy" ? '<path d="M10.5 20H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2v2.5"/><circle cx="16.5" cy="17.5" r="2.5"/><path d="M18.5 15.5v4"/><path d="M16.5 17.5h4"/>' : ''}
             ${facility.type === "hospital" ? '<path d="M12 6v4"/><path d="M14 14h-4"/><path d="M14 18h-4"/><path d="M14 8h-4"/><path d="M18 12h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2"/><path d="M18 22V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v18"/>' : ''}
             ${facility.type === "clinic" ? '<path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/>' : ''}
@@ -604,9 +704,10 @@ export default function MapPage() {
       const scaleMarker = (scale: string) => {
         if (innerDot) {
           innerDot.style.transform = scale;
+          innerDot.style.filter = scale === "scale(1)" ? "brightness(1)" : "brightness(1.1)";
         }
       };
-      el.addEventListener("mouseenter", () => scaleMarker("scale(1.1)"));
+      el.addEventListener("mouseenter", () => scaleMarker("scale(1.16)"));
       el.addEventListener("mouseleave", () => scaleMarker("scale(1)"));
       el.addEventListener("click", () => {
         setSelectedFacility(facility);
@@ -626,6 +727,47 @@ export default function MapPage() {
     });
   }, [filteredFacilities, fetchRouteToFacility]);
 
+  useEffect(() => {
+    if (!map.current) return;
+    newsMarkers.current.forEach((marker) => marker.remove());
+    newsMarkers.current = [];
+
+    const eventsWithCoords = healthNewsEvents.filter(
+      (event) =>
+        Number.isFinite(Number(event.latitude)) &&
+        Number.isFinite(Number(event.longitude))
+    );
+
+    eventsWithCoords.forEach((event) => {
+      const severity = Math.max(1, Math.min(5, Number(event.severity_level) || 3));
+      const color = severity >= 5 ? "#DC2626" : severity >= 4 ? "#EF4444" : severity >= 3 ? "#D97706" : "#0284C7";
+      const el = document.createElement("div");
+      el.className = "health-news-marker";
+      el.style.width = "44px";
+      el.style.height = "44px";
+      el.style.borderRadius = "999px";
+      el.style.border = "2px solid rgba(255,255,255,0.95)";
+      el.style.background = `${color}B8`;
+      el.style.boxShadow = `0 0 0 12px ${color}2E, 0 0 28px ${color}4D`;
+      el.style.cursor = "pointer";
+
+      el.addEventListener("click", () => {
+        setSelectedNewsEvent(event);
+        map.current?.flyTo({
+          center: [Number(event.longitude), Number(event.latitude)],
+          zoom: 8,
+          duration: 900,
+        });
+      });
+
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat([Number(event.longitude), Number(event.latitude)])
+        .addTo(map.current!);
+
+      newsMarkers.current.push(marker);
+    });
+  }, [healthNewsEvents]);
+
   const toggleFilter = (type: string) => {
     setActiveFilters((prev) =>
       prev.includes(type)
@@ -641,6 +783,7 @@ export default function MapPage() {
       zoom: 15,
       duration: 1000,
     });
+    fetchRouteToFacility(facility);
   };
 
   const getTypeLabel = (type: "pharmacy" | "hospital" | "clinic") => {
@@ -659,17 +802,17 @@ export default function MapPage() {
       <main className="flex-1 pt-16">
         <div className="flex h-[calc(100vh-4rem)]">
           {/* Sidebar */}
-          <div className="w-full md:w-96 bg-card border-r border-border flex flex-col overflow-hidden">
+          <div className="w-full md:w-[30rem] bg-card border-r border-border flex flex-col overflow-hidden">
             {/* Search Header */}
             <div className="p-4 border-b border-border space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-secondary/20 flex items-center justify-center">
-                    <MapPin className="w-5 h-5 text-secondary" />
+                  <div className="w-12 h-12 rounded-xl bg-secondary/20 flex items-center justify-center">
+                    <MapPin className="w-6 h-6 text-secondary" />
                   </div>
                   <div>
-                    <h1 className="font-display text-lg font-semibold">{t.findCare}</h1>
-                    <p className="text-xs text-muted-foreground">{t.nearbyFacilities}</p>
+                    <h1 className="font-display text-xl font-semibold">{t.findCare}</h1>
+                    <p className="text-sm text-muted-foreground">{t.nearbyFacilities}</p>
                   </div>
                 </div>
                 <Button
@@ -692,6 +835,11 @@ export default function MapPage() {
                   className="pl-10"
                 />
               </div>
+              <Input
+                placeholder={`${t.specialization}...`}
+                value={specializationQuery}
+                onChange={(e) => setSpecializationQuery(e.target.value)}
+              />
 
               {/* Filters */}
               <div className="flex gap-2">
@@ -741,20 +889,88 @@ export default function MapPage() {
                   </div>
                 </div>
               )}
+              <div className="mt-2 space-y-1">
+                <div className="text-xs text-muted-foreground">New city quick jump</div>
+                <div className="flex flex-wrap gap-1">
+                  {cityPresets.map((city) => (
+                    <Button
+                      key={city.label}
+                      variant={selectedCity === city.label ? "default" : "outline"}
+                      size="sm"
+                      className="text-[11px] px-2 py-1 h-7"
+                      onClick={() => focusCity(city.label)}
+                    >
+                      {city.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
               {healthNewsEvents.length > 0 && (
                 <div className="mt-3 px-3 py-2 bg-muted/50 rounded-lg text-xs text-muted-foreground space-y-2">
                   <div className="font-semibold text-foreground">Health News Map</div>
-                  {healthNewsEvents.slice(0, 3).map((event) => (
-                    <a
-                      key={event.id}
-                      href={event.source_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block hover:text-primary"
-                    >
-                      • {event.region}: {event.title}
-                    </a>
-                  ))}
+                  {healthNewsInsights && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                        <span>
+                          Outbreak signals: <span className="font-semibold text-foreground">{healthNewsInsights.outbreaks.length}</span>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-3.5 h-3.5 text-warning" />
+                        <span>
+                          Anomalies: <span className="font-semibold text-foreground">{healthNewsInsights.anomalies.length}</span>
+                        </span>
+                      </div>
+                      {healthNewsInsights.outbreaks.length > 0 && (
+                        <div className="text-[11px]">
+                          <span className="text-muted-foreground">Hot regions:</span>{" "}
+                          {healthNewsInsights.outbreaks.slice(0, 3).map((item) => item.region).join(", ")}
+                        </div>
+                      )}
+                      {healthNewsInsights.anomalies.length > 0 && (
+                        <div className="text-[11px]">
+                          <span className="text-muted-foreground">Anomaly regions:</span>{" "}
+                          {healthNewsInsights.anomalies.slice(0, 3).map((item) => item.region).join(", ")}
+                        </div>
+                      )}
+                      <div>
+                        <div className="flex items-center gap-1">
+                          <Activity className="w-3.5 h-3.5 text-secondary" />
+                          <span className="text-[11px] text-muted-foreground">Top symptoms:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {healthNewsInsights.topSymptoms.slice(0, 5).map((item) => (
+                            <span key={item.symptom} className="px-2 py-0.5 rounded-full bg-background border border-border text-[11px]">
+                              {item.symptom} ({item.mentions})
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="pt-1 border-t border-border/50 space-y-1">
+                    {healthNewsEvents.slice(0, 4).map((event) => (
+                      <button
+                        key={event.id}
+                        onClick={() => {
+                          if (Number.isFinite(Number(event.latitude)) && Number.isFinite(Number(event.longitude))) {
+                            setSelectedNewsEvent(event);
+                            map.current?.flyTo({
+                              center: [Number(event.longitude), Number(event.latitude)],
+                              zoom: 8,
+                              duration: 900,
+                            });
+                          } else {
+                            window.open(event.source_url, "_blank");
+                          }
+                        }}
+                        className="block w-full text-left hover:text-primary"
+                      >
+                        • {event.region}: {event.title}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -787,7 +1003,7 @@ export default function MapPage() {
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-sm truncate">{facility.name}</h3>
                         <p className="text-xs text-muted-foreground truncate">{facility.address}</p>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span
                             className="text-xs px-2 py-0.5 rounded-full"
                             style={{ backgroundColor: `${config.color}20`, color: config.color }}
@@ -804,6 +1020,11 @@ export default function MapPage() {
                             </span>
                           )}
                         </div>
+                        {facility.specializations && facility.specializations.length > 0 && (
+                          <p className="text-[11px] text-muted-foreground mt-1 line-clamp-1">
+                            {facility.specializations.join(", ")}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </motion.div>
@@ -828,7 +1049,7 @@ export default function MapPage() {
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="absolute top-4 right-4 w-80 bg-card rounded-xl shadow-xl border border-border overflow-hidden"
+                className="absolute top-4 right-4 w-[26rem] bg-card rounded-xl shadow-xl border border-border overflow-hidden"
               >
                 <div className="p-4">
                   <div className="flex items-start justify-between mb-3">
@@ -914,10 +1135,29 @@ export default function MapPage() {
                     </div>
                   )}
 
+                  {selectedFacility.departments && Object.keys(selectedFacility.departments).length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs font-medium mb-2">Department numbers</p>
+                      <div className="space-y-1">
+                        {Object.entries(selectedFacility.departments).map(([dep, phone]) => (
+                          <p key={dep} className="text-xs text-muted-foreground">
+                            {dep}: {phone}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {selectedFacility.doctorSummary && (
                     <div className="mt-3 p-3 bg-muted/50 rounded-lg">
                       <p className="text-xs font-medium mb-1">About the Medical Staff</p>
                       <p className="text-xs text-muted-foreground">{selectedFacility.doctorSummary}</p>
+                    </div>
+                  )}
+
+                  {routeInfo && (
+                    <div className="mt-3 px-3 py-2 rounded-lg bg-primary/10 text-primary text-xs font-medium">
+                      {routeInfo}
                     </div>
                   )}
 
@@ -931,10 +1171,55 @@ export default function MapPage() {
                 </div>
               </motion.div>
             )}
+
+            {selectedNewsEvent && (
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="absolute top-4 left-4 w-[30rem] bg-card rounded-xl shadow-xl border border-border overflow-hidden"
+              >
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Health News Event</p>
+                      <h3 className="font-semibold text-sm">{selectedNewsEvent.title}</h3>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="w-8 h-8"
+                      onClick={() => setSelectedNewsEvent(null)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="space-y-2 text-xs text-muted-foreground">
+                    <p><span className="font-medium text-foreground">Region:</span> {selectedNewsEvent.region}</p>
+                    <p><span className="font-medium text-foreground">Severity:</span> {selectedNewsEvent.severity_level}/5</p>
+                    {selectedNewsEvent.symptoms && selectedNewsEvent.symptoms.length > 0 && (
+                      <p><span className="font-medium text-foreground">Symptoms:</span> {selectedNewsEvent.symptoms.join(", ")}</p>
+                    )}
+                    {selectedNewsEvent.summary ? (
+                      <p className="line-clamp-3">{selectedNewsEvent.summary}</p>
+                    ) : null}
+                    <a
+                      href={selectedNewsEvent.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                    >
+                      Source <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              </motion.div>
+            )}
           </div>
         </div>
       </main>
     </div>
   );
 }
+
+
 

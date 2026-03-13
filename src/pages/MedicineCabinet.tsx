@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -31,7 +32,11 @@ import {
   X,
   Package,
   Tag,
-  Loader2
+  Loader2,
+  Bell,
+  History,
+  ScanLine,
+  MessageCircle
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -53,6 +58,42 @@ interface Medicine {
   notes: string | null;
 }
 
+interface MedicineHistoryItem {
+  id: string;
+  action: "created" | "updated" | "deleted";
+  medicine_name: string;
+  dosage: string | null;
+  quantity: number;
+  expiration_date: string | null;
+  created_at: string;
+}
+
+interface NotificationPrefs {
+  email_enabled: boolean;
+  telegram_enabled: boolean;
+  telegram_chat_id: string;
+  remind_days_before: number;
+}
+
+interface NotificationHistoryItem {
+  id: string;
+  medicine_name: string;
+  expiration_date: string;
+  days_left: number;
+  channels: {
+    email?: string;
+    telegram?: string;
+  };
+  created_at: string;
+}
+
+interface ScanResult {
+  extractedText: string;
+  plainExplanation: string;
+  warnings: string[];
+  answer: string;
+}
+
 const formTypes = [
   { value: "tablet", labelKey: "tablet" },
   { value: "capsule", labelKey: "capsule" },
@@ -71,9 +112,23 @@ export default function MedicineCabinet() {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [notifySaving, setNotifySaving] = useState(false);
+  const [notifyRunning, setNotifyRunning] = useState(false);
+  const [scanLoading, setScanLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
+  const [historyItems, setHistoryItems] = useState<MedicineHistoryItem[]>([]);
+  const [notificationHistory, setNotificationHistory] = useState<NotificationHistoryItem[]>([]);
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPrefs>({
+    email_enabled: true,
+    telegram_enabled: false,
+    telegram_chat_id: "",
+    remind_days_before: 30,
+  });
+  const [instructionImage, setInstructionImage] = useState<string | null>(null);
+  const [instructionQuestion, setInstructionQuestion] = useState("");
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     purpose: "",
@@ -101,13 +156,36 @@ export default function MedicineCabinet() {
     }
   }, [t, toast]);
 
+  const fetchMedicineHistory = useCallback(async () => {
+    try {
+      const { data } = await apiFetch<{ data: MedicineHistoryItem[] }>("/medicines/history");
+      setHistoryItems(data || []);
+    } catch (error) {
+      console.error("Error fetching medicine history:", error);
+    }
+  }, []);
+
+  const fetchNotificationSettings = useCallback(async () => {
+    try {
+      const data = await apiFetch<{ prefs: NotificationPrefs; history: NotificationHistoryItem[] }>("/medicines/notifications");
+      if (data.prefs) {
+        setNotificationPrefs(data.prefs);
+      }
+      setNotificationHistory(data.history || []);
+    } catch (error) {
+      console.error("Error fetching notification settings:", error);
+    }
+  }, []);
+
   useEffect(() => {
     if (user) {
       fetchMedicines();
+      fetchMedicineHistory();
+      fetchNotificationSettings();
     } else {
       setLoading(false);
     }
-  }, [user, fetchMedicines]);
+  }, [user, fetchMedicines, fetchMedicineHistory, fetchNotificationSettings]);
 
   const isExpired = (date: string) => new Date(date) < new Date();
   const isExpiringSoon = (date: string) => {
@@ -166,6 +244,8 @@ export default function MedicineCabinet() {
       }
 
       fetchMedicines();
+      fetchMedicineHistory();
+      fetchNotificationSettings();
       resetForm();
     } catch (error) {
       console.error("Error saving medicine:", error);
@@ -185,6 +265,8 @@ export default function MedicineCabinet() {
         method: "DELETE",
       });
       setMedicines((prev) => prev.filter((med) => med.id !== id));
+      fetchMedicineHistory();
+      fetchNotificationSettings();
       toast({ title: t.success, description: "Medicine deleted" });
     } catch (error) {
       console.error("Error deleting medicine:", error);
@@ -193,6 +275,94 @@ export default function MedicineCabinet() {
         title: t.error,
         description: "Failed to delete medicine",
       });
+    }
+  };
+
+  const handleSaveNotificationPrefs = async () => {
+    setNotifySaving(true);
+    try {
+      const data = await apiFetch<{ prefs: NotificationPrefs }>("/medicines/notifications", {
+        method: "PUT",
+        body: notificationPrefs,
+      });
+      if (data.prefs) {
+        setNotificationPrefs(data.prefs);
+      }
+      toast({ title: t.success, description: "Notification settings saved" });
+    } catch (error) {
+      console.error("Error saving notification settings:", error);
+      toast({
+        variant: "destructive",
+        title: t.error,
+        description: "Failed to save notification settings",
+      });
+    } finally {
+      setNotifySaving(false);
+    }
+  };
+
+  const handleRunExpiryCheck = async () => {
+    setNotifyRunning(true);
+    try {
+      const result = await apiFetch<{ count: number }>("/medicines/notifications/run", {
+        method: "POST",
+      });
+      await fetchNotificationSettings();
+      toast({
+        title: t.success,
+        description: `Expiry check completed. Sent ${result.count || 0} reminder(s).`,
+      });
+    } catch (error) {
+      console.error("Error running expiry check:", error);
+      toast({
+        variant: "destructive",
+        title: t.error,
+        description: "Failed to run expiry check",
+      });
+    } finally {
+      setNotifyRunning(false);
+    }
+  };
+
+  const handleInstructionImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setInstructionImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleScanInstruction = async () => {
+    if (!instructionImage) {
+      toast({
+        variant: "destructive",
+        title: t.error,
+        description: "Upload instruction image first",
+      });
+      return;
+    }
+    setScanLoading(true);
+    try {
+      const data = await apiFetch<ScanResult>("/ai/medicine-instruction-scan", {
+        method: "POST",
+        body: {
+          image: instructionImage,
+          question: instructionQuestion,
+          language: "en",
+        },
+      });
+      setScanResult(data);
+    } catch (error) {
+      console.error("Instruction scan failed:", error);
+      toast({
+        variant: "destructive",
+        title: t.error,
+        description: error instanceof Error ? error.message : "Instruction scan failed",
+      });
+    } finally {
+      setScanLoading(false);
     }
   };
 
@@ -445,6 +615,124 @@ export default function MedicineCabinet() {
                 </div>
               </DialogContent>
             </Dialog>
+          </div>
+
+          <div className="grid lg:grid-cols-3 gap-4 mb-6">
+            <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <Bell className="w-4 h-4 text-primary" />
+                <h3 className="font-semibold">Expiry Notifications</h3>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="emailEnabled">Email reminders</Label>
+                <Switch
+                  id="emailEnabled"
+                  checked={notificationPrefs.email_enabled}
+                  onCheckedChange={(checked) => setNotificationPrefs((prev) => ({ ...prev, email_enabled: checked }))}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="telegramEnabled">Telegram reminders</Label>
+                <Switch
+                  id="telegramEnabled"
+                  checked={notificationPrefs.telegram_enabled}
+                  onCheckedChange={(checked) => setNotificationPrefs((prev) => ({ ...prev, telegram_enabled: checked }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="telegramChatId">Telegram Chat ID</Label>
+                <Input
+                  id="telegramChatId"
+                  value={notificationPrefs.telegram_chat_id}
+                  onChange={(e) => setNotificationPrefs((prev) => ({ ...prev, telegram_chat_id: e.target.value }))}
+                  placeholder="e.g. 123456789"
+                />
+              </div>
+              <div>
+                <Label htmlFor="remindDays">Remind days before expiry</Label>
+                <Input
+                  id="remindDays"
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={notificationPrefs.remind_days_before}
+                  onChange={(e) => setNotificationPrefs((prev) => ({ ...prev, remind_days_before: Math.max(1, Number(e.target.value) || 30) }))}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSaveNotificationPrefs} disabled={notifySaving} className="flex-1">
+                  {notifySaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Save
+                </Button>
+                <Button variant="outline" onClick={handleRunExpiryCheck} disabled={notifyRunning} className="flex-1">
+                  {notifyRunning ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Run check
+                </Button>
+              </div>
+              <div className="text-xs text-muted-foreground max-h-32 overflow-y-auto space-y-1">
+                {notificationHistory.slice(0, 4).map((item) => (
+                  <p key={item.id}>
+                    {item.medicine_name}: {item.days_left} day(s) left
+                    {" · "}
+                    email {item.channels?.email || "n/a"}, telegram {item.channels?.telegram || "n/a"}
+                  </p>
+                ))}
+                {notificationHistory.length === 0 && <p>No reminder history yet.</p>}
+              </div>
+            </div>
+
+            <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <ScanLine className="w-4 h-4 text-primary" />
+                <h3 className="font-semibold">Instruction Scanner</h3>
+              </div>
+              <Input type="file" accept="image/*" onChange={handleInstructionImageUpload} />
+              {instructionImage && (
+                <img src={instructionImage} alt="Instruction" className="rounded-lg border border-border max-h-32 object-cover" />
+              )}
+              <Textarea
+                placeholder="Ask AI about this instruction (optional)"
+                value={instructionQuestion}
+                onChange={(e) => setInstructionQuestion(e.target.value)}
+                rows={3}
+              />
+              <Button onClick={handleScanInstruction} disabled={scanLoading} className="w-full medical-gradient">
+                {scanLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <MessageCircle className="w-4 h-4 mr-2" />}
+                Scan and Ask AI
+              </Button>
+              {scanResult && (
+                <div className="text-xs space-y-2 bg-muted rounded-lg p-3">
+                  <p><span className="font-semibold">Extracted:</span> {scanResult.extractedText || "-"}</p>
+                  <p><span className="font-semibold">Explanation:</span> {scanResult.plainExplanation || "-"}</p>
+                  <p><span className="font-semibold">Answer:</span> {scanResult.answer || "-"}</p>
+                  {scanResult.warnings?.length > 0 && (
+                    <p><span className="font-semibold">Warnings:</span> {scanResult.warnings.join("; ")}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <History className="w-4 h-4 text-primary" />
+                <h3 className="font-semibold">Medicine History</h3>
+              </div>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {historyItems.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No history yet.</p>
+                )}
+                {historyItems.map((item) => (
+                  <div key={item.id} className="bg-muted/60 rounded-lg p-2 text-xs">
+                    <p className="font-medium">{item.medicine_name}</p>
+                    <p className="text-muted-foreground">
+                      {item.action.toUpperCase()} · qty {item.quantity}
+                      {item.expiration_date ? ` · exp ${new Date(item.expiration_date).toLocaleDateString()}` : ""}
+                    </p>
+                    <p className="text-muted-foreground">{new Date(item.created_at).toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Loading State */}

@@ -22,6 +22,9 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pendingChallengeId, setPendingChallengeId] = useState<string | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [debugTwoFactorCode, setDebugTwoFactorCode] = useState<string | null>(null);
   
   // Registration flow
   const [registrationStep, setRegistrationStep] = useState<RegistrationStep>('credentials');
@@ -39,7 +42,7 @@ export default function Auth() {
     workplace: '',
   });
   
-  const { signUp, signIn } = useAuth();
+  const { signUp, signIn, verifyTwoFactor } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -69,12 +72,19 @@ export default function Auth() {
       // Sign in directly
       setLoading(true);
       try {
-        const { error } = await signIn(email, password);
+        const { error, twoFactorRequired, challengeId, debugCode } = await signIn(email, password);
         if (error) {
           toast({
             variant: 'destructive',
             title: t.error,
             description: error,
+          });
+        } else if (twoFactorRequired && challengeId) {
+          setPendingChallengeId(challengeId);
+          setDebugTwoFactorCode(debugCode || null);
+          toast({
+            title: 'Two-Factor Authentication',
+            description: 'Enter the verification code sent to your email.',
           });
         } else {
           navigate('/');
@@ -88,6 +98,29 @@ export default function Auth() {
       } finally {
         setLoading(false);
       }
+    }
+  };
+
+  const handleVerifyTwoFactor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingChallengeId || !twoFactorCode.trim()) return;
+    setLoading(true);
+    try {
+      const { error } = await verifyTwoFactor(pendingChallengeId, twoFactorCode.trim());
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: t.error,
+          description: error,
+        });
+        return;
+      }
+      setPendingChallengeId(null);
+      setTwoFactorCode('');
+      setDebugTwoFactorCode(null);
+      navigate('/');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -232,6 +265,41 @@ export default function Auth() {
       >
         {loading ? t.loading : isSignUp ? t.next : t.signIn}
         {isSignUp && <ChevronRight className="w-4 h-4 ml-2" />}
+      </Button>
+    </form>
+  );
+
+  const renderTwoFactorForm = () => (
+    <form onSubmit={handleVerifyTwoFactor} className="space-y-4">
+      <div>
+        <Label htmlFor="twoFactorCode">2FA Code</Label>
+        <Input
+          id="twoFactorCode"
+          type="text"
+          value={twoFactorCode}
+          onChange={(e) => setTwoFactorCode(e.target.value)}
+          placeholder="6-digit code"
+          maxLength={6}
+          required
+        />
+        {debugTwoFactorCode && (
+          <p className="text-xs text-warning mt-2">Debug code: {debugTwoFactorCode}</p>
+        )}
+      </div>
+      <Button type="submit" className="w-full medical-gradient" disabled={loading}>
+        {loading ? t.loading : 'Verify'}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        className="w-full"
+        onClick={() => {
+          setPendingChallengeId(null);
+          setTwoFactorCode('');
+          setDebugTwoFactorCode(null);
+        }}
+      >
+        Back to Sign In
       </Button>
     </form>
   );
@@ -478,13 +546,14 @@ export default function Auth() {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
             >
-              {registrationStep === 'credentials' && renderCredentialsForm()}
+              {registrationStep === 'credentials' && !pendingChallengeId && renderCredentialsForm()}
+              {registrationStep === 'credentials' && pendingChallengeId && renderTwoFactorForm()}
               {registrationStep === 'role-selection' && renderRoleSelection()}
               {registrationStep === 'doctor-form' && renderDoctorForm()}
             </motion.div>
           </AnimatePresence>
 
-          {registrationStep === 'credentials' && (
+          {registrationStep === 'credentials' && !pendingChallengeId && (
             <div className="mt-6 text-center">
               <button
                 type="button"
