@@ -2,26 +2,28 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
-import Home from "./pages/Home";
-import AIConsultant from "./pages/AIConsultant";
-import MedicineCabinet from "./pages/MedicineCabinet";
-import MapPage from "./pages/MapPage";
-import HealthArticles from "./pages/HealthArticles";
-import FirstAidGuide from "./pages/FirstAidGuide";
-import SymptomTracker from "./pages/SymptomTracker";
-import About from "./pages/About";
-import Auth from "./pages/Auth";
-import Forum from "./pages/Forum";
-import AdminPanel from "./pages/AdminPanel";
-import DoctorWorkplace from "./pages/DoctorWorkplace";
-import Profile from "./pages/Profile";
-import Bookmarks from "./pages/Bookmarks";
-import Tutorial from "./pages/Tutorial";
-import NotFound from "./pages/NotFound";
+
+const Home = lazy(() => import("./pages/Home"));
+const AIConsultant = lazy(() => import("./pages/AIConsultant"));
+const MedicineCabinet = lazy(() => import("./pages/MedicineCabinet"));
+const MapPage = lazy(() => import("./pages/MapPage"));
+const HealthArticles = lazy(() => import("./pages/HealthArticles"));
+const FirstAidGuide = lazy(() => import("./pages/FirstAidGuide"));
+const SymptomTracker = lazy(() => import("./pages/SymptomTracker"));
+const About = lazy(() => import("./pages/About"));
+const Auth = lazy(() => import("./pages/Auth"));
+const Forum = lazy(() => import("./pages/Forum"));
+const AdminPanel = lazy(() => import("./pages/AdminPanel"));
+const DoctorWorkplace = lazy(() => import("./pages/DoctorWorkplace"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Bookmarks = lazy(() => import("./pages/Bookmarks"));
+const Tutorial = lazy(() => import("./pages/Tutorial"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 
@@ -30,6 +32,15 @@ function ScrollThemeController() {
 
   useEffect(() => {
     const root = document.documentElement;
+    const isHome = location.pathname === "/";
+
+    if (!isHome) {
+      root.removeAttribute("data-scroll-theme");
+      root.setAttribute("data-ambient", "off");
+      return;
+    }
+
+    root.setAttribute("data-ambient", "on");
     let frame = 0;
 
     const updateTheme = () => {
@@ -63,7 +74,11 @@ function ScrollThemeController() {
 }
 
 function MedicalBackground() {
-  return (
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
     <div aria-hidden className="medical-bg">
       <svg
         className="medical-bg__svg"
@@ -83,7 +98,8 @@ function MedicalBackground() {
       <div className="medical-bg__glow medical-bg__glow--two" />
       <div className="medical-bg__cross medical-bg__cross--one" />
       <div className="medical-bg__cross medical-bg__cross--two" />
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -98,24 +114,26 @@ const App = () => (
             <ScrollThemeController />
             <MedicalBackground />
             <div className="relative z-10">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/consultant" element={<AIConsultant />} />
-                <Route path="/cabinet" element={<MedicineCabinet />} />
-                <Route path="/map" element={<MapPage />} />
-                <Route path="/articles" element={<HealthArticles />} />
-                <Route path="/first-aid" element={<FirstAidGuide />} />
-                <Route path="/symptom-tracker" element={<SymptomTracker />} />
-                <Route path="/forum" element={<Forum />} />
-                <Route path="/doctor-workplace" element={<DoctorWorkplace />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/bookmarks" element={<Bookmarks />} />
-                <Route path="/tutorial" element={<Tutorial />} />
-                <Route path="/admin" element={<AdminPanel />} />
-                <Route path="/about" element={<About />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+              <Suspense fallback={<div className="min-h-screen" />}>
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/consultant" element={<AIConsultant />} />
+                  <Route path="/cabinet" element={<MedicineCabinet />} />
+                  <Route path="/map" element={<MapPage />} />
+                  <Route path="/articles" element={<HealthArticles />} />
+                  <Route path="/first-aid" element={<FirstAidGuide />} />
+                  <Route path="/symptom-tracker" element={<SymptomTracker />} />
+                  <Route path="/forum" element={<Forum />} />
+                  <Route path="/doctor-workplace" element={<DoctorWorkplace />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/bookmarks" element={<Bookmarks />} />
+                  <Route path="/tutorial" element={<Tutorial />} />
+                  <Route path="/admin" element={<AdminPanel />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
             </div>
           </BrowserRouter>
         </TooltipProvider>

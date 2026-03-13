@@ -78,12 +78,8 @@ export function Navbar() {
   }, []);
 
   return (
-    <motion.nav
-      initial={false}
-      animate={{
-        boxShadow: scrolled ? "0 24px 55px -34px rgba(0, 20, 35, 0.55)" : "0 10px 30px -30px rgba(0, 20, 35, 0.35)",
-      }}
-      className={`fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-2xl transition-colors duration-500 ${
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-md transition-colors duration-300 ${
         scrolled ? "bg-background/92 border-border/85" : "bg-background/72 border-border/60"
       }`}
     >
@@ -115,13 +111,7 @@ export function Navbar() {
                       : "text-muted-foreground hover:text-foreground hover:bg-background/75"
                   }`}
                 >
-                  {isActive && (
-                    <motion.span
-                      layoutId="active-nav-pill"
-                      className="absolute inset-0 rounded-lg border border-primary/25"
-                      transition={{ type: "spring", stiffness: 340, damping: 30 }}
-                    />
-                  )}
+                  {isActive && <span className="absolute inset-0 rounded-lg border border-primary/25" />}
                   <span>{item.label}</span>
                 </Link>
               );
@@ -246,7 +236,7 @@ export function Navbar() {
           )}
         </AnimatePresence>
       </div>
-    </motion.nav>
+    </nav>
   );
 }
 

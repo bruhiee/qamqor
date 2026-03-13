@@ -11,7 +11,6 @@ import {
   Users,
   ArrowRight,
   Activity,
-  Brain,
   Heart,
   Stethoscope,
   Sparkles
@@ -23,15 +22,6 @@ import { useLanguage } from "@/contexts/useLanguage";
 
 export default function Home() {
   const { t } = useLanguage();
-
-  const reveal = {
-    hidden: { opacity: 0, y: 18 },
-    show: (index: number) => ({
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.55, ease: "easeOut", delay: 0.08 * index },
-    }),
-  };
 
   const features = [
     {
@@ -88,11 +78,18 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
+      <div aria-hidden className="hero-fixed-pulse">
+        <div className="pulse-ring hero-fixed-pulse__ring hero-fixed-pulse__ring--outer" />
+        <div className="pulse-ring hero-fixed-pulse__ring hero-fixed-pulse__ring--inner" />
+        <div className="hero-fixed-pulse__core">
+          <Heart className="w-10 h-10 text-medical-pulse animate-heartbeat" />
+        </div>
+      </div>
       
       {/* Hero Section */}
-      <section className="relative pt-24 pb-16 md:pt-32 md:pb-24 hero-gradient overflow-hidden aurora-panel">
+      <section className="relative pt-24 pb-16 md:pt-32 md:pb-24 hero-gradient overflow-hidden aurora-panel aurora-panel--fixed">
         {/* Background decorations */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl" />
           <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent/5 rounded-full blur-3xl" />
@@ -230,22 +227,6 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            
-            {/* Floating elements */}
-            <motion.div
-              animate={{ y: [0, -10, 0], rotate: [0, 4, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -top-6 -right-6 w-16 h-16 bg-card rounded-xl shadow-lg border border-border flex items-center justify-center"
-            >
-              <Heart className="w-8 h-8 text-medical-pulse animate-heartbeat" />
-            </motion.div>
-            <motion.div
-              animate={{ y: [0, 10, 0], rotate: [0, -5, 0] }}
-              transition={{ duration: 4.6, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -bottom-6 -left-6 w-14 h-14 bg-card rounded-xl shadow-lg border border-border flex items-center justify-center"
-            >
-              <Brain className="w-7 h-7 text-primary" />
-            </motion.div>
           </motion.div>
         </div>
       </section>
@@ -275,15 +256,7 @@ export default function Home() {
             {features.map((feature, index) => {
               const Icon = feature.icon;
               return (
-                <motion.div
-                  key={index}
-                  variants={reveal}
-                  initial="hidden"
-                  whileInView="show"
-                  custom={index}
-                  viewport={{ once: true }}
-                  whileHover={{ y: -8 }}
-                >
+                <div key={index}>
                   <Link to={feature.link}>
                     <div className="group h-full glass-lift rounded-2xl p-6">
                       <div className={`w-12 h-12 rounded-xl ${feature.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
@@ -297,7 +270,7 @@ export default function Home() {
                       </div>
                     </div>
                   </Link>
-                </motion.div>
+                </div>
               );
             })}
           </div>
@@ -326,14 +299,7 @@ export default function Home() {
                 ].map((item, index) => {
                   const Icon = item.icon;
                   return (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, x: -20 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.5, delay: index * 0.1 }}
-                      className="flex items-start gap-4"
-                    >
+                    <div key={index} className="flex items-start gap-4">
                       <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <Icon className="w-5 h-5 text-primary" />
                       </div>
@@ -341,19 +307,13 @@ export default function Home() {
                         <h4 className="font-display font-semibold mb-1">{item.title}</h4>
                         <p className="text-sm text-muted-foreground">{item.desc}</p>
                       </div>
-                    </motion.div>
+                    </div>
                   );
                 })}
               </div>
             </div>
 
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="relative"
-            >
+            <div className="relative">
               <div className="bg-card rounded-2xl p-8 shadow-xl border border-border">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-12 h-12 rounded-xl medical-gradient flex items-center justify-center">
@@ -397,7 +357,7 @@ export default function Home() {
               </div>
               
               <div className="absolute -z-10 inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 blur-3xl" />
-            </motion.div>
+            </div>
           </div>
         </div>
       </section>
@@ -405,13 +365,7 @@ export default function Home() {
       {/* CTA Section */}
       <section className="py-16 md:py-24">
         <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="relative max-w-4xl mx-auto text-center"
-          >
+          <div className="relative max-w-4xl mx-auto text-center">
             <div className="relative bg-card rounded-3xl p-8 md:p-16 border border-border overflow-hidden">
               {/* Background decorations */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl" />
@@ -432,7 +386,7 @@ export default function Home() {
                 </Link>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </section>
 

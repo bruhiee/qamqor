@@ -152,12 +152,16 @@
       radial-gradient(circle at 12% 18%, hsl(var(--primary) / 0.16), transparent 40%),
       radial-gradient(circle at 88% 12%, hsl(var(--secondary) / 0.14), transparent 42%),
       radial-gradient(circle at 50% 90%, hsl(var(--accent) / 0.12), transparent 45%);
-    background-attachment: fixed;
-    animation: ambient-shift 18s ease-in-out infinite alternate;
+    background-attachment: scroll;
     transition:
       background-image var(--theme-shift-duration) ease,
       filter var(--theme-shift-duration) ease,
       color 350ms ease;
+  }
+
+  html[data-ambient="on"] body {
+    background-attachment: fixed;
+    animation: ambient-shift 42s ease-in-out infinite alternate;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -241,6 +245,40 @@
     animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
+  .hero-fixed-pulse {
+    position: fixed;
+    right: 2.5rem;
+    top: 7.5rem;
+    width: 9.5rem;
+    height: 9.5rem;
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  .hero-fixed-pulse__ring {
+    inset: 0;
+    border-radius: 9999px;
+    background: hsl(var(--medical-pulse) / 0.22);
+  }
+
+  .hero-fixed-pulse__ring--inner {
+    inset: 1.2rem;
+    animation-delay: 0.45s;
+    background: hsl(var(--medical-pulse) / 0.16);
+  }
+
+  .hero-fixed-pulse__core {
+    position: absolute;
+    inset: 2.15rem;
+    border-radius: 9999px;
+    background: hsl(var(--card) / 0.92);
+    border: 1px solid hsl(var(--medical-pulse) / 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 18px 50px -24px hsl(var(--medical-pulse) / 0.5);
+  }
+
   @keyframes pulse-ring {
     0%, 100% {
       transform: scale(1);
@@ -285,9 +323,13 @@
       hsl(var(--accent) / 0.1),
       hsl(var(--primary) / 0.12)
     );
-    filter: blur(56px);
+    filter: blur(42px);
     transform: translate3d(0, 0, 0);
-    animation: aurora-drift 16s linear infinite;
+    animation: aurora-drift 40s linear infinite;
+  }
+
+  .aurora-panel--fixed::before {
+    position: fixed;
   }
 
   .glass-lift {
@@ -343,24 +385,35 @@
   }
 
   .medical-bg {
-    position: fixed;
-    inset: 0;
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
     pointer-events: none;
     z-index: 0;
     overflow: hidden;
-    opacity: 0.62;
+    opacity: 0.42;
     background-image:
       repeating-linear-gradient(0deg, hsl(var(--primary) / 0.035) 0 1px, transparent 1px 56px),
       repeating-linear-gradient(90deg, hsl(var(--secondary) / 0.03) 0 1px, transparent 1px 56px);
-    transition: background-image var(--theme-shift-duration) ease, opacity 450ms ease;
+    transition: none;
+    transform: translateZ(0);
+    will-change: auto;
+  }
+
+  html[data-ambient="off"] .medical-bg {
+    display: none;
   }
 
   .medical-bg__svg {
-    position: absolute;
-    inset: -8% -15%;
-    width: 130%;
-    height: 120%;
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
     filter: blur(0.2px);
+    transform: translateZ(0);
   }
 
   .medical-bg__line {
@@ -369,8 +422,9 @@
     stroke-linecap: round;
     stroke-linejoin: round;
     stroke-dasharray: 14 12;
+    vector-effect: non-scaling-stroke;
     animation: ecg-flow 8s linear infinite;
-    transition: stroke var(--theme-shift-duration) ease;
+    transition: none;
   }
 
   .medical-bg__line--primary {
@@ -380,7 +434,7 @@
 
   .medical-bg__line--secondary {
     stroke: hsl(var(--primary) / 0.36);
-    animation-duration: 10s;
+    animation-duration: 9.5s;
     animation-direction: reverse;
   }
 
@@ -446,11 +500,9 @@
   @keyframes ambient-shift {
     0% {
       background-position: 0% 0%;
-      filter: saturate(1);
     }
     100% {
       background-position: 50% 40%;
-      filter: saturate(1.08);
     }
   }
 
@@ -490,6 +542,49 @@
     }
     50% {
       transform: translateY(-16px) rotate(6deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    body,
+    .medical-bg,
+    .medical-bg__line,
+    .medical-bg__glow,
+    .medical-bg__cross,
+    .aurora-panel::before,
+    .pulse-ring,
+    .float {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+
+  @media (max-width: 1280px) {
+    html[data-ambient="on"] body {
+      animation: none;
+      background-attachment: scroll;
+    }
+
+    .medical-bg,
+    .aurora-panel::before {
+      animation: none !important;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .hero-fixed-pulse {
+      right: 1rem;
+      top: 6.75rem;
+      width: 6.5rem;
+      height: 6.5rem;
+    }
+
+    .hero-fixed-pulse__core {
+      inset: 1.4rem;
     }
   }
 }
