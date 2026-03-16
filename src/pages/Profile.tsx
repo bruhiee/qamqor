@@ -10,10 +10,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
 type ProfilePayload = {
+  age: number | null;
+  gender: string | null;
+  city: string | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  additional_info: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
   blood_type: string | null;
   allergies: string[];
+  lifestyle_factors: string[];
   chronic_conditions: string[];
   medications: string[];
   notes: string | null;
@@ -22,10 +29,17 @@ type ProfilePayload = {
 export default function Profile() {
   const { user, requestTwoFactorEnable, confirmTwoFactorEnable, disableTwoFactor } = useAuth();
   const [profile, setProfile] = useState<ProfilePayload>({
+    age: null,
+    gender: "",
+    city: "",
+    height_cm: null,
+    weight_kg: null,
+    additional_info: "",
     emergency_contact_name: "",
     emergency_contact_phone: "",
     blood_type: "",
     allergies: [],
+    lifestyle_factors: [],
     chronic_conditions: [],
     medications: [],
     notes: "",
@@ -37,6 +51,14 @@ export default function Profile() {
   const [twoFactorChallengeId, setTwoFactorChallengeId] = useState<string | null>(null);
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [debugCode, setDebugCode] = useState<string | null>(null);
+  const lifestyleOptions = [
+    "Smoking",
+    "Alcohol",
+    "Low activity",
+    "High stress",
+    "Poor sleep",
+    "Night shifts",
+  ];
 
   useEffect(() => {
     const load = async () => {
@@ -44,10 +66,17 @@ export default function Profile() {
         const { data } = await apiFetch<{ data: ProfilePayload }>("/profile");
         if (!data) return;
         setProfile({
+          age: data.age ?? null,
+          gender: data.gender || "",
+          city: data.city || "",
+          height_cm: data.height_cm ?? null,
+          weight_kg: data.weight_kg ?? null,
+          additional_info: data.additional_info || "",
           emergency_contact_name: data.emergency_contact_name || "",
           emergency_contact_phone: data.emergency_contact_phone || "",
           blood_type: data.blood_type || "",
           allergies: data.allergies || [],
+          lifestyle_factors: data.lifestyle_factors || [],
           chronic_conditions: data.chronic_conditions || [],
           medications: data.medications || [],
           notes: data.notes || "",
@@ -69,6 +98,9 @@ export default function Profile() {
         method: "PUT",
         body: {
           ...profile,
+          age: profile.age ? Number(profile.age) : null,
+          height_cm: profile.height_cm ? Number(profile.height_cm) : null,
+          weight_kg: profile.weight_kg ? Number(profile.weight_kg) : null,
           allergies: allergiesRaw.split(",").map((item) => item.trim()).filter(Boolean),
           chronic_conditions: conditionsRaw.split(",").map((item) => item.trim()).filter(Boolean),
           medications: medicationsRaw.split(",").map((item) => item.trim()).filter(Boolean),
@@ -129,6 +161,26 @@ export default function Profile() {
             <h2 className="font-semibold">Medical Information</h2>
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
+                <Label>Age</Label>
+                <Input type="number" min={0} max={120} value={profile.age ?? ""} onChange={(e) => setProfile((prev) => ({ ...prev, age: e.target.value ? Number(e.target.value) : null }))} />
+              </div>
+              <div>
+                <Label>Gender</Label>
+                <Input value={profile.gender || ""} onChange={(e) => setProfile((prev) => ({ ...prev, gender: e.target.value }))} />
+              </div>
+              <div>
+                <Label>City</Label>
+                <Input value={profile.city || ""} onChange={(e) => setProfile((prev) => ({ ...prev, city: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Height (cm)</Label>
+                <Input type="number" min={30} max={260} value={profile.height_cm ?? ""} onChange={(e) => setProfile((prev) => ({ ...prev, height_cm: e.target.value ? Number(e.target.value) : null }))} />
+              </div>
+              <div>
+                <Label>Weight (kg)</Label>
+                <Input type="number" min={1} max={500} value={profile.weight_kg ?? ""} onChange={(e) => setProfile((prev) => ({ ...prev, weight_kg: e.target.value ? Number(e.target.value) : null }))} />
+              </div>
+              <div>
                 <Label>Emergency Contact Name</Label>
                 <Input value={profile.emergency_contact_name || ""} onChange={(e) => setProfile((prev) => ({ ...prev, emergency_contact_name: e.target.value }))} />
               </div>
@@ -146,12 +198,43 @@ export default function Profile() {
               <Input value={allergiesRaw} onChange={(e) => setAllergiesRaw(e.target.value)} />
             </div>
             <div>
+              <Label>Lifestyle Factors</Label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {lifestyleOptions.map((option) => {
+                  const active = (profile.lifestyle_factors || []).includes(option);
+                  return (
+                    <Button
+                      key={option}
+                      type="button"
+                      size="sm"
+                      variant={active ? "default" : "outline"}
+                      onClick={() =>
+                        setProfile((prev) => ({
+                          ...prev,
+                          lifestyle_factors: active
+                            ? (prev.lifestyle_factors || []).filter((item) => item !== option)
+                            : [...(prev.lifestyle_factors || []), option],
+                        }))
+                      }
+                      className="rounded-full"
+                    >
+                      {option}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
               <Label>Chronic Conditions (comma separated)</Label>
               <Input value={conditionsRaw} onChange={(e) => setConditionsRaw(e.target.value)} />
             </div>
             <div>
               <Label>Current Medications (comma separated)</Label>
               <Input value={medicationsRaw} onChange={(e) => setMedicationsRaw(e.target.value)} />
+            </div>
+            <div>
+              <Label>Additional Information (optional)</Label>
+              <Textarea value={profile.additional_info || ""} onChange={(e) => setProfile((prev) => ({ ...prev, additional_info: e.target.value }))} rows={3} />
             </div>
             <div>
               <Label>Notes</Label>

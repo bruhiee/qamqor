@@ -1,6 +1,7 @@
 import { useState, useEffect, ReactNode, useCallback } from "react";
 import { apiFetch, getToken, storeToken } from "@/lib/api";
 import { AuthContext, type AuthUser } from "./auth-context";
+import type { RegistrationProfileInput } from "./auth-context";
 
 interface SignResponse {
   user: AuthUser;
@@ -39,11 +40,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser();
   }, [refreshUser]);
 
-  const signUp = async (email: string, password: string, displayName?: string, role: "user" | "doctor" = "user") => {
+  const signUp = async (
+    email: string,
+    password: string,
+    displayName?: string,
+    role: "user" | "doctor" = "user",
+    profile?: RegistrationProfileInput,
+  ) => {
     try {
       const payload = await apiFetch<SignResponse>("/auth/register", {
         method: "POST",
-        body: { email, password, displayName, role },
+        body: { email, password, displayName, role, profile },
         skipAuth: true,
       });
       storeToken(payload.token);
@@ -92,6 +99,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null };
     } catch (error) {
       return { error: error instanceof Error ? error.message : "2FA verification failed" };
+    }
+  };
+
+  const resendTwoFactorLoginCode = async (challengeId: string) => {
+    try {
+      const payload = await apiFetch<{ debug_code?: string }>("/auth/2fa/resend-login", {
+        method: "POST",
+        body: { challenge_id: challengeId },
+        skipAuth: true,
+      });
+      return { error: null, debugCode: payload.debug_code || null };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : "Failed to resend 2FA code", debugCode: null };
     }
   };
 
@@ -144,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, verifyTwoFactor, requestTwoFactorEnable, confirmTwoFactorEnable, disableTwoFactor, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signUp, signIn, verifyTwoFactor, resendTwoFactorLoginCode, requestTwoFactorEnable, confirmTwoFactorEnable, disableTwoFactor, signOut }}>
       {children}
     </AuthContext.Provider>
   );

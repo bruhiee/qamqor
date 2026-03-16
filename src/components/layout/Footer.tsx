@@ -60,8 +60,8 @@ export function Footer() {
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link to="/first-aid" className="text-background/60 hover:text-primary transition-colors">
-                  {t.firstAid}
+                <Link to="/forum" className="text-background/60 hover:text-primary transition-colors">
+                  {t.forum}
                 </Link>
               </li>
               <li>
@@ -115,4 +115,3 @@ export function Footer() {
     </footer>
   );
 }
-

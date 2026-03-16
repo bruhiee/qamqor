@@ -39,13 +39,6 @@ export default function Home() {
       color: "bg-secondary/10 text-secondary",
     },
     {
-      icon: Heart,
-      title: t.featureFirstAidTitle,
-      description: t.featureFirstAidDesc,
-      link: "/first-aid",
-      color: "bg-destructive/10 text-destructive",
-    },
-    {
       icon: Pill,
       title: t.featureMedicineTitle,
       description: t.featureMedicineDesc,

@@ -375,6 +375,8 @@ export default function MapPage() {
   const [healthNewsInsights, setHealthNewsInsights] = useState<HealthNewsMapInsights | null>(null);
   const [selectedNewsEvent, setSelectedNewsEvent] = useState<HealthNewsEvent | null>(null);
   const [selectedCity, setSelectedCity] = useState("Astana");
+  const [mapFailed, setMapFailed] = useState(false);
+  const [mapError, setMapError] = useState("");
 
   const filteredFacilities = useMemo(
     () => {
@@ -523,7 +525,7 @@ export default function MapPage() {
         drawRoute(route.geometry, userLocation);
         const distanceKm = route.distance ? route.distance / 1000 : 0;
         const durationMin = route.duration ? Math.round(route.duration / 60) : 0;
-        setRouteInfo(`Distance ${distanceKm.toFixed(1)} km В· в‰€${durationMin} min`);
+        setRouteInfo(`Distance ${distanceKm.toFixed(1)} km | ~${durationMin} min`);
       } catch (error) {
         console.warn("Route error", error);
         setRouteInfo("Не удалось проложить маршрут");
@@ -596,22 +598,35 @@ export default function MapPage() {
 
     if (!mapboxToken) {
       console.warn("Mapbox token is missing. Set VITE_MAPBOX_TOKEN in your environment.");
+      setMapFailed(true);
+      setMapError("Missing Mapbox token");
       return;
     }
     mapboxgl.accessToken = mapboxToken;
+    try {
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: "mapbox://styles/mapbox/light-v11",
+        center: [71.4306, 51.1283],
+        zoom: 3,
+      });
 
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/light-v11",
-      center: [71.4306, 51.1283],
-      zoom: 3,
-    });
+      map.current.on("error", (evt) => {
+        const message = evt?.error?.message || "Mapbox rendering error";
+        setMapFailed(true);
+        setMapError(message);
+      });
 
-    map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
-    map.current.addControl(new mapboxgl.GeolocateControl({
-      positionOptions: { enableHighAccuracy: true },
-      trackUserLocation: true,
-    }), "top-right");
+      map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+      map.current.addControl(new mapboxgl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true,
+      }), "top-right");
+    } catch (error) {
+      setMapFailed(true);
+      setMapError(error instanceof Error ? error.message : "Mapbox init failed");
+      return;
+    }
 
     return () => {
       newsMarkers.current.forEach((marker) => marker.remove());
@@ -795,14 +810,22 @@ export default function MapPage() {
     window.open(url, "_blank");
   };
 
+  const mapCenter =
+    selectedFacility?.coordinates ||
+    userLocation ||
+    cityPresets.find((city) => city.label === selectedCity)?.coords ||
+    [71.4306, 51.1283];
+
+  const osmEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${mapCenter[0] - 0.4}%2C${mapCenter[1] - 0.25}%2C${mapCenter[0] + 0.4}%2C${mapCenter[1] + 0.25}&layer=mapnik&marker=${mapCenter[1]}%2C${mapCenter[0]}`;
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
 
       <main className="flex-1 pt-16">
-        <div className="flex h-[calc(100vh-4rem)]">
+        <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)]">
           {/* Sidebar */}
-          <div className="w-full md:w-[30rem] bg-card border-r border-border flex flex-col overflow-hidden">
+          <div className="w-full md:w-[30rem] md:border-r border-border bg-card flex flex-col overflow-hidden md:h-full h-[56vh]">
             {/* Search Header */}
             <div className="p-4 border-b border-border space-y-4">
               <div className="flex items-center justify-between">
@@ -1041,8 +1064,28 @@ export default function MapPage() {
           </div>
 
           {/* Map */}
-          <div className="hidden md:block flex-1 relative">
+          <div className="block flex-1 relative min-h-[44vh] md:min-h-0">
             <div ref={mapContainer} className="absolute inset-0" />
+            {mapFailed && (
+              <div className="absolute inset-0 z-30 bg-background">
+                <iframe
+                  title="OpenStreetMap Fallback"
+                  src={osmEmbedUrl}
+                  className="w-full h-full border-0"
+                  loading="lazy"
+                />
+                <div className="absolute left-3 bottom-3 bg-card/95 border border-border rounded-md px-3 py-2 text-xs text-muted-foreground max-w-[28rem]">
+                  Mapbox unavailable, fallback map is active. {mapError}
+                </div>
+              </div>
+            )}
+            {!mapboxToken && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted/40 backdrop-blur-sm z-20">
+                <div className="bg-card border border-border rounded-xl p-4 text-sm text-muted-foreground max-w-sm text-center">
+                  Map is unavailable: set <code>VITE_MAPBOX_TOKEN</code> and restart dev server.
+                </div>
+              </div>
+            )}
 
             {/* Selected Facility Panel */}
             {selectedFacility && (

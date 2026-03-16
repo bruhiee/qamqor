@@ -12,7 +12,7 @@ import { Language, languageNames } from '@/lib/i18n';
 export function LanguageSwitcher() {
   const { language, setLanguage } = useLanguage();
 
-  const languages: Language[] = ['en', 'ru', 'kk', 'zh', 'de', 'fr', 'es'];
+  const languages: Language[] = ['en', 'ru', 'kk', 'de', 'fr', 'es'];
 
   return (
     <DropdownMenu>

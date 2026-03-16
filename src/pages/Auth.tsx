@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,17 @@ import { apiFetch } from "@/lib/api";
 type RegistrationStep = 'credentials' | 'role-selection' | 'doctor-form';
 
 export default function Auth() {
+  type RegistrationProfileForm = {
+    age: string;
+    gender: string;
+    city: string;
+    height_cm: string;
+    weight_kg: string;
+    additional_info: string;
+    allergiesRaw: string;
+    lifestyle_factors: string[];
+  };
+
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,8 +52,18 @@ export default function Auth() {
     yearsOfExperience: '',
     workplace: '',
   });
+  const [registrationProfile, setRegistrationProfile] = useState<RegistrationProfileForm>({
+    age: "",
+    gender: "",
+    city: "",
+    height_cm: "",
+    weight_kg: "",
+    additional_info: "",
+    allergiesRaw: "",
+    lifestyle_factors: [],
+  });
   
-  const { signUp, signIn, verifyTwoFactor } = useAuth();
+  const { signUp, signIn, verifyTwoFactor, resendTwoFactorLoginCode } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -61,6 +82,23 @@ export default function Auth() {
     { value: 'ophthalmologist', label: t.ophthalmologist },
     { value: 'other', label: t.otherSpecialty },
   ];
+  const lifestyleOptions = [
+    "Smoking",
+    "Alcohol",
+    "Low activity",
+    "High stress",
+    "Poor sleep",
+    "Night shifts",
+  ];
+
+  const toggleLifestyle = (value: string) => {
+    setRegistrationProfile((prev) => ({
+      ...prev,
+      lifestyle_factors: prev.lifestyle_factors.includes(value)
+        ? prev.lifestyle_factors.filter((item) => item !== value)
+        : [...prev.lifestyle_factors, value],
+    }));
+  };
 
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,6 +162,29 @@ export default function Auth() {
     }
   };
 
+  const handleResendTwoFactor = async () => {
+    if (!pendingChallengeId) return;
+    setLoading(true);
+    try {
+      const { error, debugCode } = await resendTwoFactorLoginCode(pendingChallengeId);
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: t.error,
+          description: error,
+        });
+        return;
+      }
+      setDebugTwoFactorCode(debugCode || null);
+      toast({
+        title: 'Code resent',
+        description: 'A new verification code has been sent.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRoleSelection = (role: 'user' | 'doctor') => {
     setSelectedRole(role);
     if (role === 'doctor') {
@@ -137,7 +198,19 @@ export default function Auth() {
   const completeRegistration = async (role: 'user' | 'doctor') => {
     setLoading(true);
     try {
-      const { error } = await signUp(email, password, displayName, role);
+      const { error } = await signUp(email, password, displayName, role, {
+        age: registrationProfile.age ? Number(registrationProfile.age) : null,
+        gender: registrationProfile.gender || null,
+        city: registrationProfile.city || null,
+        height_cm: registrationProfile.height_cm ? Number(registrationProfile.height_cm) : null,
+        weight_kg: registrationProfile.weight_kg ? Number(registrationProfile.weight_kg) : null,
+        additional_info: registrationProfile.additional_info || null,
+        allergies: registrationProfile.allergiesRaw
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        lifestyle_factors: registrationProfile.lifestyle_factors,
+      });
       if (error) {
         toast({
           variant: "destructive",
@@ -190,6 +263,16 @@ export default function Auth() {
       setRegistrationStep('credentials');
       setSelectedRole('user');
       setIsSignUp(false);
+      setRegistrationProfile({
+        age: "",
+        gender: "",
+        city: "",
+        height_cm: "",
+        weight_kg: "",
+        additional_info: "",
+        allergiesRaw: "",
+        lifestyle_factors: [],
+      });
     } catch {
       toast({
         variant: 'destructive',
@@ -209,17 +292,127 @@ export default function Auth() {
   const renderCredentialsForm = () => (
     <form onSubmit={handleCredentialsSubmit} className="space-y-4">
       {isSignUp && (
-        <div>
-          <Label htmlFor="displayName">{t.displayName}</Label>
-          <div className="relative mt-1">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              id="displayName"
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="pl-10"
-              placeholder="John Doe"
+        <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4">
+          <div>
+            <Label htmlFor="displayName">{t.displayName}</Label>
+            <div className="relative mt-1">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="displayName"
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="pl-10"
+                placeholder="John Doe"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="age">Age</Label>
+              <Input
+                id="age"
+                type="number"
+                min="0"
+                max="120"
+                value={registrationProfile.age}
+                onChange={(e) => setRegistrationProfile((prev) => ({ ...prev, age: e.target.value }))}
+                placeholder="25"
+              />
+            </div>
+            <div>
+              <Label htmlFor="gender">Gender</Label>
+              <Select
+                value={registrationProfile.gender}
+                onValueChange={(value) => setRegistrationProfile((prev) => ({ ...prev, gender: value }))}
+              >
+                <SelectTrigger id="gender">
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                type="text"
+                value={registrationProfile.city}
+                onChange={(e) => setRegistrationProfile((prev) => ({ ...prev, city: e.target.value }))}
+                placeholder="Almaty"
+              />
+            </div>
+            <div>
+              <Label htmlFor="height">Height (cm)</Label>
+              <Input
+                id="height"
+                type="number"
+                min="30"
+                max="260"
+                value={registrationProfile.height_cm}
+                onChange={(e) => setRegistrationProfile((prev) => ({ ...prev, height_cm: e.target.value }))}
+                placeholder="172"
+              />
+            </div>
+            <div>
+              <Label htmlFor="weight">Weight (kg)</Label>
+              <Input
+                id="weight"
+                type="number"
+                min="1"
+                max="500"
+                value={registrationProfile.weight_kg}
+                onChange={(e) => setRegistrationProfile((prev) => ({ ...prev, weight_kg: e.target.value }))}
+                placeholder="68"
+              />
+            </div>
+            <div>
+              <Label htmlFor="allergies">Allergies (comma separated)</Label>
+              <Input
+                id="allergies"
+                type="text"
+                value={registrationProfile.allergiesRaw}
+                onChange={(e) => setRegistrationProfile((prev) => ({ ...prev, allergiesRaw: e.target.value }))}
+                placeholder="Pollen, Penicillin"
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label>Lifestyle factors</Label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {lifestyleOptions.map((option) => {
+                const active = registrationProfile.lifestyle_factors.includes(option);
+                return (
+                  <Button
+                    key={option}
+                    type="button"
+                    size="sm"
+                    variant={active ? "default" : "outline"}
+                    onClick={() => toggleLifestyle(option)}
+                    className="rounded-full"
+                  >
+                    {option}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="additionalInfo">Additional Information (optional)</Label>
+            <Textarea
+              id="additionalInfo"
+              value={registrationProfile.additional_info}
+              onChange={(e) => setRegistrationProfile((prev) => ({ ...prev, additional_info: e.target.value }))}
+              className="min-h-[80px]"
+              placeholder="Anything important about your health history"
             />
           </div>
         </div>
@@ -251,7 +444,7 @@ export default function Auth() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="pl-10"
-            placeholder="••••••••"
+            placeholder="********"
             required
             minLength={6}
           />
@@ -288,6 +481,15 @@ export default function Auth() {
       </div>
       <Button type="submit" className="w-full medical-gradient" disabled={loading}>
         {loading ? t.loading : 'Verify'}
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full"
+        onClick={handleResendTwoFactor}
+        disabled={loading}
+      >
+        Resend code
       </Button>
       <Button
         type="button"
@@ -519,7 +721,7 @@ export default function Auth() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
+        className={`w-full ${isSignUp ? "max-w-2xl" : "max-w-md"}`}
       >
         <div className="bg-card rounded-2xl border border-border p-8 shadow-xl">
           <div className="text-center mb-8">
@@ -560,6 +762,7 @@ export default function Auth() {
                 onClick={() => {
                   setIsSignUp(!isSignUp);
                   setRegistrationStep('credentials');
+                  setPendingChallengeId(null);
                 }}
                 className="text-sm text-primary hover:underline"
               >
@@ -576,5 +779,6 @@ export default function Auth() {
     </div>
   );
 }
+
 
 

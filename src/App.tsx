@@ -7,13 +7,13 @@ import { createPortal } from "react-dom";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { NavigationAssistant } from "@/components/layout/NavigationAssistant";
 
 const Home = lazy(() => import("./pages/Home"));
 const AIConsultant = lazy(() => import("./pages/AIConsultant"));
 const MedicineCabinet = lazy(() => import("./pages/MedicineCabinet"));
 const MapPage = lazy(() => import("./pages/MapPage"));
 const HealthArticles = lazy(() => import("./pages/HealthArticles"));
-const FirstAidGuide = lazy(() => import("./pages/FirstAidGuide"));
 const SymptomTracker = lazy(() => import("./pages/SymptomTracker"));
 const About = lazy(() => import("./pages/About"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -122,7 +122,6 @@ const App = () => (
                   <Route path="/cabinet" element={<MedicineCabinet />} />
                   <Route path="/map" element={<MapPage />} />
                   <Route path="/articles" element={<HealthArticles />} />
-                  <Route path="/first-aid" element={<FirstAidGuide />} />
                   <Route path="/symptom-tracker" element={<SymptomTracker />} />
                   <Route path="/forum" element={<Forum />} />
                   <Route path="/doctor-workplace" element={<DoctorWorkplace />} />
@@ -135,6 +134,7 @@ const App = () => (
                 </Routes>
               </Suspense>
             </div>
+            <NavigationAssistant />
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

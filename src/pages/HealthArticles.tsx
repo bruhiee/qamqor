@@ -629,6 +629,187 @@ const articles: Article[] = [
   }
 ];
 
+const firstAidArticles: Article[] = [
+  {
+    id: "fa-cpr",
+    title: "First Aid: CPR (Cardiopulmonary Resuscitation)",
+    summary: "Step-by-step CPR actions for unresponsive people who are not breathing normally.",
+    keyTakeaways: [
+      "Call emergency services immediately",
+      "Use hard and fast chest compressions",
+      "Continue until professionals arrive"
+    ],
+    author: "First Aid Team",
+    date: "2024-03-01",
+    readTime: "6 min",
+    category: "Emergency Basics",
+    libraryType: "symptom-guide",
+    tags: ["first aid", "cpr", "emergency", "resuscitation"],
+    image: "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=400",
+    content: [
+      "Check responsiveness and normal breathing, then call emergency services and put your phone on speaker.",
+      "Place the person on a firm surface and start chest compressions in the center of the chest at 100-120 per minute with sufficient depth.",
+      "If trained, use rescue breaths in a 30:2 cycle. Keep going until the person recovers or medical help takes over."
+    ]
+  },
+  {
+    id: "fa-choking",
+    title: "First Aid: Choking (Heimlich Maneuver)",
+    summary: "How to identify severe choking and perform abdominal thrusts safely.",
+    keyTakeaways: [
+      "Act quickly when a person cannot breathe or speak",
+      "Use repeated inward-upward thrusts",
+      "Call emergency services if obstruction persists"
+    ],
+    author: "First Aid Team",
+    date: "2024-03-01",
+    readTime: "5 min",
+    category: "Emergency Basics",
+    libraryType: "symptom-guide",
+    tags: ["first aid", "choking", "heimlich", "airway"],
+    image: "https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=400",
+    content: [
+      "Recognize signs of severe choking: inability to cough, speak, or breathe, often with throat clutching and panic.",
+      "Stand behind the person, place a fist above the navel, and perform forceful inward and upward abdominal thrusts.",
+      "Repeat until the object is expelled or the person becomes unresponsive, then switch to emergency response and call for urgent help."
+    ]
+  },
+  {
+    id: "fa-burns",
+    title: "First Aid: Burns and Scalds",
+    summary: "Immediate cooling and practical burn care to reduce tissue damage.",
+    keyTakeaways: [
+      "Cool with running water for at least 20 minutes",
+      "Do not apply ice, oils, or toothpaste",
+      "Seek care for large, deep, or sensitive-area burns"
+    ],
+    author: "First Aid Team",
+    date: "2024-03-02",
+    readTime: "6 min",
+    category: "Emergency Basics",
+    libraryType: "symptom-guide",
+    tags: ["first aid", "burns", "scalds", "wound care"],
+    image: "https://images.unsplash.com/photo-1581594693702-fbdc51b2763b?w=400",
+    content: [
+      "Remove the source of heat and cool the burn under cool running water for at least 20 minutes.",
+      "Cover loosely with a clean, non-fluffy dressing and monitor pain, swelling, and signs of shock.",
+      "Do not break blisters or remove stuck clothing. Urgent evaluation is needed for severe, chemical, electrical, or large burns."
+    ]
+  },
+  {
+    id: "fa-bleeding",
+    title: "First Aid: Severe Bleeding Control",
+    summary: "How to stop heavy bleeding fast with direct pressure and safe wound handling.",
+    keyTakeaways: [
+      "Apply firm direct pressure immediately",
+      "Add layers without removing soaked dressing",
+      "Call emergency services for ongoing heavy bleeding"
+    ],
+    author: "First Aid Team",
+    date: "2024-03-02",
+    readTime: "5 min",
+    category: "Emergency Basics",
+    libraryType: "symptom-guide",
+    tags: ["first aid", "bleeding", "trauma", "emergency"],
+    image: "https://images.unsplash.com/photo-1583947582886-f40ec95dd752?w=400",
+    content: [
+      "Ensure scene safety and apply firm direct pressure with clean cloth or bandage without frequent checking.",
+      "If blood soaks through, place more material on top and keep pressure continuous to support clot formation.",
+      "Elevate the injured area when possible and seek emergency care for spurting blood, shock signs, or uncontrolled bleeding."
+    ]
+  },
+  {
+    id: "fa-stroke",
+    title: "First Aid: Stroke Recognition (FAST)",
+    summary: "Use FAST signs to identify stroke quickly and reduce delay to emergency treatment.",
+    keyTakeaways: [
+      "Face droop, Arm weakness, Speech change, Time to call",
+      "Do not give food, drink, or aspirin",
+      "Every minute matters for brain protection"
+    ],
+    author: "First Aid Team",
+    date: "2024-03-03",
+    readTime: "5 min",
+    category: "Emergency Basics",
+    libraryType: "symptom-guide",
+    tags: ["first aid", "stroke", "fast", "neurology"],
+    image: "https://images.unsplash.com/photo-1530026405186-ed1f139313f8?w=400",
+    content: [
+      "Check FAST signs: facial asymmetry, arm drift, and abnormal speech. If any sign is positive, call emergency services now.",
+      "Note symptom start time, keep the person safe and comfortable, and monitor breathing.",
+      "Avoid giving oral intake or unprescribed medication while waiting for medical responders."
+    ]
+  },
+  {
+    id: "fa-fractures",
+    title: "First Aid: Suspected Fractures",
+    summary: "Safe immobilization principles for possible broken bones before medical care.",
+    keyTakeaways: [
+      "Immobilize in found position",
+      "Use padded splinting when needed",
+      "Do not attempt bone realignment"
+    ],
+    author: "First Aid Team",
+    date: "2024-03-03",
+    readTime: "6 min",
+    category: "Emergency Basics",
+    libraryType: "symptom-guide",
+    tags: ["first aid", "fracture", "splint", "injury"],
+    image: "https://images.unsplash.com/photo-1612277795421-9bc7706a4a41?w=400",
+    content: [
+      "Suspect fracture with deformity, swelling, severe pain, or inability to move. Keep the limb still.",
+      "Apply a cold pack wrapped in cloth and immobilize using a padded splint extending beyond joints above and below injury.",
+      "Do not straighten the limb or move a person with possible spine injury unless absolutely necessary for safety."
+    ]
+  },
+  {
+    id: "fa-anaphylaxis",
+    title: "First Aid: Severe Allergic Reaction (Anaphylaxis)",
+    summary: "Emergency response for life-threatening allergic reactions and airway risk.",
+    keyTakeaways: [
+      "Recognize breathing and swelling danger signs early",
+      "Use epinephrine promptly if available",
+      "Always call emergency services"
+    ],
+    author: "First Aid Team",
+    date: "2024-03-04",
+    readTime: "5 min",
+    category: "Emergency Basics",
+    libraryType: "symptom-guide",
+    tags: ["first aid", "allergy", "anaphylaxis", "epipen"],
+    image: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=400",
+    content: [
+      "Watch for throat swelling, breathing difficulty, hives, dizziness, and rapid progression of symptoms.",
+      "Call emergency services immediately and assist with epinephrine auto-injector use if prescribed.",
+      "Keep the person under close observation and prepare for CPR if breathing stops."
+    ]
+  },
+  {
+    id: "fa-poisoning",
+    title: "First Aid: Poisoning and Overdose",
+    summary: "Immediate safety steps and poison-control actions for suspected toxic exposure.",
+    keyTakeaways: [
+      "Identify substance and exposure details",
+      "Contact poison control or emergency services fast",
+      "Do not induce vomiting unless instructed"
+    ],
+    author: "First Aid Team",
+    date: "2024-03-04",
+    readTime: "6 min",
+    category: "Emergency Basics",
+    libraryType: "symptom-guide",
+    tags: ["first aid", "poisoning", "overdose", "toxicology"],
+    image: "https://images.unsplash.com/photo-1585435557343-3b092031a831?w=400",
+    content: [
+      "Collect key details: substance name, amount, route of exposure, and time since contact.",
+      "Follow poison control instructions exactly. For inhaled toxins, move to fresh air; for skin exposure, rinse thoroughly.",
+      "Do not use home remedies or force fluids unless instructed by professionals."
+    ]
+  }
+];
+
+const allArticles: Article[] = [...articles, ...firstAidArticles];
+
 const healthFacts = [
   {
     type: "fact",
@@ -735,9 +916,9 @@ export default function HealthArticles() {
             "medical-dictionary": "Medical Dictionary",
           };
 
-  const allTags = Array.from(new Set(articles.flatMap((article) => article.tags))).sort();
+  const allTags = Array.from(new Set(allArticles.flatMap((article) => article.tags))).sort();
 
-  const filteredArticles = articles.filter((article) => {
+  const filteredArticles = allArticles.filter((article) => {
     const title = language === "ru" ? article.titleRu : language === "kz" ? article.titleKz : article.title;
     const summary = language === "ru" ? article.summaryRu : language === "kz" ? article.summaryKz : article.summary;
     const categoryMatch = activeCategory === "all" || article.libraryType === activeCategory;

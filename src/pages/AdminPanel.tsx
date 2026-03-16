@@ -55,6 +55,26 @@ interface FlaggedPost {
   created_at: string;
 }
 
+interface PendingReply {
+  id: string;
+  post_id: string;
+  post_title?: string;
+  content: string;
+  status?: string;
+  is_doctor_reply?: boolean;
+  created_at: string;
+}
+
+interface DoctorReplySample {
+  id: string;
+  created_at: string;
+  question?: {
+    title?: string;
+    symptom_description?: string;
+  };
+  doctor_answer?: string;
+}
+
 interface AdminUser {
   id: string;
   email: string;
@@ -199,6 +219,8 @@ export default function AdminPanel() {
   });
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [flaggedPosts, setFlaggedPosts] = useState<FlaggedPost[]>([]);
+  const [pendingReplies, setPendingReplies] = useState<PendingReply[]>([]);
+  const [doctorReplySamples, setDoctorReplySamples] = useState<DoctorReplySample[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null);
@@ -218,8 +240,10 @@ export default function AdminPanel() {
     fetchStats();
     fetchLogs();
     fetchFlaggedPosts();
+    fetchPendingReplies();
     fetchUsers();
     fetchAnalytics();
+    fetchDoctorReplySamples();
     fetchDoctorApplications();
   }, [user, rolesLoading, isAdminRole]);
 
@@ -250,6 +274,25 @@ export default function AdminPanel() {
       setFlaggedPosts(pending);
     } catch (error) {
       console.error('Error fetching flagged posts:', error);
+    }
+  };
+
+  const fetchPendingReplies = async () => {
+    try {
+      const { data } = await apiFetch<{ data: PendingReply[] }>("/forum/moderation/pending-replies");
+      const pending = (data || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setPendingReplies(pending);
+    } catch (error) {
+      console.error("Error fetching pending replies:", error);
+    }
+  };
+
+  const fetchDoctorReplySamples = async () => {
+    try {
+      const { data } = await apiFetch<{ data: DoctorReplySample[] }>("/admin/doctor-reply-samples");
+      setDoctorReplySamples(data || []);
+    } catch (error) {
+      console.error("Error fetching doctor reply samples:", error);
     }
   };
 
@@ -355,10 +398,48 @@ export default function AdminPanel() {
       });
 
       fetchFlaggedPosts();
+      fetchPendingReplies();
       fetchStats();
       fetchAnalytics();
     } catch (error) {
       console.error('Error moderating post:', error);
+    }
+  };
+
+  const handleModerateReply = async (replyId: string, decision: "approve" | "reject") => {
+    try {
+      await apiFetch(`/forum/replies/${replyId}/moderation`, {
+        method: "PATCH",
+        body: { decision },
+      });
+      await apiFetch("/admin/logs", {
+        method: "POST",
+        body: {
+          action: `Moderator ${decision}d reply`,
+          target_type: "forum_reply",
+          target_id: replyId,
+          details: null,
+        },
+      });
+      fetchPendingReplies();
+      fetchFlaggedPosts();
+      fetchStats();
+    } catch (error) {
+      console.error("Error moderating reply:", error);
+      toast({ title: t.error, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteReply = async (replyId: string) => {
+    try {
+      await apiFetch(`/forum/replies/${replyId}`, { method: "DELETE" });
+      fetchPendingReplies();
+      fetchFlaggedPosts();
+      fetchStats();
+      toast({ title: t.success, description: "Reply deleted" });
+    } catch (error) {
+      console.error("Error deleting reply:", error);
+      toast({ title: t.error, variant: "destructive" });
     }
   };
 
@@ -537,6 +618,54 @@ export default function AdminPanel() {
                     ))}
                   </div>
                 )}
+
+                <div className="mt-8 pt-6 border-t border-border">
+                  <h4 className="font-medium mb-4">Flagged Doctor Replies</h4>
+                  {pendingReplies.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No flagged replies to review.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {pendingReplies.map((reply) => (
+                        <div key={reply.id} className="p-4 rounded-lg border border-destructive/20 bg-destructive/5">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <p className="text-xs text-muted-foreground mb-1">
+                                Post: {reply.post_title || reply.post_id}
+                              </p>
+                              <p className="text-sm mb-1">{reply.content}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(reply.created_at).toLocaleString()} {reply.is_doctor_reply ? "· doctor reply" : ""}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleModerateReply(reply.id, "approve")}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleModerateReply(reply.id, "reject")}
+                              >
+                                Reject
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleDeleteReply(reply.id)}
+                              >
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </TabsContent>
 
@@ -862,6 +991,26 @@ export default function AdminPanel() {
                           </div>
                         </div>
                       </div>
+                    </div>
+
+                    <div className="p-4 rounded-lg bg-muted">
+                      <h4 className="font-medium mb-3">Recent Doctor Answers (for AI quality analysis)</h4>
+                      {doctorReplySamples.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No doctor answers captured yet.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {doctorReplySamples.slice(0, 5).map((sample) => (
+                            <div key={sample.id} className="p-3 rounded border border-border bg-background">
+                              <p className="text-xs text-muted-foreground mb-1">
+                                {new Date(sample.created_at).toLocaleString()}
+                              </p>
+                              <p className="text-sm font-medium mb-1">{sample.question?.title || "Question"}</p>
+                              <p className="text-xs text-muted-foreground line-clamp-2">{sample.question?.symptom_description}</p>
+                              <p className="text-sm mt-2 line-clamp-3">{sample.doctor_answer}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <p className="text-xs text-muted-foreground">

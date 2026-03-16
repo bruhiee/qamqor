@@ -1,4 +1,16 @@
 import { createContext } from "react";
+
+export type RegistrationProfileInput = {
+  age?: number | null;
+  gender?: string | null;
+  city?: string | null;
+  height_cm?: number | null;
+  weight_kg?: number | null;
+  additional_info?: string | null;
+  allergies?: string[];
+  lifestyle_factors?: string[];
+};
+
 export type AuthUser = {
   id: string;
   email: string;
@@ -25,6 +37,7 @@ export interface AuthContextType {
     password: string,
     displayName?: string,
     role?: "user" | "doctor",
+    profile?: RegistrationProfileInput,
   ) => Promise<{ error: string | null }>;
   signIn: (email: string, password: string) => Promise<{
     error: string | null;
@@ -33,6 +46,7 @@ export interface AuthContextType {
     debugCode?: string | null;
   }>;
   verifyTwoFactor: (challengeId: string, code: string) => Promise<{ error: string | null }>;
+  resendTwoFactorLoginCode: (challengeId: string) => Promise<{ error: string | null; debugCode?: string | null }>;
   requestTwoFactorEnable: () => Promise<{ error: string | null; challengeId?: string | null; debugCode?: string | null }>;
   confirmTwoFactorEnable: (challengeId: string, code: string) => Promise<{ error: string | null }>;
   disableTwoFactor: () => Promise<{ error: string | null }>;

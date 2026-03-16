@@ -108,6 +108,28 @@
       "created_at": "2026-03-12T09:12:17.887Z",
       "banned": false,
       "requested_role": "doctor"
+    },
+    {
+      "id": "FQY2xBxZL_w_ZIHqQ0pvj",
+      "email": "daefwfwfe@gmail.com",
+      "displayName": "dgdtgdtgh",
+      "passwordHash": "$2a$10$XkYv4j/cZwSpBZpYQvMmZ..X5AxRG36U.1FQ3nix9Ceu7x/jilFpa",
+      "roles": [
+        "user"
+      ],
+      "user_metadata": {
+        "display_name": "dgdtgdtgh"
+      },
+      "app_metadata": {
+        "provider": "email",
+        "roles": [
+          "user"
+        ]
+      },
+      "created_at": "2026-03-16T06:51:28.001Z",
+      "banned": false,
+      "two_factor_enabled": false,
+      "requested_role": "user"
     }
   ],
   "doctor_applications": [
@@ -178,6 +200,21 @@
       ],
       "expiration_date": "2026-03-20",
       "notes": null
+    },
+    {
+      "id": "2CLO4vFWLQKdeX3w-a8iQ",
+      "user_id": "FQY2xBxZL_w_ZIHqQ0pvj",
+      "created_at": "2026-03-16T07:05:32.262Z",
+      "name": "cfbdfgdgdfgdgffdgdfgdfg",
+      "purpose": "gdfgzdfg",
+      "dosage": "dfgdf",
+      "quantity": 1,
+      "form_type": "tablet",
+      "tags": [
+        "dfgdf"
+      ],
+      "expiration_date": "2026-03-17",
+      "notes": "dfgd"
     }
   ],
   "forum_posts": [
@@ -185,9 +222,9 @@
       "id": "zgQCmKiabjmiUqzcJzueE",
       "user_id": "wE3IwfanCIXIiGScmeRHV",
       "created_at": "2026-02-12T14:33:59.611Z",
-      "status": "open",
-      "views_count": 6,
-      "replies_count": 0,
+      "status": "answered",
+      "views_count": 10,
+      "replies_count": 1,
       "title": "i have headache doctors help me",
       "content": "ive been ill for like 40 days by now ",
       "tags": [],
@@ -201,7 +238,24 @@
       }
     }
   ],
-  "forum_replies": [],
+  "forum_replies": [
+    {
+      "id": "RWSGxvaDjw_FhXrPqww7v",
+      "post_id": "zgQCmKiabjmiUqzcJzueE",
+      "user_id": "wE3IwfanCIXIiGScmeRHV",
+      "created_at": "2026-03-13T09:36:44.320Z",
+      "is_doctor_reply": true,
+      "content": "just take  ibuprofen and cocaine and drugs",
+      "is_anonymous": false,
+      "flagged": false,
+      "moderation": {
+        "source": "ai",
+        "flagged": false,
+        "severity": "low",
+        "reasons": []
+      }
+    }
+  ],
   "symptom_logs": [
     {
       "id": "xPwRM4Y0J0D9Rrmzk6i2B",
@@ -250,6 +304,23 @@
       "notes": null,
       "mood": "great",
       "sleep_hours": 9.5
+    },
+    {
+      "id": "nZcuy6ffWed8kcI81Dqul",
+      "user_id": "wE3IwfanCIXIiGScmeRHV",
+      "symptom_date": "2026-03-13",
+      "symptoms": [
+        "Sore throat"
+      ],
+      "severity": 5,
+      "notes": null,
+      "mood": "okay",
+      "sleep_hours": 7,
+      "details": {
+        "fever": null,
+        "headache": null
+      },
+      "created_at": "2026-03-13T09:41:40.859Z"
     }
   ],
   "clinical_cases": [],
@@ -338,6 +409,126 @@
         "мучать"
       ],
       "created_at": "2026-03-13T04:30:33.766Z"
+    },
+    {
+      "id": "VfL0OR3ykSDzqbv73Tbmc",
+      "question": "привет",
+      "keywords": [
+        "привет"
+      ],
+      "language": "en",
+      "mode": "review-maker",
+      "response_summary": "Hello! I am ready to help you prepare a summary for a doctor's visit. Please describe your symptoms, when they started, and any concerns you have.",
+      "triage_score": 1,
+      "human_review_flag": true,
+      "anonymized_symptoms": [
+        "привет"
+      ],
+      "created_at": "2026-03-13T09:35:01.013Z"
+    },
+    {
+      "id": "DFx-YixFqpERJIpXPLcHT",
+      "question": "привет",
+      "keywords": [
+        "привет"
+      ],
+      "language": "en",
+      "mode": "triage",
+      "response_summary": "Hello! I am your Qamqor health assistant. How can I help you today? Please describe any symptoms or health concerns you have, and I will provide you with a structured assessment.",
+      "triage_score": 1,
+      "human_review_flag": true,
+      "anonymized_symptoms": [
+        "привет"
+      ],
+      "created_at": "2026-03-16T12:08:27.555Z"
+    },
+    {
+      "id": "Q4zhgvjyTc9HGq2oGl0xc",
+      "question": "f",
+      "keywords": [],
+      "language": "en",
+      "mode": "triage",
+      "response_summary": "Hello! I am your Qamqor health assistant. It appears your message was quite short. Could you please describe your symptoms or health concerns in more detail so I can provide you with better guidance?",
+      "triage_score": 1,
+      "human_review_flag": false,
+      "anonymized_symptoms": [],
+      "created_at": "2026-03-16T12:13:33.880Z"
+    },
+    {
+      "id": "dQRnvcsr6VuiYROkrxW77",
+      "question": "ываыва",
+      "keywords": [
+        "ываыва"
+      ],
+      "language": "en",
+      "mode": "triage",
+      "response_summary": "Hello. It appears your message contains random characters. Could you please describe your symptoms or the health concern you would like to discuss so I can provide you with a helpful assessment?",
+      "triage_score": 1,
+      "human_review_flag": true,
+      "anonymized_symptoms": [
+        "ываыва"
+      ],
+      "created_at": "2026-03-16T12:56:10.039Z"
+    },
+    {
+      "id": "zXi8acua_ZN16BytIG-s4",
+      "question": "hiii",
+      "keywords": [
+        "hiii"
+      ],
+      "language": "en",
+      "mode": "triage",
+      "response_summary": "Hello! I am your Qamqor AI health assistant. How can I help you today? Please describe any symptoms or health concerns you're currently experiencing.",
+      "triage_score": 1,
+      "human_review_flag": true,
+      "anonymized_symptoms": [
+        "hiii"
+      ],
+      "created_at": "2026-03-16T12:56:21.182Z"
+    },
+    {
+      "id": "u0iBXBtwG-kXWDrVQa7Fz",
+      "question": "hi",
+      "keywords": [],
+      "language": "en",
+      "mode": "triage",
+      "response_summary": "Hello! I am your Qamqor AI health assistant. How can I help you today? Please describe any symptoms or health concerns you have.",
+      "triage_score": 1,
+      "human_review_flag": true,
+      "anonymized_symptoms": [],
+      "created_at": "2026-03-16T12:56:37.022Z"
+    },
+    {
+      "id": "dxe66Q2uunSI2qzVJ3fUF",
+      "question": "bro",
+      "keywords": [
+        "bro"
+      ],
+      "language": "en",
+      "mode": "triage",
+      "response_summary": "Hello. I am your Qamqor AI health assistant. Please let me know if you have any symptoms, health concerns, or medical questions you would like me to help you with.",
+      "triage_score": 1,
+      "human_review_flag": true,
+      "anonymized_symptoms": [
+        "bro"
+      ],
+      "created_at": "2026-03-16T12:56:43.996Z"
+    },
+    {
+      "id": "LoFAJNs9ZPimAGsrUErhr",
+      "question": "bruder",
+      "keywords": [
+        "bruder"
+      ],
+      "language": "en",
+      "mode": "triage",
+      "response_summary": "Hello. I am your Qamqor health assistant. How can I help you today? Please describe any symptoms or health concerns you are experiencing so I can provide structured guidance.",
+      "triage_score": 1,
+      "human_review_flag": true,
+      "anonymized_symptoms": [
+        "bruder"
+      ],
+      "created_at": "2026-03-16T12:56:50.816Z"
     }
   ],
   "admin_logs": [
@@ -506,6 +697,18 @@
       "expiration_date": "2026-03-20",
       "changes": null,
       "created_at": "2026-03-12T06:25:48.715Z"
+    },
+    {
+      "id": "u54l59X06-Bk_qC37w6XI",
+      "user_id": "FQY2xBxZL_w_ZIHqQ0pvj",
+      "medicine_id": "2CLO4vFWLQKdeX3w-a8iQ",
+      "action": "created",
+      "medicine_name": "cfbdfgdgdfgdgffdgdfgdfg",
+      "dosage": "dfgdf",
+      "quantity": 1,
+      "expiration_date": "2026-03-17",
+      "changes": null,
+      "created_at": "2026-03-16T07:05:32.263Z"
     }
   ],
   "medicine_notifications": [
@@ -522,6 +725,20 @@
       },
       "dedupe_key": "yDPCDEEPvaYitbzuxxd82:Qb18c3_J9Ca7kc0jAWdK2:2026-03-20:8",
       "created_at": "2026-03-12T06:25:48.715Z"
+    },
+    {
+      "id": "F-XNnVn1Yfgyx_cLMuIfS",
+      "user_id": "FQY2xBxZL_w_ZIHqQ0pvj",
+      "medicine_id": "2CLO4vFWLQKdeX3w-a8iQ",
+      "medicine_name": "cfbdfgdgdfgdgffdgdfgdfg",
+      "expiration_date": "2026-03-17",
+      "days_left": 1,
+      "channels": {
+        "email": "configured-off",
+        "telegram": "skipped"
+      },
+      "dedupe_key": "FQY2xBxZL_w_ZIHqQ0pvj:2CLO4vFWLQKdeX3w-a8iQ:2026-03-17:1",
+      "created_at": "2026-03-16T07:05:32.263Z"
     }
   ],
   "medicine_notification_prefs": [
@@ -551,11 +768,56 @@
       "telegram_chat_id": "",
       "remind_days_before": 30,
       "updated_at": "2026-03-13T04:29:25.995Z"
+    },
+    {
+      "id": "3H_-DVXAAovetq0v_WsWw",
+      "user_id": "FQY2xBxZL_w_ZIHqQ0pvj",
+      "email_enabled": true,
+      "telegram_enabled": true,
+      "telegram_chat_id": "1683285832",
+      "remind_days_before": 1,
+      "updated_at": "2026-03-16T07:06:09.782Z"
     }
   ],
-  "doctor_reply_training_samples": [],
+  "doctor_reply_training_samples": [
+    {
+      "id": "rQQyQCYzM9F-aF3VRh7XJ",
+      "source": "forum_doctor_reply",
+      "created_at": "2026-03-13T09:36:44.320Z",
+      "question": {
+        "title": "i have headache doctors help me",
+        "symptom_description": "",
+        "symptom_duration": "",
+        "tags": [],
+        "is_urgent": false
+      },
+      "doctor_answer": "just take  ibuprofen and cocaine and drugs"
+    }
+  ],
   "two_factor_challenges": [],
-  "user_profiles": [],
+  "user_profiles": [
+    {
+      "id": "itQH2BWZcZWEb0qM1nrV8",
+      "user_id": "FQY2xBxZL_w_ZIHqQ0pvj",
+      "emergency_contact_name": null,
+      "emergency_contact_phone": null,
+      "blood_type": null,
+      "allergies": [],
+      "chronic_conditions": [],
+      "medications": [],
+      "notes": null,
+      "updated_at": "2026-03-16T06:51:28.001Z"
+    }
+  ],
   "bookmarks": [],
-  "tutorial_status": []
+  "tutorial_status": [
+    {
+      "user_id": "FQY2xBxZL_w_ZIHqQ0pvj",
+      "completed": true,
+      "skipped": false,
+      "completed_at": "2026-03-16T12:48:20.732Z",
+      "updated_at": "2026-03-16T12:48:20.732Z"
+    }
+  ],
+  "ai_chat_histories": []
 }

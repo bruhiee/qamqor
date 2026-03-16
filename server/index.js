@@ -1,4 +1,4 @@
-import dotenv from "dotenv";
+﻿import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
@@ -11,7 +11,14 @@ import { randomInt } from "crypto";
 
 dotenv.config();
 
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.openstreetmap.ru/api/interpreter",
+];
+let overpassCooldownUntil = 0;
+const OVERPASS_DEBUG = process.env.OVERPASS_DEBUG === "1";
+const OVERPASS_ENABLED = process.env.OVERPASS_ENABLED !== "0";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.join(__dirname, "data", "db.json");
@@ -34,6 +41,7 @@ const emptyDb = {
   case_collections: [],
   ai_chat_evaluations: [],
   ai_chat_sessions: [],
+  ai_chat_histories: [],
   doctor_reply_training_samples: [],
   two_factor_challenges: [],
   user_profiles: [],
@@ -44,6 +52,82 @@ const emptyDb = {
   health_news_events: [],
   medical_facilities: [],
 };
+
+const DEFAULT_MEDICAL_FACILITIES = [
+  {
+    id: "fallback-astana-hospital",
+    name: "Astana City Hospital",
+    type: "hospital",
+    coordinates: [71.4306, 51.1283],
+    address: "Astana, Kazakhstan",
+    phone: "+7 (7172) 70-00-00",
+    hours: "24/7",
+    specializations: ["Emergency", "Surgery", "Cardiology"],
+  },
+  {
+    id: "fallback-almaty-clinic",
+    name: "Almaty Family Clinic",
+    type: "clinic",
+    coordinates: [76.9286, 43.222],
+    address: "Almaty, Kazakhstan",
+    phone: "+7 (727) 250-00-00",
+    hours: "Mon-Sat: 08:00-20:00",
+    specializations: ["General Practice", "Pediatrics"],
+  },
+  {
+    id: "fallback-shymkent-pharmacy",
+    name: "Shymkent Central Pharmacy",
+    type: "pharmacy",
+    coordinates: [69.5901, 42.3242],
+    address: "Shymkent, Kazakhstan",
+    phone: "+7 (7252) 55-12-34",
+    hours: "08:00-23:00",
+  },
+  {
+    id: "fallback-ny-hospital",
+    name: "NYC General Hospital",
+    type: "hospital",
+    coordinates: [-73.9857, 40.7484],
+    address: "New York, USA",
+    phone: "+1 (212) 555-0100",
+    hours: "24/7",
+    specializations: ["Emergency", "Cardiology", "Oncology"],
+  },
+  {
+    id: "fallback-london-hospital",
+    name: "London General Hospital",
+    type: "hospital",
+    coordinates: [-0.1276, 51.5074],
+    address: "London, United Kingdom",
+    phone: "+44 20 7188 7188",
+    hours: "24/7",
+    specializations: ["Emergency", "Internal Medicine"],
+  },
+  {
+    id: "fallback-berlin-clinic",
+    name: "Berlin Medical Clinic",
+    type: "clinic",
+    coordinates: [13.4049, 52.52],
+    address: "Berlin, Germany",
+    phone: "+49 30 1234 5678",
+    hours: "Mon-Fri: 08:00-19:00",
+    specializations: ["Family Medicine", "Diagnostics"],
+  },
+];
+
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 const bannedWords = [
   "fuck",
   "shit",
@@ -137,23 +221,27 @@ const STOP_WORDS = new Set([
   "more", "when", "what", "where", "who", "about", "each", "over",
 ]);
 const REGION_KEYWORDS = [
-  { label: "Kazakhstan", aliases: ["kazakhstan", "астана", "almaty", "алматы", "шымкент", "shymkent", "актобе", "aktobe", "атырау", "atyrau"] },
-  { label: "Russia", aliases: ["russia", "россия", "moscow", "москва"] },
+  { label: "Kazakhstan", aliases: ["kazakhstan", "Р°СЃС‚Р°РЅР°", "almaty", "Р°Р»РјР°С‚С‹", "С€С‹РјРєРµРЅС‚", "shymkent", "Р°РєС‚РѕР±Рµ", "aktobe", "Р°С‚С‹СЂР°Сѓ", "atyrau"] },
+  { label: "Russia", aliases: ["russia", "СЂРѕСЃСЃРёСЏ", "moscow", "РјРѕСЃРєРІР°"] },
   { label: "United States", aliases: ["usa", "united states", "america", "new york", "nyc", "chicago"] },
   { label: "United Kingdom", aliases: ["uk", "united kingdom", "england", "london"] },
-  { label: "Germany", aliases: ["germany", "berlin", "германия", "берлин"] },
+  { label: "Germany", aliases: ["germany", "berlin", "РіРµСЂРјР°РЅРёСЏ", "Р±РµСЂР»РёРЅ"] },
   { label: "Central Asia", aliases: ["uzbekistan", "kyrgyzstan", "tajikistan", "turkmenistan"] },
 ];
 const SYMPTOM_KEYWORDS = [
   "fever", "cough", "headache", "nausea", "vomit", "rash", "sore", "throat", "pain",
   "fatigue", "dizziness", "diarrhea", "cold", "flu", "infection", "temperature", "breath",
-  "жар", "кашель", "голова", "боль", "горло", "сыпь", "тошнота", "рвота", "слабость",
+  "Р¶Р°СЂ", "РєР°С€РµР»СЊ", "РіРѕР»РѕРІР°", "Р±РѕР»СЊ", "РіРѕСЂР»Рѕ", "СЃС‹РїСЊ", "С‚РѕС€РЅРѕС‚Р°", "СЂРІРѕС‚Р°", "СЃР»Р°Р±РѕСЃС‚СЊ",
 ];
 
 const POST_PENDING_STATUS = "pending";
 const POST_VISIBLE_STATUS = "open";
 const POST_REJECTED_STATUS = "rejected";
 const HIDDEN_FORUM_STATUSES = new Set([POST_PENDING_STATUS, "flagged", POST_REJECTED_STATUS]);
+const REPLY_PENDING_STATUS = "pending";
+const REPLY_VISIBLE_STATUS = "open";
+const REPLY_REJECTED_STATUS = "rejected";
+const HIDDEN_FORUM_REPLY_STATUSES = new Set([REPLY_PENDING_STATUS, REPLY_REJECTED_STATUS]);
 const MODERATION_WARNING_MESSAGE =
   "Your post is awaiting moderator review and will only appear on the forum after a moderator approves it.";
 const HEALTH_ONLY_FORUM_MESSAGE =
@@ -175,6 +263,36 @@ const DOCTOR_APPLICATION_STATUSES = new Set([
 ]);
 
 const isForumPostVisible = (post) => !HIDDEN_FORUM_STATUSES.has(post?.status);
+const isForumReplyVisible = (reply) => !HIDDEN_FORUM_REPLY_STATUSES.has(reply?.status) && !reply?.hidden;
+
+function refreshPostStatusFromReplies(post) {
+  if (!post) return;
+  const relatedReplies = (db?.forum_replies || []).filter((reply) => reply.post_id === post.id);
+  const hasPendingReply = relatedReplies.some((reply) => reply.status === REPLY_PENDING_STATUS);
+  const hasVisibleDoctorReply = relatedReplies.some(
+    (reply) => reply.is_doctor_reply && isForumReplyVisible(reply),
+  );
+
+  if (hasPendingReply) {
+    post.statusBeforeModeration = post.statusBeforeModeration || post.status || POST_VISIBLE_STATUS;
+    post.status = POST_PENDING_STATUS;
+    post.flagged = true;
+    return;
+  }
+
+  if (post.status === POST_PENDING_STATUS && post.statusBeforeModeration) {
+    post.status = post.statusBeforeModeration;
+    delete post.statusBeforeModeration;
+  }
+
+  if (post.status === POST_VISIBLE_STATUS && hasVisibleDoctorReply) {
+    post.status = "answered";
+  }
+
+  if (!hasPendingReply && post.status !== POST_REJECTED_STATUS) {
+    post.flagged = false;
+  }
+}
 
 function extractSignificantWords(text) {
   if (!text) return [];
@@ -1035,6 +1153,7 @@ async function loadDb() {
     const parsed = JSON.parse(text.replace(/^\uFEFF/, ""));
     parsed.ai_chat_evaluations = Array.isArray(parsed.ai_chat_evaluations) ? parsed.ai_chat_evaluations : [];
     parsed.ai_chat_sessions = Array.isArray(parsed.ai_chat_sessions) ? parsed.ai_chat_sessions : [];
+    parsed.ai_chat_histories = Array.isArray(parsed.ai_chat_histories) ? parsed.ai_chat_histories : [];
     parsed.doctor_reply_training_samples = Array.isArray(parsed.doctor_reply_training_samples) ? parsed.doctor_reply_training_samples : [];
     parsed.two_factor_challenges = Array.isArray(parsed.two_factor_challenges) ? parsed.two_factor_challenges : [];
     parsed.user_profiles = Array.isArray(parsed.user_profiles) ? parsed.user_profiles : [];
@@ -1135,6 +1254,16 @@ function decodeToken(token) {
   } catch {
     return null;
   }
+}
+
+function getOptionalAuthUser(req) {
+  const token = getAuthHeader(req);
+  if (!token) return null;
+  const payload = decodeToken(token);
+  if (!payload?.id) return null;
+  const user = db.users.find((u) => u.id === payload.id);
+  if (!user || user.banned) return null;
+  return user;
 }
 
 function requireAuth(req, res, next) {
@@ -1277,7 +1406,7 @@ function createRouter() {
   app.use(express.json({ limit: "1mb" }));
 
   app.post("/api/auth/register", async (req, res) => {
-    const { email, password, displayName, role } = req.body;
+    const { email, password, displayName, role, profile: rawProfile } = req.body;
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
     }
@@ -1300,14 +1429,36 @@ function createRouter() {
       two_factor_enabled: false,
       requested_role: role === "doctor" ? "doctor" : "user",
     };
+    const profile = rawProfile && typeof rawProfile === "object" ? sanitizeRequestBody(rawProfile) : {};
+    const parseNumberOrNull = (value, min, max) => {
+      if (value === null || value === undefined || value === "") return null;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return null;
+      return Math.min(max, Math.max(min, parsed));
+    };
+    const normalizeStringList = (items, maxItems, maxLen) =>
+      Array.isArray(items)
+        ? items
+            .map((item) => sanitizeText(String(item || "")).trim().slice(0, maxLen))
+            .filter(Boolean)
+            .slice(0, maxItems)
+        : [];
+
     db.users.push(newUser);
     db.user_profiles.push({
       id: nanoid(),
       user_id: newUser.id,
+      age: parseNumberOrNull(profile.age, 0, 120),
+      gender: profile.gender ? String(profile.gender).slice(0, 32) : null,
+      city: profile.city ? String(profile.city).slice(0, 120) : null,
+      height_cm: parseNumberOrNull(profile.height_cm, 30, 260),
+      weight_kg: parseNumberOrNull(profile.weight_kg, 1, 500),
+      additional_info: profile.additional_info ? String(profile.additional_info).slice(0, 1000) : null,
       emergency_contact_name: null,
       emergency_contact_phone: null,
       blood_type: null,
-      allergies: [],
+      allergies: normalizeStringList(profile.allergies, 30, 100),
+      lifestyle_factors: normalizeStringList(profile.lifestyle_factors, 30, 100),
       chronic_conditions: [],
       medications: [],
       notes: null,
@@ -1390,6 +1541,37 @@ function createRouter() {
     return res.json({ user: sanitizeUser(user), token });
   });
 
+  app.post("/api/auth/2fa/resend-login", async (req, res) => {
+    const challengeId = sanitizeText(String(req.body?.challenge_id || "")).trim();
+    if (!challengeId) {
+      return res.status(400).json({ message: "challenge_id is required" });
+    }
+    const challenge = (db.two_factor_challenges || []).find(
+      (item) => item.id === challengeId && item.purpose === "login" && !item.used,
+    );
+    if (!challenge) {
+      return res.status(400).json({ message: "Invalid or expired 2FA challenge" });
+    }
+    const user = db.users.find((entry) => entry.id === challenge.user_id);
+    if (!user) {
+      return res.status(404).json({ message: "User no longer exists" });
+    }
+    if (user.banned) {
+      return res.status(403).json({ message: "Account is banned" });
+    }
+
+    const code = issueTwoFactorCode();
+    challenge.code = code;
+    challenge.expires_at = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const delivery = await sendTwoFactorCode(user, code, "login-resend");
+    await persistDb();
+    return res.json({
+      challenge_id: challenge.id,
+      delivery: delivery.delivery,
+      ...(delivery.delivery === "configured-off" ? { debug_code: code } : {}),
+    });
+  });
+
   app.get("/api/auth/me", requireAuth, (req, res) => {
     ensureRoles(req.user);
     return res.json({ user: sanitizeUser(req.user) });
@@ -1448,16 +1630,62 @@ function createRouter() {
     return res.json({ user: sanitizeUser(req.user) });
   });
 
+  app.get("/api/ai/chat-history", requireAuth, (req, res) => {
+    const histories = (db.ai_chat_histories || [])
+      .filter((item) => item.user_id === req.user.id)
+      .sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0))
+      .slice(0, 100)
+      .map((item) => ({
+        id: item.id,
+        title: item.title || "New consultation",
+        language: item.language || "en",
+        mode: item.mode || "triage",
+        created_at: item.created_at,
+        updated_at: item.updated_at || item.created_at,
+        last_message: item.last_message || "",
+      }));
+    return res.json({ data: histories });
+  });
+
+  app.get("/api/ai/chat-history/:id", requireAuth, (req, res) => {
+    const session = (db.ai_chat_histories || []).find(
+      (item) => item.id === req.params.id && item.user_id === req.user.id,
+    );
+    if (!session) {
+      return res.status(404).json({ message: "Chat history not found" });
+    }
+    return res.json({ data: session });
+  });
+
+  app.delete("/api/ai/chat-history/:id", requireAuth, async (req, res) => {
+    const index = (db.ai_chat_histories || []).findIndex(
+      (item) => item.id === req.params.id && item.user_id === req.user.id,
+    );
+    if (index === -1) {
+      return res.status(404).json({ message: "Chat history not found" });
+    }
+    db.ai_chat_histories.splice(index, 1);
+    await persistDb();
+    return res.json({ success: true });
+  });
+
   app.get("/api/profile", requireAuth, (req, res) => {
     let profile = (db.user_profiles || []).find((item) => item.user_id === req.user.id);
     if (!profile) {
       profile = {
         id: nanoid(),
         user_id: req.user.id,
+        age: null,
+        gender: null,
+        city: null,
+        height_cm: null,
+        weight_kg: null,
+        additional_info: null,
         emergency_contact_name: null,
         emergency_contact_phone: null,
         blood_type: null,
         allergies: [],
+        lifestyle_factors: [],
         chronic_conditions: [],
         medications: [],
         notes: null,
@@ -1475,10 +1703,23 @@ function createRouter() {
       profile = { id: nanoid(), user_id: req.user.id };
       db.user_profiles.push(profile);
     }
+    const parseNumberOrNull = (value, min, max) => {
+      if (value === null || value === undefined || value === "") return null;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return null;
+      return Math.min(max, Math.max(min, parsed));
+    };
+    profile.age = parseNumberOrNull(payload.age, 0, 120);
+    profile.gender = payload.gender ? String(payload.gender).slice(0, 32) : null;
+    profile.city = payload.city ? String(payload.city).slice(0, 120) : null;
+    profile.height_cm = parseNumberOrNull(payload.height_cm, 30, 260);
+    profile.weight_kg = parseNumberOrNull(payload.weight_kg, 1, 500);
+    profile.additional_info = payload.additional_info ? String(payload.additional_info).slice(0, 1000) : null;
     profile.emergency_contact_name = payload.emergency_contact_name ? String(payload.emergency_contact_name).slice(0, 120) : null;
     profile.emergency_contact_phone = payload.emergency_contact_phone ? String(payload.emergency_contact_phone).slice(0, 60) : null;
     profile.blood_type = payload.blood_type ? String(payload.blood_type).slice(0, 8) : null;
     profile.allergies = Array.isArray(payload.allergies) ? payload.allergies.map((item) => String(item).slice(0, 100)).slice(0, 30) : [];
+    profile.lifestyle_factors = Array.isArray(payload.lifestyle_factors) ? payload.lifestyle_factors.map((item) => String(item).slice(0, 100)).slice(0, 30) : [];
     profile.chronic_conditions = Array.isArray(payload.chronic_conditions) ? payload.chronic_conditions.map((item) => String(item).slice(0, 100)).slice(0, 30) : [];
     profile.medications = Array.isArray(payload.medications) ? payload.medications.map((item) => String(item).slice(0, 100)).slice(0, 40) : [];
     profile.notes = payload.notes ? String(payload.notes).slice(0, 1500) : null;
@@ -1882,19 +2123,31 @@ function createRouter() {
   });
 
   app.post("/api/forum/question-improve", requireAuth, async (req, res) => {
+    const title = sanitizeText(String(req.body?.title || "")).trim().slice(0, 160);
     const symptomDescription = sanitizeText(String(req.body?.symptom_description || "")).trim().slice(0, 2000);
     const symptomDuration = sanitizeText(String(req.body?.symptom_duration || "")).trim().slice(0, 400);
     const additionalDetails = sanitizeText(String(req.body?.additional_details || "")).trim().slice(0, 2500);
+    const problemCategory = sanitizeText(String(req.body?.problem_category || "")).trim().slice(0, 80);
+    const ageGroup = sanitizeText(String(req.body?.age_group || "")).trim().slice(0, 80);
+    const symptomTags = Array.isArray(req.body?.symptom_tags)
+      ? req.body.symptom_tags.map((tag) => sanitizeText(String(tag || "")).toLowerCase().trim().slice(0, 40)).filter(Boolean).slice(0, 12)
+      : [];
     const language = sanitizeText(String(req.body?.language || "en")).slice(0, 10);
 
     if (!symptomDescription) {
       return res.status(400).json({ message: "symptom_description is required" });
     }
 
-    const fallbackTitle = symptomDescription.split(/[.!?\n]/).map((item) => item.trim()).find(Boolean)?.slice(0, 80) || "Medical question";
+    const fallbackTitle =
+      title
+      || symptomDescription.split(/[.!?\n]/).map((item) => item.trim()).find(Boolean)?.slice(0, 80)
+      || "Medical question";
     const fallbackContent = [
+      problemCategory ? `Category: ${problemCategory}` : null,
       `Symptoms: ${symptomDescription}`,
       symptomDuration ? `Duration: ${symptomDuration}` : null,
+      ageGroup ? `Age group: ${ageGroup}` : null,
+      symptomTags.length ? `Symptom tags: ${symptomTags.join(", ")}` : null,
       additionalDetails ? `Additional details: ${additionalDetails}` : null,
     ].filter(Boolean).join("\n");
 
@@ -1918,13 +2171,16 @@ function createRouter() {
 Return ONLY valid JSON:
 {
   "title": "short clear title",
-  "content": "structured question with symptoms, duration, and context"
+  "content": "structured question with symptoms, duration, and context",
+  "symptom_description": "refined symptom description",
+  "symptom_duration": "refined duration if available",
+  "additional_details": "refined additional details if available"
 }
 Keep it factual. No diagnosis. Language: ${language}.`,
           },
           {
             role: "user",
-            content: `Symptoms:\n${symptomDescription}\n\nDuration:\n${symptomDuration || "not provided"}\n\nAdditional details:\n${additionalDetails || "not provided"}`,
+            content: `Title:\n${title || "not provided"}\n\nCategory:\n${problemCategory || "not provided"}\n\nSymptoms:\n${symptomDescription}\n\nDuration:\n${symptomDuration || "not provided"}\n\nAge group:\n${ageGroup || "not provided"}\n\nSymptom tags:\n${symptomTags.join(", ") || "not provided"}\n\nAdditional details:\n${additionalDetails || "not provided"}`,
           },
         ],
       });
@@ -1933,6 +2189,9 @@ Keep it factual. No diagnosis. Language: ${language}.`,
         data: {
           title: sanitizeText(String(normalized?.title || fallbackTitle)).slice(0, 160),
           content: sanitizeText(String(normalized?.content || fallbackContent)).slice(0, 6000),
+          symptom_description: sanitizeText(String(normalized?.symptom_description || symptomDescription)).slice(0, 2000),
+          symptom_duration: sanitizeText(String(normalized?.symptom_duration || symptomDuration)).slice(0, 400),
+          additional_details: sanitizeText(String(normalized?.additional_details || additionalDetails)).slice(0, 2500),
         },
       });
     } catch (error) {
@@ -1941,6 +2200,9 @@ Keep it factual. No diagnosis. Language: ${language}.`,
         data: {
           title: fallbackTitle,
           content: fallbackContent,
+          symptom_description: symptomDescription,
+          symptom_duration: symptomDuration,
+          additional_details: additionalDetails,
         },
       });
     }
@@ -1948,16 +2210,37 @@ Keep it factual. No diagnosis. Language: ${language}.`,
 
   app.post("/api/forum/posts", requireAuth, async (req, res) => {
     const cleaned = sanitizeRequestBody(req.body);
+    const problemCategory = sanitizeText(String(cleaned.problem_category || "")).toLowerCase().trim().slice(0, 80);
+    const ageGroup = sanitizeText(String(cleaned.age_group || "")).toLowerCase().trim().slice(0, 80);
     const symptomDescription = sanitizeText(String(cleaned.symptom_description || "")).trim().slice(0, 2000);
     const symptomDuration = sanitizeText(String(cleaned.symptom_duration || "")).trim().slice(0, 400);
     const additionalDetails = sanitizeText(String(cleaned.additional_details || "")).trim().slice(0, 2500);
+    const symptomTags = Array.isArray(cleaned.symptom_tags)
+      ? cleaned.symptom_tags.map((tag) => sanitizeText(String(tag || "")).toLowerCase().trim().slice(0, 40)).filter(Boolean).slice(0, 12)
+      : [];
+    const photoDataUrl = typeof cleaned.photo_data_url === "string"
+      ? String(cleaned.photo_data_url).slice(0, 1_500_000)
+      : null;
+    const photoLooksValid = !photoDataUrl || /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(photoDataUrl);
+    if (!photoLooksValid) {
+      return res.status(400).json({ message: "Invalid photo format. Use image upload." });
+    }
+    if (!problemCategory) {
+      return res.status(400).json({ message: "Problem category is required" });
+    }
     if (!symptomDescription) {
       return res.status(400).json({ message: "Symptom description is required" });
     }
+    if (!ageGroup) {
+      return res.status(400).json({ message: "Age group is required" });
+    }
 
     const contentFromStructured = [
+      `Category: ${problemCategory}`,
       `Symptoms: ${symptomDescription}`,
       symptomDuration ? `Duration: ${symptomDuration}` : null,
+      `Age group: ${ageGroup}`,
+      symptomTags.length ? `Symptom tags: ${symptomTags.join(", ")}` : null,
       additionalDetails ? `Additional details: ${additionalDetails}` : null,
     ].filter(Boolean).join("\n");
     const normalizedContent = sanitizeText(String(cleaned.content || contentFromStructured)).slice(0, 6000);
@@ -1992,6 +2275,10 @@ Keep it factual. No diagnosis. Language: ${language}.`,
       tags: Array.isArray(cleaned.tags)
         ? cleaned.tags.map((tag) => sanitizeText(String(tag || "")).toLowerCase().trim().slice(0, 40)).filter(Boolean).slice(0, 12)
         : [],
+      problem_category: problemCategory,
+      age_group: ageGroup,
+      symptom_tags: symptomTags,
+      photo_data_url: photoDataUrl,
       is_urgent: Boolean(cleaned.is_urgent),
       symptom_description: symptomDescription,
       symptom_duration: symptomDuration || null,
@@ -2039,6 +2326,7 @@ Keep it factual. No diagnosis. Language: ${language}.`,
       user_id: req.user.id,
       created_at: new Date().toISOString(),
       is_doctor_reply: req.user.roles.includes("doctor"),
+      status: flagged ? REPLY_PENDING_STATUS : REPLY_VISIBLE_STATUS,
       ...cleaned,
       flagged,
       moderation: aiModeration
@@ -2049,13 +2337,7 @@ Keep it factual. No diagnosis. Language: ${language}.`,
     };
     db.forum_replies.push(reply);
     post.replies_count = (post.replies_count || 0) + 1;
-    if (reply.flagged) {
-      post.statusBeforeModeration = post.statusBeforeModeration || post.status || POST_VISIBLE_STATUS;
-      post.status = POST_PENDING_STATUS;
-      post.flagged = true;
-    } else if (reply.is_doctor_reply) {
-      post.status = "answered";
-    }
+    refreshPostStatusFromReplies(post);
 
     if (reply.is_doctor_reply && !reply.flagged) {
       if (!Array.isArray(db.doctor_reply_training_samples)) {
@@ -2082,6 +2364,7 @@ Keep it factual. No diagnosis. Language: ${language}.`,
   app.get("/api/forum/posts/:postId/replies", (req, res) => {
     const replies = db.forum_replies
       .filter((reply) => reply.post_id === req.params.postId)
+      .filter(isForumReplyVisible)
       .map(sanitizeForumRecord);
     return res.json({ data: replies });
   });
@@ -2102,6 +2385,20 @@ Keep it factual. No diagnosis. Language: ${language}.`,
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .map(sanitizeForumRecord);
     return res.json({ data: pendingPosts });
+  });
+
+  app.get("/api/forum/moderation/pending-replies", requireAuth, requireForumModerator, (req, res) => {
+    const pendingReplies = [...db.forum_replies]
+      .filter((reply) => HIDDEN_FORUM_REPLY_STATUSES.has(reply.status || (reply.flagged ? REPLY_PENDING_STATUS : REPLY_VISIBLE_STATUS)))
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .map((reply) => {
+        const parentPost = db.forum_posts.find((post) => post.id === reply.post_id);
+        return sanitizeForumRecord({
+          ...reply,
+          post_title: parentPost?.title || "Unknown post",
+        });
+      });
+    return res.json({ data: pendingReplies });
   });
 
   app.patch("/api/forum/posts/:postId/moderation", requireAuth, requireForumModerator, async (req, res) => {
@@ -2148,6 +2445,62 @@ Keep it factual. No diagnosis. Language: ${language}.`,
     }
     await persistDb();
     return res.json({ data: sanitizeForumRecord(post) });
+  });
+
+  app.patch("/api/forum/replies/:replyId/moderation", requireAuth, requireForumModerator, async (req, res) => {
+    const reply = db.forum_replies.find((item) => item.id === req.params.replyId);
+    if (!reply) {
+      return res.status(404).json({ message: "Reply not found" });
+    }
+    const decision = String(req.body?.decision || "").toLowerCase();
+    if (!["approve", "reject"].includes(decision)) {
+      return res.status(400).json({ message: "Decision must be approve or reject" });
+    }
+    const note = req.body?.note ? String(req.body.note).slice(0, 600) : null;
+    const now = new Date().toISOString();
+
+    if (!Array.isArray(reply.moderationHistory)) {
+      reply.moderationHistory = [];
+    }
+    reply.moderationHistory.push({
+      id: nanoid(),
+      moderator_id: req.user.id,
+      decision,
+      note,
+      created_at: now,
+    });
+
+    if (decision === "approve") {
+      reply.status = REPLY_VISIBLE_STATUS;
+      reply.flagged = false;
+      reply.hidden = false;
+    } else {
+      reply.status = REPLY_REJECTED_STATUS;
+      reply.flagged = true;
+      reply.hidden = true;
+    }
+
+    reply.moderationReview = {
+      status: decision === "approve" ? "approved" : "rejected",
+      moderator_id: req.user.id,
+      note,
+      created_at: now,
+    };
+
+    const parentPost = db.forum_posts.find((post) => post.id === reply.post_id);
+    if (parentPost) {
+      refreshPostStatusFromReplies(parentPost);
+    }
+
+    logAdminAction(
+      req.user.id,
+      `Moderator ${decision}d forum reply`,
+      "forum_reply",
+      reply.id,
+      { post_id: reply.post_id, is_doctor_reply: Boolean(reply.is_doctor_reply) },
+    );
+    await persistDb();
+    return res.json({ data: sanitizeForumRecord(reply) });
   });
 
   app.patch("/api/forum/posts/:postId", requireAuth, async (req, res) => {
@@ -2227,7 +2580,8 @@ Keep it factual. No diagnosis. Language: ${language}.`,
     }
     const totalUsers = db.users.length;
     const totalPosts = db.forum_posts.length;
-    const flaggedPosts = db.forum_posts.filter((post) => HIDDEN_FORUM_STATUSES.has(post.status)).length;
+    const flaggedPosts = db.forum_posts.filter((post) => HIDDEN_FORUM_STATUSES.has(post.status)).length
+      + db.forum_replies.filter((reply) => HIDDEN_FORUM_REPLY_STATUSES.has(reply.status || (reply.flagged ? REPLY_PENDING_STATUS : REPLY_VISIBLE_STATUS))).length;
     const pendingArticles = db.health_articles.filter((article) => article.needs_review).length;
     const pendingDoctorApplications = db.doctor_applications.filter(
       (application) => application.status === DOCTOR_APPLICATION_PENDING,
@@ -2348,6 +2702,13 @@ Never include personal data. Never invent user identities.`,
     return res.json({ data: users });
   });
 
+  app.get("/api/admin/doctor-reply-samples", requireAuth, requireAdmin, (req, res) => {
+    const samples = [...(db.doctor_reply_training_samples || [])]
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+      .slice(0, 50);
+    return res.json({ data: samples });
+  });
+
   app.post("/api/admin/users/:userId/ban", requireAuth, requireAdmin, async (req, res) => {
     const target = db.users.find((user) => user.id === req.params.userId);
     if (!target) {
@@ -2442,7 +2803,22 @@ Never include personal data. Never invent user identities.`,
 
     try {
       const facilities = await fetchFacilitiesOverpass(lat, lon, radius);
-      return res.json({ data: facilities });
+      if (facilities.length > 0) {
+        return res.json({ data: facilities });
+      }
+
+      const customFacilities =
+        Array.isArray(db.medical_facilities) && db.medical_facilities.length > 0
+          ? db.medical_facilities
+          : DEFAULT_MEDICAL_FACILITIES;
+      const nearbyFallback = customFacilities
+        .filter((item) => {
+          const [fLon, fLat] = item.coordinates || [];
+          if (!Number.isFinite(fLat) || !Number.isFinite(fLon)) return false;
+          return distanceMeters(lat, lon, Number(fLat), Number(fLon)) <= radius * 2.5;
+        })
+        .slice(0, 80);
+      return res.json({ data: nearbyFallback.length > 0 ? nearbyFallback : customFacilities.slice(0, 40) });
     } catch (error) {
       console.error("Failed to load facilities:", error);
       return res.status(502).json({ message: "Failed to query facilities" });
@@ -2508,7 +2884,7 @@ Language: ${language}`,
       });
     }
 
-    const { messages, language = "en", mode = "triage" } = req.body;
+    const { messages, language = "en", mode = "triage", session_id: sessionIdRaw } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ message: "Messages are required" });
@@ -2632,6 +3008,68 @@ Language: ${language}`,
       anonymized_symptoms: keywords,
       created_at: new Date().toISOString(),
     });
+
+    const authUser = getOptionalAuthUser(req);
+    let historySessionId = null;
+    if (authUser) {
+      if (!Array.isArray(db.ai_chat_histories)) {
+        db.ai_chat_histories = [];
+      }
+      const nowIso = new Date().toISOString();
+      const requestedSessionId = sanitizeText(String(sessionIdRaw || "")).trim();
+      let session = requestedSessionId
+        ? db.ai_chat_histories.find(
+            (item) => item.id === requestedSessionId && item.user_id === authUser.id,
+          )
+        : null;
+
+      if (!session) {
+        const titleSource =
+          sanitizeText(String(sanitizedQuestion || "")).trim()
+          || sanitizeText(String(userMessage || "")).trim()
+          || "New consultation";
+        session = {
+          id: nanoid(),
+          user_id: authUser.id,
+          title: titleSource.slice(0, 80),
+          language: sanitizeText(String(language || "en")).slice(0, 10),
+          mode: isReviewMode ? "review-maker" : "triage",
+          created_at: nowIso,
+          updated_at: nowIso,
+          last_message: "",
+          messages: [],
+        };
+        db.ai_chat_histories.push(session);
+      }
+
+      const userHistoryMessage = {
+        id: nanoid(),
+        role: "user",
+        content: sanitizeText(String(userMessage || "")).slice(0, 8000),
+        timestamp: nowIso,
+        mode: isReviewMode ? "review-maker" : "triage",
+      };
+      const assistantHistoryMessage = {
+        id: nanoid(),
+        role: "assistant",
+        content: sanitizeText(String(responseText || "")).slice(0, 8000),
+        timestamp: nowIso,
+        report: normalizedReport,
+        triage,
+        summary: structuredSummary,
+        reviewMaker: normalizedReviewMaker,
+        mode: isReviewMode ? "review-maker" : "triage",
+      };
+
+      const currentMessages = Array.isArray(session.messages) ? session.messages : [];
+      session.messages = [...currentMessages, userHistoryMessage, assistantHistoryMessage].slice(-200);
+      session.updated_at = nowIso;
+      session.language = sanitizeText(String(language || session.language || "en")).slice(0, 10);
+      session.mode = isReviewMode ? "review-maker" : "triage";
+      session.last_message = sanitizeText(String(responseText || "")).slice(0, 240);
+      historySessionId = session.id;
+    }
+
     await persistDb();
 
     const safeResponse = responseText || "AI assistant did not return a response.";
@@ -2642,6 +3080,7 @@ Language: ${language}`,
       summary: structuredSummary,
       reviewMaker: normalizedReviewMaker,
       mode: isReviewMode ? "review-maker" : "triage",
+      session_id: historySessionId,
     });
   });
 
@@ -2756,6 +3195,14 @@ Language: ${language}`,
 }
 
 async function fetchFacilitiesOverpass(lat, lon, radius) {
+  if (!OVERPASS_ENABLED) {
+    return [];
+  }
+
+  if (Date.now() < overpassCooldownUntil) {
+    return [];
+  }
+
   const query = `[out:json][timeout:25];
 (node["amenity"~"pharmacy|hospital|clinic"](around:${radius},${lat},${lon});
 way["amenity"~"pharmacy|hospital|clinic"](around:${radius},${lat},${lon});
@@ -2765,22 +3212,8 @@ out center;`;
 
   const body = new URLSearchParams({ data: query }).toString();
 
-  try {
-    const res = await fetch(OVERPASS_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      },
-      body,
-    });
-
-    if (!res.ok) {
-      console.error("Overpass response not ok", await res.text());
-      return [];
-    }
-
-    const data = await res.json();
-    return (data.elements || [])
+  const toFacilities = (elements) =>
+    (elements || [])
       .map((el) => {
         const latlon =
           el.type === "node"
@@ -2789,29 +3222,34 @@ out center;`;
               ? { lat: el.center.lat, lon: el.center.lon }
               : null;
         if (!latlon) return null;
+
         const addressParts = [];
         if (el.tags?.["addr:street"]) addressParts.push(el.tags["addr:street"]);
         if (el.tags?.["addr:housenumber"]) addressParts.push(el.tags["addr:housenumber"]);
         if (el.tags?.["addr:city"]) addressParts.push(el.tags["addr:city"]);
+
         const specializationsRaw =
           el.tags?.["healthcare:speciality"] ||
           el.tags?.speciality ||
           el.tags?.specialization ||
           "";
+
         const specializations = String(specializationsRaw)
           .split(/[;,]/)
           .map((item) => item.trim())
           .filter(Boolean)
           .slice(0, 8);
+
         const mainPhone = el.tags?.phone || el.tags?.["contact:phone"] || "";
         const departments = {
           reception: el.tags?.["contact:phone"] || mainPhone || "",
           emergency: el.tags?.["emergency:phone"] || "",
           pharmacy: el.tags?.["pharmacy:phone"] || "",
         };
+
         return {
           id: `${el.type}-${el.id}`,
-          name: el.tags?.name || "Место",
+          name: el.tags?.name || "Place",
           type:
             el.tags?.amenity === "hospital"
               ? "hospital"
@@ -2821,7 +3259,7 @@ out center;`;
           coordinates: [latlon.lon, latlon.lat],
           address: addressParts.join(", ") || el.tags?.village || el.tags?.city || "",
           phone: mainPhone,
-          hours: el.tags?.opening_hours || "—",
+          hours: el.tags?.opening_hours || "-",
           website: el.tags?.website || el.tags?.url,
           specializations,
           departments,
@@ -2829,10 +3267,61 @@ out center;`;
         };
       })
       .filter(Boolean);
-  } catch (error) {
-    console.error("Overpass request failed", error);
-    return [];
+
+  let hadRateLimit = false;
+  let hadAnyNetworkFailure = false;
+
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        },
+        body,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        hadAnyNetworkFailure = true;
+        if (res.status === 429 || res.status === 504) {
+          hadRateLimit = true;
+        }
+        if (OVERPASS_DEBUG) {
+          console.warn(`Overpass ${res.status} from ${endpoint}`);
+        }
+        continue;
+      }
+
+      const text = await res.text();
+      const parsed = JSON.parse(text);
+      const facilities = toFacilities(parsed.elements);
+      if (facilities.length > 0) {
+        return facilities;
+      }
+
+      if (OVERPASS_DEBUG) {
+        console.warn(`Overpass returned empty dataset from ${endpoint}`);
+      }
+    } catch (error) {
+      clearTimeout(timeout);
+      hadAnyNetworkFailure = true;
+      const message = error instanceof Error ? error.message : String(error);
+      if (OVERPASS_DEBUG) {
+        console.warn(`Overpass request failed for ${endpoint}: ${message}`);
+      }
+    }
   }
+
+  if (hadAnyNetworkFailure) {
+    overpassCooldownUntil = Date.now() + (hadRateLimit ? 10 * 60 * 1000 : 2 * 60 * 1000);
+  }
+
+  return [];
 }
 
 async function start() {
@@ -2848,3 +3337,4 @@ start().catch((error) => {
   console.error("Failed to start server", error);
   process.exit(1);
 });
+

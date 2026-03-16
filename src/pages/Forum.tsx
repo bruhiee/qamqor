@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ChangeEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ import {
   Trash,
   Sparkles,
   Loader2,
+  ImagePlus,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -45,6 +47,10 @@ interface ForumPost {
   symptom_description?: string;
   symptom_duration?: string | null;
   additional_details?: string | null;
+  problem_category?: string | null;
+  age_group?: string | null;
+  symptom_tags?: string[];
+  photo_data_url?: string | null;
   tags: string[];
   is_urgent: boolean;
   status: string;
@@ -63,10 +69,9 @@ interface ForumReply {
   created_at: string;
 }
 
-const TAGS = [
-  "symptoms", "medication", "nutrition", "mental-health", 
-  "chronic-illness", "prevention", "emergency", "general"
-];
+const TAGS = ["itching", "fever", "cough", "headache", "nausea", "pain", "rash", "fatigue", "swelling", "dizziness"];
+const PROBLEM_CATEGORIES = ["skin", "allergy", "cold", "stomach", "pain", "other"];
+const AGE_GROUPS = ["0-12", "13-17", "18-25", "26-40", "41-60", "61+"];
 
 export default function Forum() {
   const { t, language } = useLanguage();
@@ -88,9 +93,21 @@ export default function Forum() {
   const [symptomDescription, setSymptomDescription] = useState("");
   const [symptomDuration, setSymptomDuration] = useState("");
   const [additionalDetails, setAdditionalDetails] = useState("");
+  const [problemCategory, setProblemCategory] = useState("");
+  const [ageGroup, setAgeGroup] = useState("");
+  const [symptomTagsRaw, setSymptomTagsRaw] = useState("");
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+  const [photoFileName, setPhotoFileName] = useState("");
   const [newTags, setNewTags] = useState<string[]>([]);
   const [isUrgent, setIsUrgent] = useState(false);
   const [improvingQuestion, setImprovingQuestion] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<{
+    title: string;
+    content: string;
+    symptom_description: string;
+    symptom_duration: string;
+    additional_details: string;
+  } | null>(null);
 
   // Reply form
   const [replyContent, setReplyContent] = useState("");
@@ -169,7 +186,7 @@ export default function Forum() {
   };
 
   const handleCreatePost = async () => {
-    if (!user || !newTitle.trim() || !symptomDescription.trim()) return;
+    if (!user || !newTitle.trim() || !symptomDescription.trim() || !problemCategory || !ageGroup) return;
 
     try {
       await apiFetch("/forum/posts", {
@@ -177,9 +194,13 @@ export default function Forum() {
         body: {
           title: newTitle,
           content: newContent,
+          problem_category: problemCategory,
           symptom_description: symptomDescription,
           symptom_duration: symptomDuration,
           additional_details: additionalDetails,
+          symptom_tags: symptomTagsRaw.split(",").map((item) => item.trim()).filter(Boolean),
+          age_group: ageGroup,
+          photo_data_url: photoDataUrl,
           tags: newTags,
           is_urgent: isUrgent,
         },
@@ -192,8 +213,14 @@ export default function Forum() {
       setSymptomDescription("");
       setSymptomDuration("");
       setAdditionalDetails("");
+      setProblemCategory("");
+      setAgeGroup("");
+      setSymptomTagsRaw("");
+      setPhotoDataUrl(null);
+      setPhotoFileName("");
       setNewTags([]);
       setIsUrgent(false);
+      setAiSuggestion(null);
       fetchPosts();
     } catch (error) {
       console.error('Error creating post:', error);
@@ -216,24 +243,69 @@ export default function Forum() {
     }
     setImprovingQuestion(true);
     try {
-      const { data } = await apiFetch<{ data: { title: string; content: string } }>("/forum/question-improve", {
+      const { data } = await apiFetch<{ data: { title: string; content: string; symptom_description: string; symptom_duration: string; additional_details: string } }>("/forum/question-improve", {
         method: "POST",
         body: {
+          title: newTitle,
+          problem_category: problemCategory,
           symptom_description: symptomDescription,
           symptom_duration: symptomDuration,
           additional_details: additionalDetails,
+          symptom_tags: symptomTagsRaw.split(",").map((item) => item.trim()).filter(Boolean),
+          age_group: ageGroup,
           language,
         },
       });
-      if (data?.title) setNewTitle(data.title);
-      if (data?.content) setNewContent(data.content);
-      toast({ title: t.success, description: "Question improved with AI." });
+      if (data) {
+        setAiSuggestion({
+          title: data.title || newTitle,
+          content: data.content || newContent,
+          symptom_description: data.symptom_description || symptomDescription,
+          symptom_duration: data.symptom_duration || symptomDuration,
+          additional_details: data.additional_details || additionalDetails,
+        });
+      }
+      toast({ title: t.success, description: "AI prepared an improved draft. Review and apply if needed." });
     } catch (error) {
       console.error("Question improvement failed:", error);
       toast({ title: t.error, variant: "destructive" });
     } finally {
       setImprovingQuestion(false);
     }
+  };
+
+  const applyAiSuggestion = () => {
+    if (!aiSuggestion) return;
+    setNewTitle(aiSuggestion.title);
+    setNewContent(aiSuggestion.content);
+    setSymptomDescription(aiSuggestion.symptom_description);
+    setSymptomDuration(aiSuggestion.symptom_duration);
+    setAdditionalDetails(aiSuggestion.additional_details);
+    setAiSuggestion(null);
+    toast({ title: t.success, description: "Improved draft applied. You can still edit it." });
+  };
+
+  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setPhotoDataUrl(null);
+      setPhotoFileName("");
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      toast({ title: t.error, description: "Only image files are allowed.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 900 * 1024) {
+      toast({ title: t.error, description: "Image is too large. Max 900KB.", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPhotoDataUrl(typeof reader.result === "string" ? reader.result : null);
+      setPhotoFileName(file.name);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleReply = async () => {
@@ -329,14 +401,49 @@ export default function Forum() {
                         placeholder={t.questionTitle}
                       />
                     </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label>Problem Category</Label>
+                        <Select value={problemCategory} onValueChange={setProblemCategory}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PROBLEM_CATEGORIES.map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Age Group</Label>
+                        <Select value={ageGroup} onValueChange={setAgeGroup}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select age group" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {AGE_GROUPS.map((group) => (
+                              <SelectItem key={group} value={group}>
+                                {group}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                     <div>
                       <Label>Symptom Description</Label>
                       <Textarea
                         value={symptomDescription}
                         onChange={(e) => setSymptomDescription(e.target.value)}
-                        placeholder={t.typeSymptoms}
+                        placeholder="Describe the main symptoms"
                         rows={3}
                       />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Пожалуйста, опишите вашу проблему как можно подробнее: какие симптомы вы наблюдаете, когда они начались, усиливаются ли они со временем, и есть ли другие сопутствующие симптомы. Чем подробнее описание, тем точнее врачи смогут вам помочь.
+                      </p>
                     </div>
                     <div>
                       <Label>Symptom Duration</Label>
@@ -354,6 +461,24 @@ export default function Forum() {
                         placeholder="Triggers, medications tried, related conditions..."
                         rows={3}
                       />
+                    </div>
+                    <div>
+                      <Label>Symptoms (tags, comma separated)</Label>
+                      <Input
+                        value={symptomTagsRaw}
+                        onChange={(e) => setSymptomTagsRaw(e.target.value)}
+                        placeholder="fever, cough, sore throat"
+                      />
+                    </div>
+                    <div>
+                      <Label>Upload Photo (optional)</Label>
+                      <Input type="file" accept="image/*" onChange={handlePhotoChange} />
+                      {photoFileName && (
+                        <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+                          <ImagePlus className="w-3 h-3" />
+                          {photoFileName}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label>{t.questionDetails} (Final message)</Label>
@@ -374,6 +499,25 @@ export default function Forum() {
                       {improvingQuestion ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                       Improve with AI
                     </Button>
+                    {aiSuggestion && (
+                      <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+                        <p className="text-sm font-medium">AI improved draft is ready</p>
+                        <p className="text-xs text-muted-foreground line-clamp-4">{aiSuggestion.content}</p>
+                        <div className="flex gap-2">
+                          <Button type="button" size="sm" onClick={applyAiSuggestion}>
+                            Accept improved version
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setAiSuggestion(null)}
+                          >
+                            Keep original
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     <div>
                       <Label>{t.selectTags}</Label>
                       <div className="flex flex-wrap gap-2 mt-2">
@@ -399,7 +543,7 @@ export default function Forum() {
                         {t.markAsUrgent}
                       </Label>
                     </div>
-                    <Button onClick={handleCreatePost} className="w-full">
+                    <Button onClick={handleCreatePost} className="w-full" disabled={!newTitle.trim() || !symptomDescription.trim() || !problemCategory || !ageGroup}>
                       {t.postQuestion}
                     </Button>
                   </div>
@@ -447,6 +591,9 @@ export default function Forum() {
                         <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" />
                       )}
                     </div>
+                    {post.problem_category && (
+                      <Badge variant="outline" className="mb-2 capitalize">{post.problem_category}</Badge>
+                    )}
                     <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
                       {post.content}
                     </p>
@@ -515,13 +662,31 @@ export default function Forum() {
                     <p className="text-muted-foreground mb-4">{selectedPost.content}</p>
                     {selectedPost.symptom_description && (
                       <div className="mb-4 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                        {selectedPost.problem_category && (
+                          <p><span className="font-medium">Category:</span> <span className="capitalize">{selectedPost.problem_category}</span></p>
+                        )}
+                        {selectedPost.age_group && (
+                          <p><span className="font-medium">Age group:</span> {selectedPost.age_group}</p>
+                        )}
                         <p><span className="font-medium">Symptoms:</span> {selectedPost.symptom_description}</p>
                         {selectedPost.symptom_duration && (
                           <p><span className="font-medium">Duration:</span> {selectedPost.symptom_duration}</p>
                         )}
+                        {selectedPost.symptom_tags?.length ? (
+                          <p><span className="font-medium">Symptom tags:</span> {selectedPost.symptom_tags.join(", ")}</p>
+                        ) : null}
                         {selectedPost.additional_details && (
                           <p><span className="font-medium">Details:</span> {selectedPost.additional_details}</p>
                         )}
+                      </div>
+                    )}
+                    {selectedPost.photo_data_url && (
+                      <div className="mb-4">
+                        <img
+                          src={selectedPost.photo_data_url}
+                          alt="Uploaded symptom reference"
+                          className="max-h-64 w-full rounded-lg border border-border object-cover"
+                        />
                       </div>
                     )}
 

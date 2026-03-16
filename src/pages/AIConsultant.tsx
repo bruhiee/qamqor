@@ -24,7 +24,10 @@ import {
   Stethoscope,
   Clock,
   MapPin,
-  ClipboardCheck
+  ClipboardCheck,
+  History,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { DisclaimerBanner } from "@/components/layout/DisclaimerBanner";
@@ -87,23 +90,54 @@ interface Message {
   mode?: "triage" | "review-maker";
 }
 
+interface ChatHistoryItem {
+  id: string;
+  title: string;
+  language?: string;
+  mode?: "triage" | "review-maker";
+  created_at: string;
+  updated_at?: string;
+  last_message?: string;
+}
+
+interface ChatHistorySession extends ChatHistoryItem {
+  user_id: string;
+  messages: Array<{
+    id?: string;
+    role: "user" | "assistant";
+    content: string;
+    timestamp?: string;
+    report?: AIReport;
+    triage?: AITriage;
+    summary?: AISummary;
+    reviewMaker?: AIReviewMaker | null;
+    mode?: "triage" | "review-maker";
+  }>;
+}
+
 export default function AIConsultant() {
   const { t, language } = useLanguage();
   const { user } = useAuth();
   const { isDoctor } = useUserRoles();
   const { toast } = useToast();
+  const getWelcomeMessage = () => (
+    language === "ru"
+      ? "Здравствуйте! Я AI-помощник по здоровью. Опишите симптомы, и я помогу с первичной оценкой риска и следующими шагами."
+      : language === "kk"
+        ? "Сәлеметсіз бе! Мен денсаулық бойынша AI-көмекшімін. Белгілеріңізді жазыңыз, мен тәуекел деңгейін бағалап, келесі қадамдарды ұсынамын."
+        : "Hello! I'm your AI health assistant powered by advanced AI. I'm here to help you understand your symptoms and provide general health information. You can type your symptoms, upload an image, or use voice input. How can I assist you today?"
+  );
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       role: "assistant",
-      content: language === 'ru' 
-        ? "Р—РґСЂР°РІСЃС‚РІСѓР№С‚Рµ! РЇ РІР°С€ РР-РїРѕРјРѕС‰РЅРёРє РїРѕ Р·РґРѕСЂРѕРІСЊСЋ РЅР° Р±Р°Р·Рµ РїСЂРѕРґРІРёРЅСѓС‚РѕРіРѕ РР. РЇ РїРѕРјРѕРіСѓ РІР°Рј РїРѕРЅСЏС‚СЊ РІР°С€Рё СЃРёРјРїС‚РѕРјС‹ Рё РїСЂРµРґРѕСЃС‚Р°РІР»СЋ РѕР±С‰СѓСЋ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ Р·РґРѕСЂРѕРІСЊРµ. Р’С‹ РјРѕР¶РµС‚Рµ РІРІРµСЃС‚Рё СЃРёРјРїС‚РѕРјС‹, Р·Р°РіСЂСѓР·РёС‚СЊ РёР·РѕР±СЂР°Р¶РµРЅРёРµ РёР»Рё РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ РіРѕР»РѕСЃРѕРІРѕР№ РІРІРѕРґ. Р§РµРј РјРѕРіСѓ РїРѕРјРѕС‡СЊ?"
-        : language === 'kk'
-        ? "РЎУ™Р»РµРјРµС‚СЃС–Р· Р±Рµ! РњРµРЅ СЃС–Р·РґС–ТЈ Р–Р РґРµРЅСЃР°СѓР»С‹Т› РєУ©РјРµРєС€С–ТЈС–Р·Р±С–РЅ. РњРµРЅ СЃРёРјРїС‚РѕРјРґР°СЂС‹ТЈС‹Р·РґС‹ С‚ТЇСЃС–РЅСѓРіРµ Р¶У™РЅРµ Р¶Р°Р»РїС‹ РґРµРЅСЃР°СѓР»С‹Т› С‚СѓСЂР°Р»С‹ Р°Т›РїР°СЂР°С‚ Р±РµСЂСѓРіРµ РєУ©РјРµРєС‚РµСЃРµРјС–РЅ. РЎРёРјРїС‚РѕРјРґР°СЂРґС‹ Р¶Р°Р·Р° Р°Р»Р°СЃС‹Р·, СЃСѓСЂРµС‚ Р¶ТЇРєС‚РµР№ Р°Р»Р°СЃС‹Р· РЅРµРјРµСЃРµ РґР°СѓС‹СЃРїРµРЅ РµРЅРіС–Р·СѓРґС– Т›РѕР»РґР°РЅР° Р°Р»Р°СЃС‹Р·. РЎС–Р·РіРµ Т›Р°Р»Р°Р№ РєУ©РјРµРєС‚РµСЃРµ Р°Р»Р°РјС‹РЅ?"
-        : "Hello! I'm your AI health assistant powered by advanced AI. I'm here to help you understand your symptoms and provide general health information. You can type your symptoms, upload an image, or use voice input. How can I assist you today?",
+      content: getWelcomeMessage(),
       timestamp: new Date(),
     }
   ]);
+  const [historyItems, setHistoryItems] = useState<ChatHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isFinalizingSummary, setIsFinalizingSummary] = useState(false);
@@ -137,26 +171,26 @@ export default function AIConsultant() {
       submit: "Submit Evaluation",
     },
     ru: {
-      title: "РћС†РµРЅРєР° С‡Р°С‚Р° РІСЂР°С‡РѕРј",
-      subtitle: "РџРѕСЃС‚Р°РІСЊС‚Рµ РѕС†РµРЅРєСѓ РѕС‚ 1 РґРѕ 100 Рё РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё РѕСЃС‚Р°РІСЊС‚Рµ РєРѕРјРјРµРЅС‚Р°СЂРёР№.",
-      urgencyAssessmentCorrectness: "РљРѕСЂСЂРµРєС‚РЅРѕСЃС‚СЊ РѕС†РµРЅРєРё СЃСЂРѕС‡РЅРѕСЃС‚Рё",
-      safetyOfRecommendations: "Р‘РµР·РѕРїР°СЃРЅРѕСЃС‚СЊ СЂРµРєРѕРјРµРЅРґР°С†РёР№",
-      handlingOfUncertainty: "Р Р°Р±РѕС‚Р° СЃ РЅРµРѕРїСЂРµРґРµР»С‘РЅРЅРѕСЃС‚СЊСЋ",
-      consistencyAcrossSimilarCases: "РЎРѕРіР»Р°СЃРѕРІР°РЅРЅРѕСЃС‚СЊ РІ РїРѕС…РѕР¶РёС… СЃР»СѓС‡Р°СЏС…",
-      notes: "РљРѕРјРјРµРЅС‚Р°СЂРёР№ (РЅРµРѕР±СЏР·Р°С‚РµР»СЊРЅРѕ)",
-      notesPlaceholder: "РџСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё РїРѕСЏСЃРЅРёС‚Рµ СЃРІРѕСЋ РѕС†РµРЅРєСѓ...",
-      submit: "РћС‚РїСЂР°РІРёС‚СЊ РѕС†РµРЅРєСѓ",
+      title: "Оценка чата врачом",
+      subtitle: "Поставьте оценку от 1 до 100 и при необходимости оставьте комментарий.",
+      urgencyAssessmentCorrectness: "Корректность оценки срочности",
+      safetyOfRecommendations: "Безопасность рекомендаций",
+      handlingOfUncertainty: "Работа с неопределенностью",
+      consistencyAcrossSimilarCases: "Согласованность в похожих случаях",
+      notes: "Комментарий (необязательно)",
+      notesPlaceholder: "При необходимости поясните свою оценку...",
+      submit: "Отправить оценку",
     },
     kk: {
-      title: "Р”У™СЂС–РіРµСЂРґС–ТЈ С‡Р°С‚ Р±Р°Т“Р°СЃС‹",
-      subtitle: "Р§Р°С‚С‚С‹ 1-РґРµРЅ 100-РіРµ РґРµР№С–РЅ Р±Р°Т“Р°Р»Р°Рї, Т›Р°Р¶РµС‚ Р±РѕР»СЃР° С‚ТЇСЃС–РЅС–РєС‚РµРјРµ Т›РѕСЃС‹ТЈС‹Р·.",
-      urgencyAssessmentCorrectness: "РЁТ±Т“С‹Р»РґС‹Т›С‚С‹ Р±Р°Т“Р°Р»Р°Сѓ РґТ±СЂС‹СЃС‚С‹Т“С‹",
-      safetyOfRecommendations: "Т°СЃС‹РЅС‹СЃС‚Р°СЂРґС‹ТЈ Т›Р°СѓС–РїСЃС–Р·РґС–РіС–",
-      handlingOfUncertainty: "Р‘РµР»РіС–СЃС–Р·РґС–РєРїРµРЅ Р¶Т±РјС‹СЃ",
-      consistencyAcrossSimilarCases: "Т°Т›СЃР°СЃ Р¶Р°Т“РґР°Р№Р»Р°СЂРґР°Т“С‹ Р±С–СЂС–Р·РґС–Р»С–Рє",
-      notes: "РўТЇСЃС–РЅС–РєС‚РµРјРµ (РјС–РЅРґРµС‚С‚С– РµРјРµСЃ)",
-      notesPlaceholder: "ТљР°Р¶РµС‚ Р±РѕР»СЃР° Р±Р°Т“Р°ТЈС‹Р·РґС‹ С‚ТЇСЃС–РЅРґС–СЂС–ТЈС–Р·...",
-      submit: "Р‘Р°Т“Р°РЅС‹ Р¶С–Р±РµСЂСѓ",
+      title: "Дәрігердің чат бағасы",
+      subtitle: "Чатты 1-ден 100-ге дейін бағалап, қажет болса түсіндірме қалдырыңыз.",
+      urgencyAssessmentCorrectness: "Шұғылдықты бағалау дұрыстығы",
+      safetyOfRecommendations: "Ұсыныстардың қауіпсіздігі",
+      handlingOfUncertainty: "Белгісіздікпен жұмыс",
+      consistencyAcrossSimilarCases: "Ұқсас жағдайлардағы бірізділік",
+      notes: "Түсіндірме (міндетті емес)",
+      notesPlaceholder: "Қажет болса бағаңызды түсіндіріңіз...",
+      submit: "Бағаны жіберу",
     },
   };
 
@@ -164,9 +198,9 @@ export default function AIConsultant() {
     evaluationLabelMap[language as keyof typeof evaluationLabelMap] ?? evaluationLabelMap.en;
 
   const openEvaluationLabel = language === "ru"
-    ? "РћС†РµРЅРёС‚СЊ С‡Р°С‚"
+    ? "Оценить чат"
     : language === "kk"
-      ? "Р§Р°С‚С‚С‹ Р±Р°Т“Р°Р»Р°Сѓ"
+      ? "Чатты бағалау"
       : "Evaluate Chat";
 
   const scrollToBottom = () => {
@@ -176,6 +210,92 @@ export default function AIConsultant() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const loadChatHistory = async () => {
+    if (!user) {
+      setHistoryItems([]);
+      return;
+    }
+    setHistoryLoading(true);
+    try {
+      const payload = await apiFetch<{ data: ChatHistoryItem[] }>("/ai/chat-history");
+      setHistoryItems(Array.isArray(payload.data) ? payload.data : []);
+    } catch {
+      setHistoryItems([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadChatHistory();
+  }, [user?.id]);
+
+  const handleNewChat = () => {
+    setActiveSessionId(null);
+    setMessages([
+      {
+        id: "welcome",
+        role: "assistant",
+        content: getWelcomeMessage(),
+        timestamp: new Date(),
+      },
+    ]);
+    setFinalSummary(null);
+    setFinalReviewMaker(null);
+  };
+
+  const handleOpenHistorySession = async (sessionId: string) => {
+    try {
+      const payload = await apiFetch<{ data: ChatHistorySession }>(`/ai/chat-history/${sessionId}`);
+      const session = payload.data;
+      if (!session) return;
+      const mappedMessages: Message[] = [
+        {
+          id: "welcome",
+          role: "assistant",
+          content: getWelcomeMessage(),
+          timestamp: new Date(),
+        },
+        ...(Array.isArray(session.messages) ? session.messages : []).map((message, index) => ({
+          id: message.id || `${session.id}-${index}`,
+          role: message.role,
+          content: message.content,
+          timestamp: message.timestamp ? new Date(message.timestamp) : new Date(),
+          report: message.report,
+          triage: message.triage,
+          summary: message.summary,
+          reviewMaker: message.reviewMaker ?? null,
+          mode: message.mode,
+        })),
+      ];
+      setActiveSessionId(session.id);
+      setMode((session.mode as "triage" | "review-maker") || "triage");
+      setMessages(mappedMessages);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: t.error,
+        description: error instanceof Error ? error.message : t.errorOccurred,
+      });
+    }
+  };
+
+  const handleDeleteHistorySession = async (sessionId: string) => {
+    try {
+      await apiFetch(`/ai/chat-history/${sessionId}`, { method: "DELETE" });
+      setHistoryItems((prev) => prev.filter((item) => item.id !== sessionId));
+      if (activeSessionId === sessionId) {
+        handleNewChat();
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: t.error,
+        description: error instanceof Error ? error.message : t.errorOccurred,
+      });
+    }
+  };
 
   const exportSummaryAsPdf = (message?: Message, summaryOverride?: AISummary | null, reviewOverride?: AIReviewMaker | null) => {
     const win = window.open("", "_blank", "width=900,height=700");
@@ -259,6 +379,7 @@ export default function AIConsultant() {
         summary?: AISummary;
         reviewMaker?: AIReviewMaker;
         mode?: "triage" | "review-maker";
+        session_id?: string | null;
       }>("/ai/medical-chat", {
         method: "POST",
         body: {
@@ -266,6 +387,7 @@ export default function AIConsultant() {
           image: currentImage,
           language,
           mode,
+          session_id: activeSessionId,
         },
       });
 
@@ -282,11 +404,17 @@ export default function AIConsultant() {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+      if (data.session_id) {
+        setActiveSessionId(data.session_id);
+      }
       if (data.summary) {
         setFinalSummary(data.summary);
       }
       if (data.reviewMaker) {
         setFinalReviewMaker(data.reviewMaker);
+      }
+      if (user) {
+        loadChatHistory();
       }
     } catch (error) {
       console.error("Error calling AI:", error);
@@ -371,9 +499,9 @@ export default function AIConsultant() {
         variant: "destructive",
         title: t.error,
         description: language === "ru"
-          ? "РЈРєР°Р¶РёС‚Рµ РєРѕСЂСЂРµРєС‚РЅС‹Рµ РѕС†РµРЅРєРё РѕС‚ 1 РґРѕ 100 РґР»СЏ РІСЃРµС… РєСЂРёС‚РµСЂРёРµРІ."
+          ? "Укажите корректные оценки от 1 до 100 для всех критериев."
           : language === "kk"
-            ? "Р‘Р°СЂР»С‹Т› РєСЂРёС‚РµСЂРёР№Р»РµСЂ ТЇС€С–РЅ 1-РґРµРЅ 100-РіРµ РґРµР№С–РЅ РґТ±СЂС‹СЃ Р±Р°Т“Р° РµРЅРіС–Р·С–ТЈС–Р·."
+            ? "Барлық критерийлер үшін 1-ден 100-ге дейін дұрыс баға енгізіңіз."
             : "Please enter valid scores from 1 to 100 for all criteria.",
       });
       return;
@@ -402,9 +530,9 @@ export default function AIConsultant() {
       toast({
         title: t.success,
         description: language === "ru"
-          ? "РћС†РµРЅРєР° СЃРѕС…СЂР°РЅРµРЅР°."
+          ? "Оценка сохранена."
           : language === "kk"
-            ? "Р‘Р°Т“Р° СЃР°Т›С‚Р°Р»РґС‹."
+            ? "Баға сақталды."
             : "Evaluation saved.",
       });
     } catch (error) {
@@ -438,11 +566,11 @@ export default function AIConsultant() {
 
   const getSeverityLabel = (score?: number) => {
     switch (score) {
-      case 1: return "1 вЂ” Situation is not urgent";
-      case 2: return "2 вЂ” Low risk level";
-      case 3: return "3 вЂ” Medium risk level";
-      case 4: return "4 вЂ” Elevated risk";
-      case 5: return "5 вЂ” Potentially critical";
+      case 1: return "1 - Situation is not urgent";
+      case 2: return "2 - Low risk level";
+      case 3: return "3 - Medium risk level";
+      case 4: return "4 - Elevated risk";
+      case 5: return "5 - Potentially critical";
       default: return "Not assessed";
     }
   };
@@ -578,6 +706,59 @@ export default function AIConsultant() {
               </div>
             </div>
           </div>
+
+          {user && (
+            <div className="mb-4 rounded-xl border border-border bg-card p-3">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <History className="w-4 h-4" />
+                  Chat history
+                </div>
+                <Button size="sm" variant="outline" onClick={handleNewChat} className="gap-1">
+                  <Plus className="w-4 h-4" />
+                  New chat
+                </Button>
+              </div>
+              {historyLoading ? (
+                <div className="text-xs text-muted-foreground">Loading...</div>
+              ) : historyItems.length === 0 ? (
+                <div className="text-xs text-muted-foreground">No saved chats yet.</div>
+              ) : (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {historyItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`min-w-[220px] max-w-[260px] rounded-lg border p-2 ${
+                        activeSessionId === item.id ? "border-primary bg-primary/5" : "border-border"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        className="w-full text-left"
+                        onClick={() => handleOpenHistorySession(item.id)}
+                      >
+                        <p className="text-xs font-medium truncate">{item.title || "New consultation"}</p>
+                        <p className="text-[11px] text-muted-foreground truncate mt-1">
+                          {item.last_message || "-"}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {new Date(item.updated_at || item.created_at).toLocaleString()}
+                        </p>
+                      </button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 mt-1"
+                        onClick={() => handleDeleteHistorySession(item.id)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Disclaimer */}
           <div className="mb-4">
