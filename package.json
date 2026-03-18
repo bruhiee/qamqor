@@ -15,7 +15,7 @@
     "preview": "vite preview",
     "server:api": "node server/index.js",
     "server:webhook": "node server/email-webhook.js",
-    "server": "start \"Qamqor API\" cmd /c \"npm run server:api\" && start \"Qamqor Webhook\" cmd /c \"npm run server:webhook\"",
+    "server": "node server/run-server.js",
     "webhook:email": "npm run server:webhook",
     "dev:all": "npm run server && npm run dev:client",
     "test": "vitest run",

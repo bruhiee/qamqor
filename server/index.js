@@ -23,7 +23,7 @@ const OVERPASS_ENABLED = process.env.OVERPASS_ENABLED !== "0";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.join(__dirname, "data", "db.json");
 const JWT = "qamqorS";
-const PORT = 4000;
+const PORT = Number(process.env.PORT || 4000);
 const SUPABASE_FUNCTION_URL = process.env.SUPABASE_FUNCTION_URL;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || "";
 let db = null;
