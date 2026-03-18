@@ -110,6 +110,7 @@ export function Navbar() {
                   }`}
                 >
                   {isActive && <span className="absolute inset-0 rounded-lg border border-primary/25" />}
+                  <Icon className="w-4 h-4 mr-2" />
                   <span>{item.label}</span>
                 </Link>
               );
