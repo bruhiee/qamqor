@@ -3294,17 +3294,55 @@ async function fetchFacilitiesOverpass(lat, lon, radius) {
     return [];
   }
 
-  const query = `[out:json][timeout:25];
-(node["amenity"~"pharmacy|hospital|clinic"](around:${radius},${lat},${lon});
-way["amenity"~"pharmacy|hospital|clinic"](around:${radius},${lat},${lon});
-relation["amenity"~"pharmacy|hospital|clinic"](around:${radius},${lat},${lon});
+  const query = `[out:json][timeout:30];
+(
+  node["amenity"~"pharmacy|hospital|clinic|doctors|dentist"](around:${radius},${lat},${lon});
+  way["amenity"~"pharmacy|hospital|clinic|doctors|dentist"](around:${radius},${lat},${lon});
+  relation["amenity"~"pharmacy|hospital|clinic|doctors|dentist"](around:${radius},${lat},${lon});
+  node["healthcare"~"hospital|clinic|doctor|dentist|physiotherapist|laboratory|pharmacy"](around:${radius},${lat},${lon});
+  way["healthcare"~"hospital|clinic|doctor|dentist|physiotherapist|laboratory|pharmacy"](around:${radius},${lat},${lon});
+  relation["healthcare"~"hospital|clinic|doctor|dentist|physiotherapist|laboratory|pharmacy"](around:${radius},${lat},${lon});
+  node["shop"~"chemist|drugstore|medical_supply"](around:${radius},${lat},${lon});
+  way["shop"~"chemist|drugstore|medical_supply"](around:${radius},${lat},${lon});
+  relation["shop"~"chemist|drugstore|medical_supply"](around:${radius},${lat},${lon});
 );
 out center;`;
 
   const body = new URLSearchParams({ data: query }).toString();
 
-  const toFacilities = (elements) =>
-    (elements || [])
+  const inferFacilityType = (tags = {}) => {
+    const amenity = String(tags.amenity || "").toLowerCase();
+    const healthcare = String(tags.healthcare || "").toLowerCase();
+    const shop = String(tags.shop || "").toLowerCase();
+
+    if (amenity === "hospital" || healthcare === "hospital") return "hospital";
+    if (
+      amenity === "clinic" ||
+      amenity === "doctors" ||
+      amenity === "dentist" ||
+      healthcare === "clinic" ||
+      healthcare === "doctor" ||
+      healthcare === "dentist" ||
+      healthcare === "physiotherapist" ||
+      healthcare === "laboratory"
+    ) {
+      return "clinic";
+    }
+    if (
+      amenity === "pharmacy" ||
+      healthcare === "pharmacy" ||
+      shop === "chemist" ||
+      shop === "drugstore" ||
+      shop === "medical_supply"
+    ) {
+      return "pharmacy";
+    }
+    return null;
+  };
+
+  const toFacilities = (elements) => {
+    const seen = new Set();
+    return (elements || [])
       .map((el) => {
         const latlon =
           el.type === "node"
@@ -3313,11 +3351,20 @@ out center;`;
               ? { lat: el.center.lat, lon: el.center.lon }
               : null;
         if (!latlon) return null;
+        const inferredType = inferFacilityType(el.tags || {});
+        if (!inferredType) return null;
 
         const addressParts = [];
+        if (el.tags?.["addr:full"]) addressParts.push(el.tags["addr:full"]);
         if (el.tags?.["addr:street"]) addressParts.push(el.tags["addr:street"]);
         if (el.tags?.["addr:housenumber"]) addressParts.push(el.tags["addr:housenumber"]);
         if (el.tags?.["addr:city"]) addressParts.push(el.tags["addr:city"]);
+
+        const rawName = el.tags?.name || el.tags?.["name:en"] || "";
+        const name = rawName || (inferredType === "hospital" ? "Hospital" : inferredType === "clinic" ? "Clinic" : "Pharmacy");
+        const dedupeKey = `${inferredType}:${name.toLowerCase()}:${latlon.lat.toFixed(5)}:${latlon.lon.toFixed(5)}`;
+        if (seen.has(dedupeKey)) return null;
+        seen.add(dedupeKey);
 
         const specializationsRaw =
           el.tags?.["healthcare:speciality"] ||
@@ -3340,13 +3387,8 @@ out center;`;
 
         return {
           id: `${el.type}-${el.id}`,
-          name: el.tags?.name || "Place",
-          type:
-            el.tags?.amenity === "hospital"
-              ? "hospital"
-              : el.tags?.amenity === "clinic"
-                ? "clinic"
-                : "pharmacy",
+          name,
+          type: inferredType,
           coordinates: [latlon.lon, latlon.lat],
           address: addressParts.join(", ") || el.tags?.village || el.tags?.city || "",
           phone: mainPhone,
@@ -3358,13 +3400,14 @@ out center;`;
         };
       })
       .filter(Boolean);
+  };
 
   let hadRateLimit = false;
   let hadAnyNetworkFailure = false;
 
   for (const endpoint of OVERPASS_ENDPOINTS) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 12000);
 
     try {
       const res = await fetch(endpoint, {

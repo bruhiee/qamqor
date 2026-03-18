@@ -309,6 +309,7 @@ const typeConfig = {
 
 const cityPresets: Array<{ label: string; coords: [number, number] }> = [
   { label: "Astana", coords: [71.4306, 51.1283] },
+  { label: "Kostanay", coords: [63.6246, 53.2145] },
   { label: "Almaty", coords: [76.9286, 43.2220] },
   { label: "Shymkent", coords: [69.5901, 42.3242] },
   { label: "New York", coords: [-73.9857, 40.7484] },
@@ -349,21 +350,28 @@ export default function MapPage() {
       const normalizedSearch = searchQuery.toLowerCase().trim();
       const normalizedSpecialization = specializationQuery.toLowerCase().trim();
       const maxDistance = radiusKm;
-      const filtered = facilities.filter((f) => {
-        const textMatch =
-          !normalizedSearch ||
-          f.name.toLowerCase().includes(normalizedSearch) ||
-          f.address.toLowerCase().includes(normalizedSearch) ||
-          f.specializations?.some((s) => s.toLowerCase().includes(normalizedSearch));
+      const base = facilities.filter((f) => {
         const specializationMatch =
           !normalizedSpecialization ||
           f.specializations?.some((s) => s.toLowerCase().includes(normalizedSpecialization));
         const typeMatch = activeFilters.includes(f.type);
         const distanceMatch =
           f.distance == null || f.distance <= maxDistance;
-        return textMatch && specializationMatch && typeMatch && distanceMatch;
+        return specializationMatch && typeMatch && distanceMatch;
       });
-      return filtered.sort((a, b) => (a.distance ?? Number.MAX_SAFE_INTEGER) - (b.distance ?? Number.MAX_SAFE_INTEGER));
+      if (!normalizedSearch) {
+        return base.sort((a, b) => (a.distance ?? Number.MAX_SAFE_INTEGER) - (b.distance ?? Number.MAX_SAFE_INTEGER));
+      }
+
+      const byText = base.filter((f) =>
+        f.name.toLowerCase().includes(normalizedSearch) ||
+        f.address.toLowerCase().includes(normalizedSearch) ||
+        f.specializations?.some((s) => s.toLowerCase().includes(normalizedSearch))
+      );
+
+      // If text query has no direct facility matches, keep base results instead of blank state.
+      const finalList = byText.length > 0 ? byText : base;
+      return finalList.sort((a, b) => (a.distance ?? Number.MAX_SAFE_INTEGER) - (b.distance ?? Number.MAX_SAFE_INTEGER));
     },
     [facilities, activeFilters, searchQuery, specializationQuery, radiusKm]
   );
@@ -599,6 +607,11 @@ export default function MapPage() {
         },
         (error) => {
           console.error("Geolocation error:", error);
+          const preset = cityPresets.find((item) => item.label === selectedCity) || cityPresets[0];
+          if (preset) {
+            setUserLocation(preset.coords);
+            void loadFacilities(preset.coords, radiusKm);
+          }
           setLoading(false);
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
@@ -606,7 +619,7 @@ export default function MapPage() {
     } else {
       setLoading(false);
     }
-  }, [centerMapOnLocation, loadFacilities, radiusKm]);
+  }, [centerMapOnLocation, loadFacilities, radiusKm, selectedCity]);
 
   const focusCity = async (cityLabel: string) => {
     const preset = cityPresets.find((item) => item.label === cityLabel);
@@ -717,13 +730,6 @@ export default function MapPage() {
     autoLocateAttempted.current = true;
     getUserLocation();
   }, [getUserLocation]);
-
-  useEffect(() => {
-    const preset = cityPresets.find((item) => item.label === selectedCity) || cityPresets[0];
-    if (!preset) return;
-    setUserLocation(preset.coords);
-    void loadFacilities(preset.coords, radiusKm);
-  }, [selectedCity, loadFacilities]);
 
   useEffect(() => {
     if (!userLocation) return;
