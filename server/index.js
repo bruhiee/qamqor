@@ -1716,7 +1716,22 @@ function createRouter() {
       });
     }
     const normalizedEmail = email.toLowerCase();
-    if (db.users.some((u) => u.email === normalizedEmail)) {
+    const existingUser = db.users.find((u) => u.email === normalizedEmail);
+    if (existingUser) {
+      if (existingUser.banned) {
+        return res.status(403).json({ message: "Account is banned" });
+      }
+      if (!existingUser.email_verified) {
+        const { challenge, code } = createEmailVerificationChallenge(existingUser);
+        const delivery = await sendEmailVerificationCode(existingUser, code, "signup-existing");
+        await persistDb();
+        return res.status(200).json({
+          email_verification_required: true,
+          challenge_id: challenge.id,
+          delivery: delivery.delivery,
+          ...(delivery.delivery !== "sent" ? { debug_code: code } : {}),
+        });
+      }
       return res.status(409).json({ message: "User already exists" });
     }
     const passwordHash = await bcrypt.hash(password, 10);

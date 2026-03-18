@@ -1,5 +1,79 @@
 {
-  "users": [],
+  "users": [
+    {
+      "id": "Qkh1lujYG477A2vUi7SS4",
+      "email": "admin@qamqor.local",
+      "displayName": "Admin",
+      "passwordHash": "$2a$10$kkX8CQikpbzrt8J5Tl9MguResc/fCTLLJzz500ZaKWFGaqhePtDfy",
+      "roles": [
+        "admin",
+        "doctor",
+        "user",
+        "moderator"
+      ],
+      "user_metadata": {
+        "display_name": "Admin"
+      },
+      "app_metadata": {
+        "provider": "email",
+        "roles": [
+          "admin",
+          "doctor",
+          "user",
+          "moderator"
+        ]
+      },
+      "created_at": "2026-03-18T12:46:38.556Z",
+      "banned": false,
+      "email_verified": true
+    },
+    {
+      "id": "p6Vw6lqdpmSNJbAB47mVe",
+      "email": "pork@gmail.com",
+      "displayName": "lkszmdfsdf",
+      "passwordHash": "$2a$10$G9fRC1C3Wx.90BZc7WGcEe254imgpH7KQNEa0G/jT13U4cvRvga8m",
+      "roles": [
+        "user"
+      ],
+      "user_metadata": {
+        "display_name": "lkszmdfsdf"
+      },
+      "app_metadata": {
+        "provider": "email",
+        "roles": [
+          "user"
+        ]
+      },
+      "created_at": "2026-03-18T12:47:25.017Z",
+      "banned": false,
+      "email_verified": false,
+      "two_factor_enabled": false,
+      "requested_role": "user"
+    },
+    {
+      "id": "X6gMjOmRbCRI5_TK3Whke",
+      "email": "mansurkurmet83@gmail.com",
+      "displayName": "lkszmdfsdf",
+      "passwordHash": "$2a$10$8M7I3nWLZfVWOK4aQ/zjiOurVp0C7fAsFUDqOn9mBI35.WFg0NPbK",
+      "roles": [
+        "user"
+      ],
+      "user_metadata": {
+        "display_name": "lkszmdfsdf"
+      },
+      "app_metadata": {
+        "provider": "email",
+        "roles": [
+          "user"
+        ]
+      },
+      "created_at": "2026-03-18T12:48:18.434Z",
+      "banned": false,
+      "email_verified": false,
+      "two_factor_enabled": false,
+      "requested_role": "user"
+    }
+  ],
   "doctor_applications": [],
   "medicines": [],
   "medicine_history": [],
@@ -15,8 +89,68 @@
   "ai_chat_histories": [],
   "doctor_reply_training_samples": [],
   "two_factor_challenges": [],
-  "email_verification_challenges": [],
-  "user_profiles": [],
+  "email_verification_challenges": [
+    {
+      "id": "s3zJ6Q1iC7KsFzl0lkMQ9",
+      "user_id": "p6Vw6lqdpmSNJbAB47mVe",
+      "code": "747784",
+      "purpose": "email-verification",
+      "expires_at": "2026-03-18T12:57:25.018Z",
+      "used": false
+    },
+    {
+      "id": "mcuYTVMpZf36ck8l3NZaB",
+      "user_id": "X6gMjOmRbCRI5_TK3Whke",
+      "code": "982902",
+      "purpose": "email-verification",
+      "expires_at": "2026-03-18T12:58:18.434Z",
+      "used": false
+    }
+  ],
+  "user_profiles": [
+    {
+      "id": "yIKYEQLmgzKmZWq3sbYCD",
+      "user_id": "p6Vw6lqdpmSNJbAB47mVe",
+      "age": 23,
+      "gender": "male",
+      "city": "fl,sfsf",
+      "height_cm": 163,
+      "weight_kg": 44,
+      "additional_info": "dfgdf",
+      "emergency_contact_name": null,
+      "emergency_contact_phone": null,
+      "blood_type": null,
+      "allergies": [
+        "543"
+      ],
+      "lifestyle_factors": [],
+      "chronic_conditions": [],
+      "medications": [],
+      "notes": null,
+      "updated_at": "2026-03-18T12:47:25.018Z"
+    },
+    {
+      "id": "GZbtQLoBLCa_1J_xLjLmN",
+      "user_id": "X6gMjOmRbCRI5_TK3Whke",
+      "age": 23,
+      "gender": "male",
+      "city": "fl,sfsf",
+      "height_cm": 163,
+      "weight_kg": 44,
+      "additional_info": "dfgdf",
+      "emergency_contact_name": null,
+      "emergency_contact_phone": null,
+      "blood_type": null,
+      "allergies": [
+        "543"
+      ],
+      "lifestyle_factors": [],
+      "chronic_conditions": [],
+      "medications": [],
+      "notes": null,
+      "updated_at": "2026-03-18T12:48:18.434Z"
+    }
+  ],
   "bookmarks": [],
   "tutorial_status": [],
   "admin_logs": [],

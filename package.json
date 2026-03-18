@@ -7,7 +7,7 @@
     "node": "20.x"
   },
   "scripts": {
-    "dev": "concurrently \"npm run dev:client\" \"npm run server\"",
+    "dev": "npm run dev:client",
     "dev:client": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
@@ -15,9 +15,9 @@
     "preview": "vite preview",
     "server:api": "node server/index.js",
     "server:webhook": "node server/email-webhook.js",
-    "server": "concurrently \"npm run server:api\" \"npm run server:webhook\"",
+    "server": "start \"Qamqor API\" cmd /c \"npm run server:api\" && start \"Qamqor Webhook\" cmd /c \"npm run server:webhook\"",
     "webhook:email": "npm run server:webhook",
-    "dev:all": "npm run dev",
+    "dev:all": "npm run server && npm run dev:client",
     "test": "vitest run",
     "test:watch": "vitest",
     "prebuild": "node -e \"const v=require('esbuild/package.json').version; require('child_process').execSync('npm i --no-save --include=optional @esbuild/linux-x64@'+v,{stdio:'inherit'})\""
