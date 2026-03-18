@@ -17,9 +17,6 @@ import {
   Globe,
   ExternalLink,
   Loader2,
-  TrendingUp,
-  Activity,
-  AlertTriangle
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { useLanguage } from "@/contexts/useLanguage";
@@ -38,39 +35,6 @@ interface MedicalFacility {
   departments?: Record<string, string>;
   doctorSummary?: string;
   distance?: number;
-}
-
-interface HealthNewsEvent {
-  id: string;
-  title: string;
-  region: string;
-  country?: string | null;
-  summary?: string | null;
-  symptoms?: string[];
-  severity_level: number;
-  source_url: string;
-  published_at: string;
-  latitude?: number | null;
-  longitude?: number | null;
-}
-
-interface HealthNewsRegionInsight {
-  region: string;
-  totalEvents: number;
-  averageSeverity: number;
-  recent7: number;
-  previous7: number;
-  growthRatio: number;
-  topSymptoms: string[];
-}
-
-interface HealthNewsMapInsights {
-  lookbackDays: number;
-  eventCount: number;
-  outbreaks: HealthNewsRegionInsight[];
-  anomalies: HealthNewsRegionInsight[];
-  topSymptoms: Array<{ symptom: string; mentions: number }>;
-  regions: HealthNewsRegionInsight[];
 }
 
 // Global medical facilities database
@@ -351,13 +315,13 @@ const cityPresets: Array<{ label: string; coords: [number, number] }> = [
   { label: "London", coords: [-0.1276, 51.5074] },
   { label: "Berlin", coords: [13.4049, 52.5200] },
 ];
+const USE_MAPBOX = true;
 
 export default function MapPage() {
   const { t } = useLanguage();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
-  const newsMarkers = useRef<mapboxgl.Marker[]>([]);
   const userMarker = useRef<mapboxgl.Marker | null>(null);
   const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
   const [routeInfo, setRouteInfo] = useState("");
@@ -371,12 +335,11 @@ export default function MapPage() {
   const [facilities, setFacilities] = useState<MedicalFacility[]>(globalFacilities);
   const [nearbyPharmacies, setNearbyPharmacies] = useState<MedicalFacility[]>([]);
   const [radiusKm, setRadiusKm] = useState(50);
-  const [healthNewsEvents, setHealthNewsEvents] = useState<HealthNewsEvent[]>([]);
-  const [healthNewsInsights, setHealthNewsInsights] = useState<HealthNewsMapInsights | null>(null);
-  const [selectedNewsEvent, setSelectedNewsEvent] = useState<HealthNewsEvent | null>(null);
   const [selectedCity, setSelectedCity] = useState("Astana");
   const [mapFailed, setMapFailed] = useState(false);
   const [mapError, setMapError] = useState("");
+  const [mapReady, setMapReady] = useState(false);
+  const autoLocateAttempted = useRef(false);
 
   const filteredFacilities = useMemo(
     () => {
@@ -512,6 +475,22 @@ export default function MapPage() {
     [calculateDistance, fetchFacilitiesOverpass],
   );
 
+  const centerMapOnLocation = useCallback((coords: [number, number], zoom = 12) => {
+    if (!map.current || !mapReady) return;
+    map.current.flyTo({
+      center: coords,
+      zoom,
+      duration: 1200,
+    });
+    if (userMarker.current) {
+      userMarker.current.setLngLat(coords);
+    } else {
+      userMarker.current = new mapboxgl.Marker({ color: "#ef4444" })
+        .setLngLat(coords)
+        .addTo(map.current);
+    }
+  }, [mapReady]);
+
   const fetchRouteToFacility = useCallback(
     async (facility: MedicalFacility) => {
       if (!userLocation) return;
@@ -535,41 +514,27 @@ export default function MapPage() {
   );
 
   // Get user location
-  const getUserLocation = () => {
+  const getUserLocation = useCallback(() => {
     setLoading(true);
-      if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const coords: [number, number] = [position.coords.longitude, position.coords.latitude];
-        setUserLocation(coords);
-        
-        await loadFacilities(coords, radiusKm);
-        
-        if (map.current) {
-            map.current.flyTo({
-              center: coords,
-              zoom: 12,
-              duration: 1500,
-            });
-            if (userMarker.current) {
-              userMarker.current.setLngLat(coords);
-            } else {
-              userMarker.current = new mapboxgl.Marker({ color: "#ef4444" })
-                .setLngLat(coords)
-                .addTo(map.current);
-            }
-          }
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const coords: [number, number] = [position.coords.longitude, position.coords.latitude];
+          setUserLocation(coords);
+          await loadFacilities(coords, radiusKm);
+          centerMapOnLocation(coords, 13);
           setLoading(false);
         },
         (error) => {
           console.error("Geolocation error:", error);
           setLoading(false);
-        }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
       );
     } else {
       setLoading(false);
     }
-  };
+  }, [centerMapOnLocation, loadFacilities, radiusKm]);
 
   const focusCity = async (cityLabel: string) => {
     const preset = cityPresets.find((item) => item.label === cityLabel);
@@ -595,6 +560,11 @@ export default function MapPage() {
 
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
+    if (!USE_MAPBOX) {
+      setMapFailed(true);
+      setMapError("Mapbox disabled for stability mode");
+      return;
+    }
 
     if (!mapboxToken) {
       console.warn("Mapbox token is missing. Set VITE_MAPBOX_TOKEN in your environment.");
@@ -603,6 +573,8 @@ export default function MapPage() {
       return;
     }
     mapboxgl.accessToken = mapboxToken;
+    let loadTimeout: ReturnType<typeof setTimeout> | null = null;
+    let loaded = false;
     try {
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
@@ -616,6 +588,18 @@ export default function MapPage() {
         setMapFailed(true);
         setMapError(message);
       });
+      map.current.on("load", () => {
+        loaded = true;
+        setMapReady(true);
+        map.current?.resize();
+        setTimeout(() => map.current?.resize(), 100);
+      });
+      loadTimeout = setTimeout(() => {
+        if (!loaded) {
+          setMapFailed(true);
+          setMapError("Mapbox load timeout");
+        }
+      }, 7000);
 
       map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
       map.current.addControl(new mapboxgl.GeolocateControl({
@@ -629,31 +613,34 @@ export default function MapPage() {
     }
 
     return () => {
-      newsMarkers.current.forEach((marker) => marker.remove());
-      newsMarkers.current = [];
+      if (loadTimeout) clearTimeout(loadTimeout);
       map.current?.remove();
       map.current = null;
     };
   }, [mapboxToken]);
 
   useEffect(() => {
-    getUserLocation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!mapReady || !map.current) return;
+    map.current.resize();
+  }, [mapReady]);
 
   useEffect(() => {
-    const loadHealthNews = async () => {
-      try {
-        const { data } = await apiFetch<{ data: HealthNewsEvent[] }>("/health-news-events");
-        setHealthNewsEvents(data || []);
-        const insights = await apiFetch<{ data: HealthNewsMapInsights }>("/health-news-map-insights?days=30");
-        setHealthNewsInsights(insights.data || null);
-      } catch (error) {
-        console.warn("Failed to load health news map events", error);
-      }
-    };
-    loadHealthNews();
-  }, []);
+    if (!userLocation) return;
+    centerMapOnLocation(userLocation, 13);
+  }, [centerMapOnLocation, userLocation]);
+
+  useEffect(() => {
+    if (autoLocateAttempted.current) return;
+    autoLocateAttempted.current = true;
+    getUserLocation();
+  }, [getUserLocation]);
+
+  useEffect(() => {
+    const preset = cityPresets.find((item) => item.label === selectedCity) || cityPresets[0];
+    if (!preset) return;
+    setUserLocation(preset.coords);
+    void loadFacilities(preset.coords, radiusKm);
+  }, [selectedCity, loadFacilities]);
 
   useEffect(() => {
     if (!userLocation) return;
@@ -741,47 +728,6 @@ export default function MapPage() {
       markers.current.push(marker);
     });
   }, [filteredFacilities, fetchRouteToFacility]);
-
-  useEffect(() => {
-    if (!map.current) return;
-    newsMarkers.current.forEach((marker) => marker.remove());
-    newsMarkers.current = [];
-
-    const eventsWithCoords = healthNewsEvents.filter(
-      (event) =>
-        Number.isFinite(Number(event.latitude)) &&
-        Number.isFinite(Number(event.longitude))
-    );
-
-    eventsWithCoords.forEach((event) => {
-      const severity = Math.max(1, Math.min(5, Number(event.severity_level) || 3));
-      const color = severity >= 5 ? "#DC2626" : severity >= 4 ? "#EF4444" : severity >= 3 ? "#D97706" : "#0284C7";
-      const el = document.createElement("div");
-      el.className = "health-news-marker";
-      el.style.width = "44px";
-      el.style.height = "44px";
-      el.style.borderRadius = "999px";
-      el.style.border = "2px solid rgba(255,255,255,0.95)";
-      el.style.background = `${color}B8`;
-      el.style.boxShadow = `0 0 0 12px ${color}2E, 0 0 28px ${color}4D`;
-      el.style.cursor = "pointer";
-
-      el.addEventListener("click", () => {
-        setSelectedNewsEvent(event);
-        map.current?.flyTo({
-          center: [Number(event.longitude), Number(event.latitude)],
-          zoom: 8,
-          duration: 900,
-        });
-      });
-
-      const marker = new mapboxgl.Marker({ element: el })
-        .setLngLat([Number(event.longitude), Number(event.latitude)])
-        .addTo(map.current!);
-
-      newsMarkers.current.push(marker);
-    });
-  }, [healthNewsEvents]);
 
   const toggleFilter = (type: string) => {
     setActiveFilters((prev) =>
@@ -928,74 +874,6 @@ export default function MapPage() {
                   ))}
                 </div>
               </div>
-              {healthNewsEvents.length > 0 && (
-                <div className="mt-3 px-3 py-2 bg-muted/50 rounded-lg text-xs text-muted-foreground space-y-2">
-                  <div className="font-semibold text-foreground">Health News Map</div>
-                  {healthNewsInsights && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="w-3.5 h-3.5 text-primary" />
-                        <span>
-                          Outbreak signals: <span className="font-semibold text-foreground">{healthNewsInsights.outbreaks.length}</span>
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-3.5 h-3.5 text-warning" />
-                        <span>
-                          Anomalies: <span className="font-semibold text-foreground">{healthNewsInsights.anomalies.length}</span>
-                        </span>
-                      </div>
-                      {healthNewsInsights.outbreaks.length > 0 && (
-                        <div className="text-[11px]">
-                          <span className="text-muted-foreground">Hot regions:</span>{" "}
-                          {healthNewsInsights.outbreaks.slice(0, 3).map((item) => item.region).join(", ")}
-                        </div>
-                      )}
-                      {healthNewsInsights.anomalies.length > 0 && (
-                        <div className="text-[11px]">
-                          <span className="text-muted-foreground">Anomaly regions:</span>{" "}
-                          {healthNewsInsights.anomalies.slice(0, 3).map((item) => item.region).join(", ")}
-                        </div>
-                      )}
-                      <div>
-                        <div className="flex items-center gap-1">
-                          <Activity className="w-3.5 h-3.5 text-secondary" />
-                          <span className="text-[11px] text-muted-foreground">Top symptoms:</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {healthNewsInsights.topSymptoms.slice(0, 5).map((item) => (
-                            <span key={item.symptom} className="px-2 py-0.5 rounded-full bg-background border border-border text-[11px]">
-                              {item.symptom} ({item.mentions})
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div className="pt-1 border-t border-border/50 space-y-1">
-                    {healthNewsEvents.slice(0, 4).map((event) => (
-                      <button
-                        key={event.id}
-                        onClick={() => {
-                          if (Number.isFinite(Number(event.latitude)) && Number.isFinite(Number(event.longitude))) {
-                            setSelectedNewsEvent(event);
-                            map.current?.flyTo({
-                              center: [Number(event.longitude), Number(event.latitude)],
-                              zoom: 8,
-                              duration: 900,
-                            });
-                          } else {
-                            window.open(event.source_url, "_blank");
-                          }
-                        }}
-                        className="block w-full text-left hover:text-primary"
-                      >
-                        • {event.region}: {event.title}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Facility List */}
@@ -1065,25 +943,35 @@ export default function MapPage() {
 
           {/* Map */}
           <div className="block flex-1 relative min-h-[44vh] md:min-h-0">
-            <div ref={mapContainer} className="absolute inset-0" />
-            {mapFailed && (
-              <div className="absolute inset-0 z-30 bg-background">
+            {USE_MAPBOX && (
+              <div
+                ref={mapContainer}
+                className={`absolute inset-0 z-20 transition-opacity duration-300 ${
+                  mapReady ? "opacity-100" : "opacity-0 pointer-events-none"
+                }`}
+              />
+            )}
+            {(!USE_MAPBOX || mapFailed || !mapboxToken || !mapReady) && (
+              <div className="absolute inset-0 z-10 bg-background">
                 <iframe
                   title="OpenStreetMap Fallback"
                   src={osmEmbedUrl}
                   className="w-full h-full border-0"
                   loading="lazy"
                 />
-                <div className="absolute left-3 bottom-3 bg-card/95 border border-border rounded-md px-3 py-2 text-xs text-muted-foreground max-w-[28rem]">
-                  Mapbox unavailable, fallback map is active. {mapError}
+              </div>
+            )}
+            {USE_MAPBOX && !mapFailed && Boolean(mapboxToken) && !mapReady && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80">
+                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading map...
                 </div>
               </div>
             )}
-            {!mapboxToken && (
-              <div className="absolute inset-0 flex items-center justify-center bg-muted/40 backdrop-blur-sm z-20">
-                <div className="bg-card border border-border rounded-xl p-4 text-sm text-muted-foreground max-w-sm text-center">
-                  Map is unavailable: set <code>VITE_MAPBOX_TOKEN</code> and restart dev server.
-                </div>
+            {(!USE_MAPBOX || mapFailed || !mapboxToken) && (
+              <div className="absolute left-3 bottom-3 z-30 bg-card/95 border border-border rounded-md px-3 py-2 text-xs text-muted-foreground max-w-[28rem]">
+                Fallback map is active{mapError ? `. ${mapError}` : "."}
               </div>
             )}
 
@@ -1215,48 +1103,6 @@ export default function MapPage() {
               </motion.div>
             )}
 
-            {selectedNewsEvent && (
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="absolute top-4 left-4 w-[30rem] bg-card rounded-xl shadow-xl border border-border overflow-hidden"
-              >
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Health News Event</p>
-                      <h3 className="font-semibold text-sm">{selectedNewsEvent.title}</h3>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="w-8 h-8"
-                      onClick={() => setSelectedNewsEvent(null)}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <div className="space-y-2 text-xs text-muted-foreground">
-                    <p><span className="font-medium text-foreground">Region:</span> {selectedNewsEvent.region}</p>
-                    <p><span className="font-medium text-foreground">Severity:</span> {selectedNewsEvent.severity_level}/5</p>
-                    {selectedNewsEvent.symptoms && selectedNewsEvent.symptoms.length > 0 && (
-                      <p><span className="font-medium text-foreground">Symptoms:</span> {selectedNewsEvent.symptoms.join(", ")}</p>
-                    )}
-                    {selectedNewsEvent.summary ? (
-                      <p className="line-clamp-3">{selectedNewsEvent.summary}</p>
-                    ) : null}
-                    <a
-                      href={selectedNewsEvent.source_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-primary hover:underline"
-                    >
-                      Source <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                </div>
-              </motion.div>
-            )}
           </div>
         </div>
       </main>

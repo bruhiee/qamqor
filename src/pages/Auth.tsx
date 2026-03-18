@@ -104,6 +104,21 @@ export default function Auth() {
     e.preventDefault();
     
     if (isSignUp) {
+      const requiredProfileFieldsFilled =
+        displayName.trim() &&
+        registrationProfile.age.trim() &&
+        registrationProfile.gender.trim() &&
+        registrationProfile.city.trim() &&
+        registrationProfile.height_cm.trim() &&
+        registrationProfile.weight_kg.trim();
+      if (!requiredProfileFieldsFilled) {
+        toast({
+          variant: "destructive",
+          title: t.error,
+          description: "Please fill in all required registration fields.",
+        });
+        return;
+      }
       // Move to role selection for sign up
       setRegistrationStep('role-selection');
     } else {
@@ -304,6 +319,7 @@ export default function Auth() {
                 onChange={(e) => setDisplayName(e.target.value)}
                 className="pl-10"
                 placeholder="John Doe"
+                required
               />
             </div>
           </div>
@@ -319,6 +335,7 @@ export default function Auth() {
                 value={registrationProfile.age}
                 onChange={(e) => setRegistrationProfile((prev) => ({ ...prev, age: e.target.value }))}
                 placeholder="25"
+                required
               />
             </div>
             <div>
@@ -346,6 +363,7 @@ export default function Auth() {
                 value={registrationProfile.city}
                 onChange={(e) => setRegistrationProfile((prev) => ({ ...prev, city: e.target.value }))}
                 placeholder="Almaty"
+                required
               />
             </div>
             <div>
@@ -358,6 +376,7 @@ export default function Auth() {
                 value={registrationProfile.height_cm}
                 onChange={(e) => setRegistrationProfile((prev) => ({ ...prev, height_cm: e.target.value }))}
                 placeholder="172"
+                required
               />
             </div>
             <div>
@@ -370,6 +389,7 @@ export default function Auth() {
                 value={registrationProfile.weight_kg}
                 onChange={(e) => setRegistrationProfile((prev) => ({ ...prev, weight_kg: e.target.value }))}
                 placeholder="68"
+                required
               />
             </div>
             <div>

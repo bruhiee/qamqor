@@ -140,6 +140,14 @@ export default function MedicineCabinet() {
     notes: "",
   });
 
+  const parseTags = useCallback((rawTags: string) => {
+    const normalized = rawTags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+    return Array.from(new Set(normalized));
+  }, []);
+
   const fetchMedicines = useCallback(async () => {
     try {
       const { data } = await apiFetch<{ data: Medicine[] }>("/medicines");
@@ -224,7 +232,7 @@ export default function MedicineCabinet() {
         dosage: formData.dosage || null,
         quantity: formData.quantity,
         form_type: formData.form_type,
-        tags: formData.tags ? formData.tags.split(",").map(t => t.trim()) : [],
+        tags: parseTags(formData.tags),
         expiration_date: formData.expiration_date,
         notes: formData.notes || null,
       };
@@ -400,6 +408,13 @@ export default function MedicineCabinet() {
     const formType = formTypes.find(f => f.value === value);
     return formType ? t[formType.labelKey as keyof typeof t] : value;
   };
+
+  const removeFormTag = (tagToRemove: string) => {
+    const nextTags = parseTags(formData.tags).filter((tag) => tag !== tagToRemove);
+    setFormData((prev) => ({ ...prev, tags: nextTags.join(", ") }));
+  };
+
+  const formTags = parseTags(formData.tags);
 
   if (!user) {
     return (
@@ -580,6 +595,26 @@ export default function MedicineCabinet() {
                       onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
                       placeholder="headache, pain, fever (comma separated)"
                     />
+                    {formTags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {formTags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs"
+                          >
+                            {tag}
+                            <button
+                              type="button"
+                              onClick={() => removeFormTag(tag)}
+                              className="text-muted-foreground hover:text-foreground"
+                              aria-label={`Delete tag ${tag}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="expiration">{t.expirationDate} *</Label>

@@ -202,19 +202,34 @@
       "notes": null
     },
     {
-      "id": "2CLO4vFWLQKdeX3w-a8iQ",
+      "id": "w8og0j3Q4WR8bERivFXzb",
       "user_id": "FQY2xBxZL_w_ZIHqQ0pvj",
-      "created_at": "2026-03-16T07:05:32.262Z",
-      "name": "cfbdfgdgdfgdgffdgdfgdfg",
-      "purpose": "gdfgzdfg",
-      "dosage": "dfgdf",
+      "created_at": "2026-03-18T06:01:51.511Z",
+      "name": "kuhilugh",
+      "purpose": "khjg",
+      "dosage": "ihi",
       "quantity": 1,
       "form_type": "tablet",
       "tags": [
-        "dfgdf"
+        "oiyh"
       ],
-      "expiration_date": "2026-03-17",
-      "notes": "dfgd"
+      "expiration_date": "2026-03-19",
+      "notes": "kihiuh"
+    },
+    {
+      "id": "Tk3cAGd2_T8YFCwJAKhfM",
+      "user_id": "FQY2xBxZL_w_ZIHqQ0pvj",
+      "created_at": "2026-03-18T06:03:02.043Z",
+      "name": "mANSURGAY",
+      "purpose": "SDFSDF",
+      "dosage": "SFGDFG",
+      "quantity": 1,
+      "form_type": "tablet",
+      "tags": [
+        "SDGDFG"
+      ],
+      "expiration_date": "2026-03-19",
+      "notes": "DFG"
     }
   ],
   "forum_posts": [
@@ -709,6 +724,42 @@
       "expiration_date": "2026-03-17",
       "changes": null,
       "created_at": "2026-03-16T07:05:32.263Z"
+    },
+    {
+      "id": "ldgN7kFkVcM9YC1RvYc-x",
+      "user_id": "FQY2xBxZL_w_ZIHqQ0pvj",
+      "medicine_id": "2CLO4vFWLQKdeX3w-a8iQ",
+      "action": "deleted",
+      "medicine_name": "cfbdfgdgdfgdgffdgdfgdfg",
+      "dosage": "dfgdf",
+      "quantity": 1,
+      "expiration_date": "2026-03-17",
+      "changes": null,
+      "created_at": "2026-03-18T06:01:32.852Z"
+    },
+    {
+      "id": "kATfb8SQQvwMGf1RUXBcR",
+      "user_id": "FQY2xBxZL_w_ZIHqQ0pvj",
+      "medicine_id": "w8og0j3Q4WR8bERivFXzb",
+      "action": "created",
+      "medicine_name": "kuhilugh",
+      "dosage": "ihi",
+      "quantity": 1,
+      "expiration_date": "2026-03-19",
+      "changes": null,
+      "created_at": "2026-03-18T06:01:51.511Z"
+    },
+    {
+      "id": "UPbg11HZUXUjZoUH2Vp6_",
+      "user_id": "FQY2xBxZL_w_ZIHqQ0pvj",
+      "medicine_id": "Tk3cAGd2_T8YFCwJAKhfM",
+      "action": "created",
+      "medicine_name": "mANSURGAY",
+      "dosage": "SFGDFG",
+      "quantity": 1,
+      "expiration_date": "2026-03-19",
+      "changes": null,
+      "created_at": "2026-03-18T06:03:02.043Z"
     }
   ],
   "medicine_notifications": [
@@ -739,6 +790,34 @@
       },
       "dedupe_key": "FQY2xBxZL_w_ZIHqQ0pvj:2CLO4vFWLQKdeX3w-a8iQ:2026-03-17:1",
       "created_at": "2026-03-16T07:05:32.263Z"
+    },
+    {
+      "id": "-Akgy15XkwTWUAQrV5Y0m",
+      "user_id": "FQY2xBxZL_w_ZIHqQ0pvj",
+      "medicine_id": "w8og0j3Q4WR8bERivFXzb",
+      "medicine_name": "kuhilugh",
+      "expiration_date": "2026-03-19",
+      "days_left": 1,
+      "channels": {
+        "email": "configured-off",
+        "telegram": "sent"
+      },
+      "dedupe_key": "FQY2xBxZL_w_ZIHqQ0pvj:w8og0j3Q4WR8bERivFXzb:2026-03-19:1",
+      "created_at": "2026-03-18T06:01:55.502Z"
+    },
+    {
+      "id": "to-tiMjnz-wClgwo79ITy",
+      "user_id": "FQY2xBxZL_w_ZIHqQ0pvj",
+      "medicine_id": "Tk3cAGd2_T8YFCwJAKhfM",
+      "medicine_name": "mANSURGAY",
+      "expiration_date": "2026-03-19",
+      "days_left": 1,
+      "channels": {
+        "email": "configured-off",
+        "telegram": "sent"
+      },
+      "dedupe_key": "FQY2xBxZL_w_ZIHqQ0pvj:Tk3cAGd2_T8YFCwJAKhfM:2026-03-19:1",
+      "created_at": "2026-03-18T06:03:02.925Z"
     }
   ],
   "medicine_notification_prefs": [
@@ -776,7 +855,7 @@
       "telegram_enabled": true,
       "telegram_chat_id": "1683285832",
       "remind_days_before": 1,
-      "updated_at": "2026-03-16T07:06:09.782Z"
+      "updated_at": "2026-03-18T06:02:38.496Z"
     }
   ],
   "doctor_reply_training_samples": [

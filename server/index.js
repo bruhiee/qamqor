@@ -908,7 +908,7 @@ async function sendExpiryNotification({ user, medicine, prefs, daysLeft }) {
     if (process.env.TELEGRAM_BOT_TOKEN) {
       try {
         const tgUrl = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`;
-        await fetch(tgUrl, {
+        const tgResponse = await fetch(tgUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -916,7 +916,24 @@ async function sendExpiryNotification({ user, medicine, prefs, daysLeft }) {
             text: message,
           }),
         });
-        result.telegram = "sent";
+        let tgPayload = null;
+        try {
+          tgPayload = await tgResponse.json();
+        } catch {
+          tgPayload = null;
+        }
+
+        const isTelegramOk = tgResponse.ok && tgPayload?.ok === true;
+        if (isTelegramOk) {
+          result.telegram = "sent";
+        } else {
+          const description = sanitizeText(String(tgPayload?.description || "")).slice(0, 120);
+          result.telegram = description ? `failed:${description}` : "failed";
+          console.error("Telegram reminder failed", {
+            status: tgResponse.status,
+            payload: tgPayload,
+          });
+        }
       } catch (error) {
         console.error("Telegram reminder failed", error);
         result.telegram = "failed";
@@ -1092,18 +1109,18 @@ CRITICAL RULES:
 3. If risk is high or uncertain, recommend urgent professional care.
 4. Return ONLY valid JSON.
 5. Keep output concise, clinically useful, and structured.
+6. Do NOT predict or list diseases/diagnoses. Explain danger and risk factors instead.
 
 For symptom-related requests, return:
 {
   "response": "short explanation for user",
   "report": {
     "severityScore": 1|2|3|4|5,
-    "assessmentExplanation": "brief explanation of why this score",
-    "possibleCauses": ["cause 1", "cause 2", "cause 3"],
+    "dangerExplanation": "brief explanation of why this can be dangerous",
+    "riskFactors": ["risk factor 1", "risk factor 2", "risk factor 3"],
     "recommendations": ["step 1", "step 2", "step 3"],
     "doctorAdvice": "advice about doctor visit or emergency care",
     "riskLevel": "low" | "medium" | "high",
-    "possibleConditions": ["condition1", "condition2"],
     "whenToSeeDoctor": "when to seek care"
   },
   "reviewMaker": {
@@ -1126,6 +1143,7 @@ Severity scale meaning:
 If message is non-medical greeting, still return JSON with only "response".`;
 
 const reviewMakerPrompt = `You are in AI Review Maker mode. Build a clean doctor-ready structured summary.
+Do NOT predict or list diseases/diagnoses. Focus on risk and urgency reasoning.
 Return ONLY valid JSON:
 {
   "response": "short plain-language note for patient",
@@ -1140,7 +1158,8 @@ Return ONLY valid JSON:
   },
   "summary": {
     "summaryText": "compact structured summary",
-    "possibleConditions": ["..."],
+    "dangerExplanation": "why this situation can be dangerous",
+    "riskFactors": ["..."],
     "recommendations": ["..."],
     "whenToSeeDoctor": "...",
     "keywords": ["..."]
@@ -1406,9 +1425,31 @@ function createRouter() {
   app.use(express.json({ limit: "1mb" }));
 
   app.post("/api/auth/register", async (req, res) => {
-    const { email, password, displayName, role, profile: rawProfile } = req.body;
+    const payload = sanitizeRequestBody(req.body || {});
+    const email = sanitizeText(String(payload.email || "")).trim();
+    const password = String(payload.password || "");
+    const displayName = sanitizeText(String(payload.displayName || "")).trim();
+    const role = payload.role;
+    const rawProfile = payload.profile;
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
+    }
+    const profile = rawProfile && typeof rawProfile === "object" ? sanitizeRequestBody(rawProfile) : {};
+    const parseNumberOrNull = (value, min, max) => {
+      if (value === null || value === undefined || value === "") return null;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return null;
+      return Math.min(max, Math.max(min, parsed));
+    };
+    const age = parseNumberOrNull(profile.age, 0, 120);
+    const gender = profile.gender ? sanitizeText(String(profile.gender)).trim().slice(0, 32) : "";
+    const city = profile.city ? sanitizeText(String(profile.city)).trim().slice(0, 120) : "";
+    const heightCm = parseNumberOrNull(profile.height_cm, 30, 260);
+    const weightKg = parseNumberOrNull(profile.weight_kg, 1, 500);
+    if (!displayName || age === null || !gender || !city || heightCm === null || weightKg === null) {
+      return res.status(400).json({
+        message: "Display name, age, gender, city, height and weight are required",
+      });
     }
     const normalizedEmail = email.toLowerCase();
     if (db.users.some((u) => u.email === normalizedEmail)) {
@@ -1419,22 +1460,15 @@ function createRouter() {
     const newUser = {
       id: nanoid(),
       email: normalizedEmail,
-      displayName: displayName || normalizedEmail.split("@")[0],
+      displayName,
       passwordHash,
       roles,
-      user_metadata: { display_name: displayName || normalizedEmail.split("@")[0] },
+      user_metadata: { display_name: displayName },
       app_metadata: { provider: "email", roles },
       created_at: new Date().toISOString(),
       banned: false,
       two_factor_enabled: false,
       requested_role: role === "doctor" ? "doctor" : "user",
-    };
-    const profile = rawProfile && typeof rawProfile === "object" ? sanitizeRequestBody(rawProfile) : {};
-    const parseNumberOrNull = (value, min, max) => {
-      if (value === null || value === undefined || value === "") return null;
-      const parsed = Number(value);
-      if (!Number.isFinite(parsed)) return null;
-      return Math.min(max, Math.max(min, parsed));
     };
     const normalizeStringList = (items, maxItems, maxLen) =>
       Array.isArray(items)
@@ -1448,11 +1482,11 @@ function createRouter() {
     db.user_profiles.push({
       id: nanoid(),
       user_id: newUser.id,
-      age: parseNumberOrNull(profile.age, 0, 120),
-      gender: profile.gender ? String(profile.gender).slice(0, 32) : null,
-      city: profile.city ? String(profile.city).slice(0, 120) : null,
-      height_cm: parseNumberOrNull(profile.height_cm, 30, 260),
-      weight_kg: parseNumberOrNull(profile.weight_kg, 1, 500),
+      age,
+      gender,
+      city,
+      height_cm: heightCm,
+      weight_kg: weightKg,
       additional_info: profile.additional_info ? String(profile.additional_info).slice(0, 1000) : null,
       emergency_contact_name: null,
       emergency_contact_phone: null,
@@ -2124,31 +2158,26 @@ function createRouter() {
 
   app.post("/api/forum/question-improve", requireAuth, async (req, res) => {
     const title = sanitizeText(String(req.body?.title || "")).trim().slice(0, 160);
+    const content = sanitizeText(String(req.body?.content || "")).trim().slice(0, 6000);
     const symptomDescription = sanitizeText(String(req.body?.symptom_description || "")).trim().slice(0, 2000);
     const symptomDuration = sanitizeText(String(req.body?.symptom_duration || "")).trim().slice(0, 400);
-    const additionalDetails = sanitizeText(String(req.body?.additional_details || "")).trim().slice(0, 2500);
     const problemCategory = sanitizeText(String(req.body?.problem_category || "")).trim().slice(0, 80);
     const ageGroup = sanitizeText(String(req.body?.age_group || "")).trim().slice(0, 80);
-    const symptomTags = Array.isArray(req.body?.symptom_tags)
-      ? req.body.symptom_tags.map((tag) => sanitizeText(String(tag || "")).toLowerCase().trim().slice(0, 40)).filter(Boolean).slice(0, 12)
-      : [];
     const language = sanitizeText(String(req.body?.language || "en")).slice(0, 10);
-
-    if (!symptomDescription) {
-      return res.status(400).json({ message: "symptom_description is required" });
+    const baseContent = content || symptomDescription;
+    if (!baseContent) {
+      return res.status(400).json({ message: "content is required" });
     }
 
     const fallbackTitle =
       title
-      || symptomDescription.split(/[.!?\n]/).map((item) => item.trim()).find(Boolean)?.slice(0, 80)
+      || baseContent.split(/[.!?\n]/).map((item) => item.trim()).find(Boolean)?.slice(0, 80)
       || "Medical question";
     const fallbackContent = [
       problemCategory ? `Category: ${problemCategory}` : null,
-      `Symptoms: ${symptomDescription}`,
+      `Case summary: ${baseContent}`,
       symptomDuration ? `Duration: ${symptomDuration}` : null,
       ageGroup ? `Age group: ${ageGroup}` : null,
-      symptomTags.length ? `Symptom tags: ${symptomTags.join(", ")}` : null,
-      additionalDetails ? `Additional details: ${additionalDetails}` : null,
     ].filter(Boolean).join("\n");
 
     if (!SUPABASE_FUNCTION_URL) {
@@ -2171,16 +2200,14 @@ function createRouter() {
 Return ONLY valid JSON:
 {
   "title": "short clear title",
-  "content": "structured question with symptoms, duration, and context",
-  "symptom_description": "refined symptom description",
-  "symptom_duration": "refined duration if available",
-  "additional_details": "refined additional details if available"
+  "content": "structured, concise medical case summary"
 }
+Use a neutral clinical style and never write in first person (avoid: I, my, me, mine; я, мой, меня; мен, менің).
 Keep it factual. No diagnosis. Language: ${language}.`,
           },
           {
             role: "user",
-            content: `Title:\n${title || "not provided"}\n\nCategory:\n${problemCategory || "not provided"}\n\nSymptoms:\n${symptomDescription}\n\nDuration:\n${symptomDuration || "not provided"}\n\nAge group:\n${ageGroup || "not provided"}\n\nSymptom tags:\n${symptomTags.join(", ") || "not provided"}\n\nAdditional details:\n${additionalDetails || "not provided"}`,
+            content: `Title:\n${title || "not provided"}\n\nCategory:\n${problemCategory || "not provided"}\n\nCase details:\n${baseContent}\n\nDuration:\n${symptomDuration || "not provided"}\n\nAge group:\n${ageGroup || "not provided"}`,
           },
         ],
       });
@@ -2189,9 +2216,6 @@ Keep it factual. No diagnosis. Language: ${language}.`,
         data: {
           title: sanitizeText(String(normalized?.title || fallbackTitle)).slice(0, 160),
           content: sanitizeText(String(normalized?.content || fallbackContent)).slice(0, 6000),
-          symptom_description: sanitizeText(String(normalized?.symptom_description || symptomDescription)).slice(0, 2000),
-          symptom_duration: sanitizeText(String(normalized?.symptom_duration || symptomDuration)).slice(0, 400),
-          additional_details: sanitizeText(String(normalized?.additional_details || additionalDetails)).slice(0, 2500),
         },
       });
     } catch (error) {
@@ -2200,9 +2224,6 @@ Keep it factual. No diagnosis. Language: ${language}.`,
         data: {
           title: fallbackTitle,
           content: fallbackContent,
-          symptom_description: symptomDescription,
-          symptom_duration: symptomDuration,
-          additional_details: additionalDetails,
         },
       });
     }
@@ -2228,22 +2249,22 @@ Keep it factual. No diagnosis. Language: ${language}.`,
     if (!problemCategory) {
       return res.status(400).json({ message: "Problem category is required" });
     }
-    if (!symptomDescription) {
-      return res.status(400).json({ message: "Symptom description is required" });
-    }
     if (!ageGroup) {
       return res.status(400).json({ message: "Age group is required" });
     }
 
     const contentFromStructured = [
       `Category: ${problemCategory}`,
-      `Symptoms: ${symptomDescription}`,
+      symptomDescription ? `Symptoms: ${symptomDescription}` : null,
       symptomDuration ? `Duration: ${symptomDuration}` : null,
       `Age group: ${ageGroup}`,
       symptomTags.length ? `Symptom tags: ${symptomTags.join(", ")}` : null,
       additionalDetails ? `Additional details: ${additionalDetails}` : null,
     ].filter(Boolean).join("\n");
     const normalizedContent = sanitizeText(String(cleaned.content || contentFromStructured)).slice(0, 6000);
+    if (!normalizedContent) {
+      return res.status(400).json({ message: "Content is required" });
+    }
 
     const topicModeration = await moderateForumTopicWithAI(`${cleaned.title || ""}\n${normalizedContent}`);
     if (!topicModeration.healthRelated) {
@@ -2847,11 +2868,12 @@ Never include personal data. Never invent user identities.`,
 Return ONLY JSON:
 {
   "extractedText": "short extracted instruction text",
-  "plainExplanation": "simple explanation for user",
+  "plainExplanation": "very short, direct explanation for user",
   "warnings": ["warning 1", "warning 2"],
-  "answer": "answer to user question if provided"
+  "answer": "short, direct answer to user question if provided"
 }
 Never diagnose. Encourage doctor/pharmacist consultation for uncertainty.
+Be concise and strictly to the point. Prefer 1-3 short sentences for "answer".
 Language: ${language}`,
           },
           {
@@ -2868,7 +2890,7 @@ Language: ${language}`,
         warnings: Array.isArray(data.warnings)
           ? data.warnings.map((item) => sanitizeText(String(item)).slice(0, 220)).slice(0, 8)
           : [],
-        answer: sanitizeText(String(data.answer || "")).slice(0, 2000),
+        answer: sanitizeText(String(data.answer || "")).slice(0, 500),
       });
     } catch (error) {
       console.error("Medicine instruction scan failed", error);
@@ -2937,25 +2959,28 @@ Language: ${language}`,
       || (triage.triageScore >= 4
         ? "Seek urgent medical care and contact emergency services if symptoms worsen."
         : "Consult a doctor if symptoms persist, worsen, or new warning signs appear.");
-    const assessmentExplanation = assistantReport?.assessmentExplanation
+    const dangerExplanation = assistantReport?.dangerExplanation
+      || assistantReport?.assessmentExplanation
       || "Initial triage is based on reported symptoms and potential red flags.";
-    const possibleCauses = Array.isArray(assistantReport?.possibleCauses)
-      ? assistantReport.possibleCauses.slice(0, 6)
+    const riskFactors = Array.isArray(assistantReport?.riskFactors)
+      ? assistantReport.riskFactors.slice(0, 6)
+      : Array.isArray(assistantReport?.possibleCauses)
+        ? assistantReport.possibleCauses.slice(0, 6)
       : Array.isArray(assistantReport?.possibleConditions)
         ? assistantReport.possibleConditions.slice(0, 6)
         : [];
     const normalizedReport = {
       riskLevel: assistantReport?.riskLevel || (triage.triageScore >= 4 ? "high" : triage.triageScore >= 3 ? "medium" : "low"),
       severityScore: triage.triageScore,
-      assessmentExplanation: sanitizeText(String(assessmentExplanation)).slice(0, 400),
-      possibleCauses: possibleCauses.map((item) => sanitizeText(String(item)).slice(0, 120)),
+      dangerExplanation: sanitizeText(String(dangerExplanation)).slice(0, 400),
+      assessmentExplanation: sanitizeText(String(dangerExplanation)).slice(0, 400),
+      riskFactors: riskFactors.map((item) => sanitizeText(String(item)).slice(0, 120)),
+      possibleCauses: [],
       recommendations: Array.isArray(assistantReport?.recommendations)
         ? assistantReport.recommendations.map((item) => sanitizeText(String(item)).slice(0, 160)).slice(0, 8)
         : [],
       doctorAdvice: sanitizeText(String(doctorAdvice)).slice(0, 500),
-      possibleConditions: Array.isArray(assistantReport?.possibleConditions)
-        ? assistantReport.possibleConditions.map((item) => sanitizeText(String(item)).slice(0, 120)).slice(0, 6)
-        : [],
+      possibleConditions: [],
       whenToSeeDoctor: sanitizeText(String(assistantReport?.whenToSeeDoctor || doctorAdvice)).slice(0, 500),
     };
 
@@ -2981,11 +3006,15 @@ Language: ${language}`,
       summaryText: sanitizeText(
         String(assistantSummary?.summaryText || responseText || "Structured consultation summary"),
       ).slice(0, 700),
-      possibleConditions: Array.isArray(assistantSummary?.possibleConditions)
-        ? assistantSummary.possibleConditions.slice(0, 6)
-        : normalizedReport.possibleConditions,
+      dangerExplanation: sanitizeText(
+        String(assistantSummary?.dangerExplanation || normalizedReport.dangerExplanation || ""),
+      ).slice(0, 400),
+      riskFactors: Array.isArray(assistantSummary?.riskFactors)
+        ? assistantSummary.riskFactors.map((item) => sanitizeText(String(item)).slice(0, 120)).slice(0, 8)
+        : normalizedReport.riskFactors,
+      possibleConditions: [],
       recommendations: Array.isArray(assistantSummary?.recommendations)
-        ? assistantSummary.recommendations.slice(0, 8)
+        ? assistantSummary.recommendations.map((item) => sanitizeText(String(item)).slice(0, 160)).slice(0, 8)
         : normalizedReport.recommendations,
       whenToSeeDoctor: sanitizeText(String(assistantSummary?.whenToSeeDoctor || normalizedReport.whenToSeeDoctor)).slice(0, 400),
       keywords,
@@ -3117,6 +3146,8 @@ Language: ${language}`,
       return res.json({
         summary: summary || {
           summaryText: sanitizeText(String(text || "Consultation summary.")).slice(0, 700),
+          dangerExplanation: "",
+          riskFactors: [],
           possibleConditions: [],
           recommendations: [],
           whenToSeeDoctor: "",

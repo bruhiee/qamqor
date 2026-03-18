@@ -42,7 +42,9 @@ import { Link } from "react-router-dom";
 interface AIReport {
   riskLevel: "low" | "medium" | "high";
   severityScore?: number;
+  dangerExplanation?: string;
   assessmentExplanation?: string;
+  riskFactors?: string[];
   possibleCauses?: string[];
   possibleConditions: string[];
   recommendations: string[];
@@ -59,6 +61,8 @@ interface AITriage {
 
 interface AISummary {
   summaryText: string;
+  dangerExplanation?: string;
+  riskFactors?: string[];
   possibleConditions: string[];
   recommendations: string[];
   whenToSeeDoctor: string;
@@ -316,8 +320,10 @@ export default function AIConsultant() {
         <p><strong>${triageLine}</strong></p>
         <h3>Assistant Response</h3>
         <p>${(message?.content || summary?.summaryText || "").replace(/\n/g, "<br/>")}</p>
-        <h3>Possible Conditions</h3>
-        <p>${summary?.possibleConditions?.join(", ") || "-"}</p>
+        <h3>Why It May Be Dangerous</h3>
+        <p>${summary?.dangerExplanation || "-"}</p>
+        <h3>Risk Factors</h3>
+        <p>${summary?.riskFactors?.join(", ") || "-"}</p>
         <h3>Recommendations</h3>
         <p>${summary?.recommendations?.join("; ") || "-"}</p>
         <h3>When To See Doctor</h3>
@@ -829,25 +835,31 @@ export default function AIConsultant() {
                             {message.triage.humanReviewReason ? ` Reason: ${message.triage.humanReviewReason}` : ""}
                           </div>
                         )}
-                        {message.report.assessmentExplanation && (
+                        {(message.report.dangerExplanation || message.report.assessmentExplanation) && (
                           <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
-                            <p className="text-xs text-muted-foreground">{message.report.assessmentExplanation}</p>
+                            <p className="text-xs text-muted-foreground">{message.report.dangerExplanation || message.report.assessmentExplanation}</p>
                           </div>
                         )}
 
-                        {/* Possible Causes */}
+                        {/* Risk Factors */}
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <Stethoscope className="w-4 h-4 text-primary" />
-                            <span className="text-sm font-medium">Possible causes</span>
+                            <span className="text-sm font-medium">Why this may be dangerous</span>
                           </div>
-                          <div className="flex flex-wrap gap-2">
-                            {(message.report.possibleCauses?.length ? message.report.possibleCauses : message.report.possibleConditions).map((condition, i) => (
-                              <span key={i} className="text-xs bg-muted px-2 py-1 rounded-full">
-                                {condition}
-                              </span>
-                            ))}
-                          </div>
+                          {(message.report.riskFactors?.length || message.report.possibleCauses?.length) ? (
+                            <div className="flex flex-wrap gap-2">
+                              {(message.report.riskFactors?.length ? message.report.riskFactors : message.report.possibleCauses).map((factor, i) => (
+                                <span key={i} className="text-xs bg-muted px-2 py-1 rounded-full">
+                                  {factor}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              {(message.report.dangerExplanation || message.report.assessmentExplanation || "Risk depends on red-flag symptoms and overall progression.")}
+                            </p>
+                          )}
                         </div>
 
                         {/* Recommendations */}
@@ -953,7 +965,8 @@ export default function AIConsultant() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">{finalSummary.summaryText}</p>
-              <p className="text-xs"><span className="font-medium">Possible conditions:</span> {finalSummary.possibleConditions.join(", ") || "-"}</p>
+              <p className="text-xs"><span className="font-medium">Why it may be dangerous:</span> {finalSummary.dangerExplanation || "-"}</p>
+              <p className="text-xs"><span className="font-medium">Risk factors:</span> {finalSummary.riskFactors?.join(", ") || "-"}</p>
               <p className="text-xs"><span className="font-medium">Recommendations:</span> {finalSummary.recommendations.join("; ") || "-"}</p>
               <p className="text-xs"><span className="font-medium">Doctor advice:</span> {finalSummary.whenToSeeDoctor || "-"}</p>
               {finalSummary.severityScore ? (

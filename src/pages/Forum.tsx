@@ -90,12 +90,9 @@ export default function Forum() {
   // New post form
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
-  const [symptomDescription, setSymptomDescription] = useState("");
   const [symptomDuration, setSymptomDuration] = useState("");
-  const [additionalDetails, setAdditionalDetails] = useState("");
   const [problemCategory, setProblemCategory] = useState("");
   const [ageGroup, setAgeGroup] = useState("");
-  const [symptomTagsRaw, setSymptomTagsRaw] = useState("");
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [photoFileName, setPhotoFileName] = useState("");
   const [newTags, setNewTags] = useState<string[]>([]);
@@ -104,9 +101,6 @@ export default function Forum() {
   const [aiSuggestion, setAiSuggestion] = useState<{
     title: string;
     content: string;
-    symptom_description: string;
-    symptom_duration: string;
-    additional_details: string;
   } | null>(null);
 
   // Reply form
@@ -186,7 +180,7 @@ export default function Forum() {
   };
 
   const handleCreatePost = async () => {
-    if (!user || !newTitle.trim() || !symptomDescription.trim() || !problemCategory || !ageGroup) return;
+    if (!user || !newTitle.trim() || !newContent.trim() || !problemCategory || !ageGroup) return;
 
     try {
       await apiFetch("/forum/posts", {
@@ -195,10 +189,7 @@ export default function Forum() {
           title: newTitle,
           content: newContent,
           problem_category: problemCategory,
-          symptom_description: symptomDescription,
           symptom_duration: symptomDuration,
-          additional_details: additionalDetails,
-          symptom_tags: symptomTagsRaw.split(",").map((item) => item.trim()).filter(Boolean),
           age_group: ageGroup,
           photo_data_url: photoDataUrl,
           tags: newTags,
@@ -210,12 +201,9 @@ export default function Forum() {
       setNewPostOpen(false);
       setNewTitle("");
       setNewContent("");
-      setSymptomDescription("");
       setSymptomDuration("");
-      setAdditionalDetails("");
       setProblemCategory("");
       setAgeGroup("");
-      setSymptomTagsRaw("");
       setPhotoDataUrl(null);
       setPhotoFileName("");
       setNewTags([]);
@@ -233,25 +221,23 @@ export default function Forum() {
   };
 
   const handleImproveQuestion = async () => {
-    if (!symptomDescription.trim()) {
+    if (!newContent.trim()) {
       toast({
         title: t.error,
-        description: "Describe symptoms first.",
+        description: "Write your question details first.",
         variant: "destructive",
       });
       return;
     }
     setImprovingQuestion(true);
     try {
-      const { data } = await apiFetch<{ data: { title: string; content: string; symptom_description: string; symptom_duration: string; additional_details: string } }>("/forum/question-improve", {
+      const { data } = await apiFetch<{ data: { title: string; content: string } }>("/forum/question-improve", {
         method: "POST",
         body: {
           title: newTitle,
+          content: newContent,
           problem_category: problemCategory,
-          symptom_description: symptomDescription,
           symptom_duration: symptomDuration,
-          additional_details: additionalDetails,
-          symptom_tags: symptomTagsRaw.split(",").map((item) => item.trim()).filter(Boolean),
           age_group: ageGroup,
           language,
         },
@@ -260,9 +246,6 @@ export default function Forum() {
         setAiSuggestion({
           title: data.title || newTitle,
           content: data.content || newContent,
-          symptom_description: data.symptom_description || symptomDescription,
-          symptom_duration: data.symptom_duration || symptomDuration,
-          additional_details: data.additional_details || additionalDetails,
         });
       }
       toast({ title: t.success, description: "AI prepared an improved draft. Review and apply if needed." });
@@ -278,9 +261,6 @@ export default function Forum() {
     if (!aiSuggestion) return;
     setNewTitle(aiSuggestion.title);
     setNewContent(aiSuggestion.content);
-    setSymptomDescription(aiSuggestion.symptom_description);
-    setSymptomDuration(aiSuggestion.symptom_duration);
-    setAdditionalDetails(aiSuggestion.additional_details);
     setAiSuggestion(null);
     toast({ title: t.success, description: "Improved draft applied. You can still edit it." });
   };
@@ -434,40 +414,11 @@ export default function Forum() {
                       </div>
                     </div>
                     <div>
-                      <Label>Symptom Description</Label>
-                      <Textarea
-                        value={symptomDescription}
-                        onChange={(e) => setSymptomDescription(e.target.value)}
-                        placeholder="Describe the main symptoms"
-                        rows={3}
-                      />
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Пожалуйста, опишите вашу проблему как можно подробнее: какие симптомы вы наблюдаете, когда они начались, усиливаются ли они со временем, и есть ли другие сопутствующие симптомы. Чем подробнее описание, тем точнее врачи смогут вам помочь.
-                      </p>
-                    </div>
-                    <div>
                       <Label>Symptom Duration</Label>
                       <Input
                         value={symptomDuration}
                         onChange={(e) => setSymptomDuration(e.target.value)}
                         placeholder="e.g. 3 days, 2 weeks"
-                      />
-                    </div>
-                    <div>
-                      <Label>Additional Details</Label>
-                      <Textarea
-                        value={additionalDetails}
-                        onChange={(e) => setAdditionalDetails(e.target.value)}
-                        placeholder="Triggers, medications tried, related conditions..."
-                        rows={3}
-                      />
-                    </div>
-                    <div>
-                      <Label>Symptoms (tags, comma separated)</Label>
-                      <Input
-                        value={symptomTagsRaw}
-                        onChange={(e) => setSymptomTagsRaw(e.target.value)}
-                        placeholder="fever, cough, sore throat"
                       />
                     </div>
                     <div>
@@ -543,7 +494,7 @@ export default function Forum() {
                         {t.markAsUrgent}
                       </Label>
                     </div>
-                    <Button onClick={handleCreatePost} className="w-full" disabled={!newTitle.trim() || !symptomDescription.trim() || !problemCategory || !ageGroup}>
+                    <Button onClick={handleCreatePost} className="w-full" disabled={!newTitle.trim() || !newContent.trim() || !problemCategory || !ageGroup}>
                       {t.postQuestion}
                     </Button>
                   </div>

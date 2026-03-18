@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,8 @@ interface Article {
   contentKz?: string[];
   contentRu?: string[];
 }
+
+type SortOption = "relevance" | "newest" | "oldest" | "short-read";
 
 const articles: Article[] = [
   {
@@ -889,7 +891,9 @@ export default function HealthArticles() {
   const [currentFactIndex, setCurrentFactIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<"all" | Article["libraryType"]>("all");
   const [activeTag, setActiveTag] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<SortOption>("relevance");
   const copy = articlePageCopy[language];
+  const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const categoryLabels =
     language === "ru"
@@ -916,24 +920,75 @@ export default function HealthArticles() {
             "medical-dictionary": "Medical Dictionary",
           };
 
-  const allTags = Array.from(new Set(allArticles.flatMap((article) => article.tags))).sort();
+  const allTags = useMemo(
+    () => Array.from(new Set(allArticles.flatMap((article) => article.tags))).sort(),
+    [],
+  );
 
-  const filteredArticles = allArticles.filter((article) => {
-    const title = language === "ru" ? article.titleRu : language === "kz" ? article.titleKz : article.title;
-    const summary = language === "ru" ? article.summaryRu : language === "kz" ? article.summaryKz : article.summary;
-    const categoryMatch = activeCategory === "all" || article.libraryType === activeCategory;
-    const tagMatch = activeTag === "all" || article.tags.includes(activeTag);
-    return (
-      categoryMatch &&
-      tagMatch &&
-      (
-        (title?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
-        (summary?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
-        article.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        article.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-    );
-  });
+  const getReadTimeMinutes = (readTime: string) => Number.parseInt(readTime, 10) || 999;
+
+  const filteredArticles = useMemo(() => {
+    const getLocalizedTitle = (article: Article) =>
+      language === "ru" ? article.titleRu || article.title : language === "kz" ? article.titleKz || article.title : article.title;
+    const getLocalizedSummary = (article: Article) =>
+      language === "ru" ? article.summaryRu || article.summary : language === "kz" ? article.summaryKz || article.summary : article.summary;
+    const getLocalizedTakeaways = (article: Article) =>
+      language === "ru" ? article.keyTakeawaysRu || article.keyTakeaways : language === "kz" ? article.keyTakeawaysKz || article.keyTakeaways : article.keyTakeaways;
+    const getLocalizedContent = (article: Article) =>
+      language === "ru" ? article.contentRu || article.content : language === "kz" ? article.contentKz || article.content : article.content;
+
+    const getRelevanceScore = (article: Article) => {
+      if (!normalizedQuery) return 0;
+      const title = getLocalizedTitle(article).toLowerCase();
+      const summary = getLocalizedSummary(article).toLowerCase();
+      const takeaways = getLocalizedTakeaways(article).join(" ").toLowerCase();
+      const content = getLocalizedContent(article).join(" ").toLowerCase();
+      const tags = article.tags.join(" ").toLowerCase();
+      const category = article.category.toLowerCase();
+
+      let score = 0;
+      if (title.includes(normalizedQuery)) score += 6;
+      if (summary.includes(normalizedQuery)) score += 4;
+      if (takeaways.includes(normalizedQuery)) score += 3;
+      if (content.includes(normalizedQuery)) score += 2;
+      if (tags.includes(normalizedQuery)) score += 3;
+      if (category.includes(normalizedQuery)) score += 2;
+      return score;
+    };
+
+    const filtered = allArticles.filter((article) => {
+      const categoryMatch = activeCategory === "all" || article.libraryType === activeCategory;
+      const tagMatch = activeTag === "all" || article.tags.includes(activeTag);
+      if (!categoryMatch || !tagMatch) return false;
+      if (!normalizedQuery) return true;
+      return getRelevanceScore(article) > 0;
+    });
+
+    return filtered.sort((a, b) => {
+      if (sortBy === "newest") {
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      }
+      if (sortBy === "oldest") {
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      }
+      if (sortBy === "short-read") {
+        return getReadTimeMinutes(a.readTime) - getReadTimeMinutes(b.readTime);
+      }
+      if (normalizedQuery) {
+        return getRelevanceScore(b) - getRelevanceScore(a);
+      }
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+  }, [activeCategory, activeTag, language, normalizedQuery, sortBy]);
+
+  const resetFilters = () => {
+    setSearchQuery("");
+    setActiveCategory("all");
+    setActiveTag("all");
+    setSortBy("relevance");
+  };
+
+  const hasActiveFilters = Boolean(normalizedQuery) || activeCategory !== "all" || activeTag !== "all" || sortBy !== "relevance";
 
   const getTitle = (article: Article) => {
     if (language === "ru") return article.titleRu || article.title;
@@ -1084,14 +1139,45 @@ export default function HealthArticles() {
 
           {/* Search */}
           <div className="mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <p className="text-sm text-muted-foreground">
+                {language === "ru"
+                  ? `Найдено: ${filteredArticles.length}`
+                  : language === "kz"
+                    ? `Табылды: ${filteredArticles.length}`
+                    : `Showing: ${filteredArticles.length}`}
+              </p>
+              {hasActiveFilters && (
+                <Button variant="outline" size="sm" onClick={resetFilters}>
+                  {language === "ru" ? "Сбросить фильтры" : language === "kz" ? "Сүзгілерді тазарту" : "Clear filters"}
+                </Button>
+              )}
+            </div>
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                 <Input
-                   placeholder={copy.searchPlaceholder}
-                   value={searchQuery}
-                   onChange={(e) => setSearchQuery(e.target.value)}
-                   className="pl-10"
-                 />
+              <Input
+                placeholder={copy.searchPlaceholder}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2 mt-4">
+              {([
+                { key: "relevance", label: language === "ru" ? "По релевантности" : language === "kz" ? "Өзектілігі бойынша" : "Relevance" },
+                { key: "newest", label: language === "ru" ? "Сначала новые" : language === "kz" ? "Жаңалары алдымен" : "Newest" },
+                { key: "oldest", label: language === "ru" ? "Сначала старые" : language === "kz" ? "Ескілері алдымен" : "Oldest" },
+                { key: "short-read", label: language === "ru" ? "Короткое чтение" : language === "kz" ? "Қысқа оқу" : "Short reads" },
+              ] as Array<{ key: SortOption; label: string }>).map((option) => (
+                <Button
+                  key={option.key}
+                  variant={sortBy === option.key ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSortBy(option.key)}
+                >
+                  {option.label}
+                </Button>
+              ))}
             </div>
             <div className="flex flex-wrap gap-2 mt-4">
               {(
