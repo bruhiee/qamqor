@@ -2846,6 +2846,66 @@ Never include personal data. Never invent user identities.`,
     }
   });
 
+  app.get("/api/geocode", async (req, res) => {
+    const q = String(req.query.q || "").trim();
+    const limitRaw = Number(req.query.limit);
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(8, Math.round(limitRaw))) : 3;
+    const nearLat = Number(req.query.near_lat);
+    const nearLon = Number(req.query.near_lon);
+
+    if (!q) {
+      return res.status(400).json({ message: "q is required" });
+    }
+
+    const params = new URLSearchParams({
+      q,
+      format: "jsonv2",
+      addressdetails: "1",
+      limit: String(limit),
+      dedupe: "1",
+      "accept-language": "ru,en",
+    });
+
+    if (Number.isFinite(nearLat) && Number.isFinite(nearLon)) {
+      params.set("lat", String(nearLat));
+      params.set("lon", String(nearLon));
+    }
+
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+        headers: {
+          "User-Agent": "Qamqor/1.0 (medical facilities search)",
+          Accept: "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        return res.status(502).json({ message: `Geocoding provider error: ${response.status}` });
+      }
+
+      const payload = await response.json();
+      const results = Array.isArray(payload)
+        ? payload
+            .map((item) => {
+              const lat = Number(item?.lat);
+              const lon = Number(item?.lon);
+              if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+              return {
+                name: String(item?.name || item?.display_name || "Unknown place"),
+                address: String(item?.display_name || ""),
+                coordinates: [lon, lat],
+              };
+            })
+            .filter(Boolean)
+        : [];
+
+      return res.json({ data: results });
+    } catch (error) {
+      console.error("Geocode failed:", error);
+      return res.status(502).json({ message: "Failed to geocode place" });
+    }
+  });
+
   app.post("/api/ai/medicine-instruction-scan", requireAuth, async (req, res) => {
     if (!SUPABASE_FUNCTION_URL) {
       return res.status(503).json({ message: "AI assistant is unavailable." });

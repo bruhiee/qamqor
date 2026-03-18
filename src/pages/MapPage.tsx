@@ -316,6 +316,9 @@ const cityPresets: Array<{ label: string; coords: [number, number] }> = [
   { label: "Berlin", coords: [13.4049, 52.5200] },
 ];
 const USE_MAPBOX = true;
+const BUILDING_LAYER_ID = "3d-buildings";
+const isFatalMapboxError = (message: string) =>
+  /access token|unauthorized|forbidden|401|403|style.*not found|source.*not found/i.test(message);
 
 export default function MapPage() {
   const { t } = useLanguage();
@@ -405,6 +408,34 @@ export default function MapPage() {
     setRouteInfo("");
   }, [mapboxToken]);
 
+  const enable3DBuildings = useCallback(() => {
+    if (!map.current) return;
+    if (map.current.getLayer(BUILDING_LAYER_ID)) return;
+
+    const style = map.current.getStyle();
+    const labelLayerId = style.layers?.find(
+      (layer) => layer.type === "symbol" && layer.layout && "text-field" in layer.layout
+    )?.id;
+
+    map.current.addLayer(
+      {
+        id: BUILDING_LAYER_ID,
+        source: "composite",
+        "source-layer": "building",
+        filter: ["==", "extrude", "true"],
+        type: "fill-extrusion",
+        minzoom: 14,
+        paint: {
+          "fill-extrusion-color": "#c9d2de",
+          "fill-extrusion-height": ["get", "height"],
+          "fill-extrusion-base": ["get", "min_height"],
+          "fill-extrusion-opacity": 0.72,
+        },
+      },
+      labelLayerId
+    );
+  }, []);
+
   const drawRoute = useCallback(
     (geojson: GeoJSON.LineString, user: [number, number]) => {
       if (!map.current) return;
@@ -481,6 +512,8 @@ export default function MapPage() {
       center: coords,
       zoom,
       duration: 1200,
+      pitch: zoom >= 14 ? 50 : 0,
+      bearing: zoom >= 14 ? -18 : 0,
     });
     if (userMarker.current) {
       userMarker.current.setLngLat(coords);
@@ -490,6 +523,45 @@ export default function MapPage() {
         .addTo(map.current);
     }
   }, [mapReady]);
+
+  const searchPlace = useCallback(
+    async (queryRaw: string) => {
+      const query = queryRaw.trim();
+      if (!query || !map.current) return;
+      try {
+        const nearLat = userLocation?.[1];
+        const nearLon = userLocation?.[0];
+        const params = new URLSearchParams({
+          q: query,
+          limit: "1",
+        });
+        if (Number.isFinite(nearLat) && Number.isFinite(nearLon)) {
+          params.set("near_lat", String(nearLat));
+          params.set("near_lon", String(nearLon));
+        }
+        const geocode = await apiFetch<{ data: Array<{ coordinates: [number, number] }> }>(`/geocode?${params.toString()}`);
+        const coords = geocode?.data?.[0]?.coordinates;
+
+        if (!coords) {
+          setRouteInfo("Здание не найдено");
+          return;
+        }
+
+        setRouteInfo("");
+        map.current.flyTo({
+          center: coords,
+          zoom: 16,
+          duration: 1100,
+          pitch: 58,
+          bearing: -20,
+        });
+      } catch (error) {
+        console.warn("Place search failed", error);
+        setRouteInfo("Не удалось найти здание");
+      }
+    },
+    [userLocation],
+  );
 
   const fetchRouteToFacility = useCallback(
     async (facility: MedicalFacility) => {
@@ -547,6 +619,8 @@ export default function MapPage() {
         center: preset.coords,
         zoom: 12,
         duration: 1300,
+        pitch: 0,
+        bearing: 0,
       });
       if (userMarker.current) {
         userMarker.current.setLngLat(preset.coords);
@@ -581,25 +655,34 @@ export default function MapPage() {
         style: "mapbox://styles/mapbox/light-v11",
         center: [71.4306, 51.1283],
         zoom: 3,
+        antialias: true,
       });
 
       map.current.on("error", (evt) => {
         const message = evt?.error?.message || "Mapbox rendering error";
-        setMapFailed(true);
+        if (isFatalMapboxError(message)) {
+          setMapFailed(true);
+        } else {
+          console.warn("Non-fatal Mapbox error:", message);
+        }
         setMapError(message);
       });
       map.current.on("load", () => {
         loaded = true;
+        enable3DBuildings();
+        setMapFailed(false);
+        setMapError("");
         setMapReady(true);
         map.current?.resize();
         setTimeout(() => map.current?.resize(), 100);
       });
+      map.current.on("style.load", enable3DBuildings);
       loadTimeout = setTimeout(() => {
         if (!loaded) {
           setMapFailed(true);
           setMapError("Mapbox load timeout");
         }
-      }, 7000);
+      }, 15000);
 
       map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
       map.current.addControl(new mapboxgl.GeolocateControl({
@@ -617,7 +700,7 @@ export default function MapPage() {
       map.current?.remove();
       map.current = null;
     };
-  }, [mapboxToken]);
+  }, [mapboxToken, enable3DBuildings]);
 
   useEffect(() => {
     if (!mapReady || !map.current) return;
@@ -717,6 +800,8 @@ export default function MapPage() {
           center: facility.coordinates,
           zoom: 15,
           duration: 1000,
+          pitch: 58,
+          bearing: -20,
         });
         fetchRouteToFacility(facility);
       });
@@ -743,6 +828,8 @@ export default function MapPage() {
       center: facility.coordinates,
       zoom: 15,
       duration: 1000,
+      pitch: 58,
+      bearing: -20,
     });
     fetchRouteToFacility(facility);
   };
@@ -801,6 +888,11 @@ export default function MapPage() {
                   placeholder={`${t.search}...`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      void searchPlace(searchQuery);
+                    }
+                  }}
                   className="pl-10"
                 />
               </div>
