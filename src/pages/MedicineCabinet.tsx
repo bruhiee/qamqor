@@ -56,6 +56,13 @@ interface Medicine {
   tags: string[];
   expiration_date: string;
   notes: string | null;
+  instruction_images?: Array<{
+    id: string;
+    created_at: string;
+    image_data_url: string;
+    extracted_text: string;
+    structured?: Record<string, string[]>;
+  }>;
 }
 
 interface MedicineHistoryItem {
@@ -90,8 +97,10 @@ interface NotificationHistoryItem {
 interface ScanResult {
   extractedText: string;
   plainExplanation: string;
+  structured?: Record<string, string[]>;
   warnings: string[];
   answer: string;
+  imagesStored?: number;
 }
 
 const formTypes = [
@@ -126,7 +135,8 @@ export default function MedicineCabinet() {
     telegram_chat_id: "",
     remind_days_before: 30,
   });
-  const [instructionImage, setInstructionImage] = useState<string | null>(null);
+  const [selectedMedicineId, setSelectedMedicineId] = useState<string>("");
+  const [instructionImages, setInstructionImages] = useState<string[]>([]);
   const [instructionQuestion, setInstructionQuestion] = useState("");
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [formData, setFormData] = useState({
@@ -194,6 +204,15 @@ export default function MedicineCabinet() {
       setLoading(false);
     }
   }, [user, fetchMedicines, fetchMedicineHistory, fetchNotificationSettings]);
+
+  useEffect(() => {
+    if (!selectedMedicineId && medicines.length > 0) {
+      setSelectedMedicineId(medicines[0].id);
+    }
+    if (selectedMedicineId && medicines.every((medicine) => medicine.id !== selectedMedicineId)) {
+      setSelectedMedicineId(medicines[0]?.id || "");
+    }
+  }, [medicines, selectedMedicineId]);
 
   const isExpired = (date: string) => new Date(date) < new Date();
   const isExpiringSoon = (date: string) => {
@@ -333,35 +352,77 @@ export default function MedicineCabinet() {
   };
 
   const handleInstructionImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setInstructionImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    Promise.all(
+      files.map(
+        (file) =>
+          new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result || ""));
+            reader.onerror = () => reject(new Error("Failed to read instruction image."));
+            reader.readAsDataURL(file);
+          }),
+      ),
+    )
+      .then((images) => {
+        setInstructionImages((prev) => [...prev, ...images.filter(Boolean)].slice(0, 20));
+      })
+      .catch((error) => {
+        toast({
+          variant: "destructive",
+          title: t.error,
+          description: error instanceof Error ? error.message : "Failed to read instruction image.",
+        });
+      });
+    e.target.value = "";
   };
 
   const handleScanInstruction = async () => {
-    if (!instructionImage) {
+    if (!selectedMedicineId) {
       toast({
         variant: "destructive",
         title: t.error,
-        description: "Upload instruction image first",
+        description: "Select medicine first",
+      });
+      return;
+    }
+    if (instructionImages.length === 0 && !instructionQuestion.trim()) {
+      toast({
+        variant: "destructive",
+        title: t.error,
+        description: "Upload images or ask a question",
       });
       return;
     }
     setScanLoading(true);
     try {
-      const data = await apiFetch<ScanResult>("/ai/medicine-instruction-scan", {
-        method: "POST",
-        body: {
-          image: instructionImage,
-          question: instructionQuestion,
-          language: "en",
-        },
-      });
-      setScanResult(data);
+      let latest: ScanResult | null = null;
+      if (instructionImages.length > 0) {
+        for (const image of instructionImages) {
+          latest = await apiFetch<ScanResult>("/ai/medicine-instruction-scan", {
+            method: "POST",
+            body: {
+              medicine_id: selectedMedicineId,
+              image,
+              question: instructionQuestion,
+              language: "en",
+            },
+          });
+        }
+      } else {
+        latest = await apiFetch<ScanResult>("/ai/medicine-instruction-scan", {
+          method: "POST",
+          body: {
+            medicine_id: selectedMedicineId,
+            question: instructionQuestion,
+            language: "en",
+          },
+        });
+      }
+      setScanResult(latest);
+      setInstructionImages([]);
+      fetchMedicines();
     } catch (error) {
       console.error("Instruction scan failed:", error);
       toast({
@@ -721,28 +782,55 @@ export default function MedicineCabinet() {
                 <ScanLine className="w-4 h-4 text-primary" />
                 <h3 className="font-semibold">Instruction Scanner</h3>
               </div>
-              <Input type="file" accept="image/*" onChange={handleInstructionImageUpload} />
-              {instructionImage && (
-                <img src={instructionImage} alt="Instruction" className="rounded-lg border border-border max-h-32 object-cover" />
+              <div>
+                <Label>Medicine</Label>
+                <Select value={selectedMedicineId} onValueChange={setSelectedMedicineId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select medicine" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {medicines.map((medicine) => (
+                      <SelectItem key={medicine.id} value={medicine.id}>
+                        {medicine.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Input type="file" accept="image/*" multiple onChange={handleInstructionImageUpload} />
+              {instructionImages.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {instructionImages.map((img, index) => (
+                    <img key={`${index}-${img.slice(0, 24)}`} src={img} alt="Instruction" className="rounded-lg border border-border h-20 w-full object-cover" />
+                  ))}
+                </div>
               )}
               <Textarea
-                placeholder="Ask AI about this instruction (optional)"
+                placeholder="Ask AI about saved instruction images"
                 value={instructionQuestion}
                 onChange={(e) => setInstructionQuestion(e.target.value)}
                 rows={3}
               />
               <Button onClick={handleScanInstruction} disabled={scanLoading} className="w-full medical-gradient">
                 {scanLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <MessageCircle className="w-4 h-4 mr-2" />}
-                Scan and Ask AI
+                Save/Scan and Ask AI
               </Button>
               {scanResult && (
                 <div className="text-xs space-y-2 bg-muted rounded-lg p-3">
-                  <p><span className="font-semibold">Extracted:</span> {scanResult.extractedText || "-"}</p>
-                  <p><span className="font-semibold">Explanation:</span> {scanResult.plainExplanation || "-"}</p>
                   <p><span className="font-semibold">Answer:</span> {scanResult.answer || "-"}</p>
+                  {typeof scanResult.imagesStored === "number" && (
+                    <p><span className="font-semibold">Stored images:</span> {scanResult.imagesStored}</p>
+                  )}
                   {scanResult.warnings?.length > 0 && (
                     <p><span className="font-semibold">Warnings:</span> {scanResult.warnings.join("; ")}</p>
                   )}
+                  <details className="pt-1">
+                    <summary className="cursor-pointer text-muted-foreground">Show details</summary>
+                    <div className="mt-2 space-y-2">
+                      <p><span className="font-semibold">Extracted:</span> {scanResult.extractedText || "-"}</p>
+                      <p><span className="font-semibold">Explanation:</span> {scanResult.plainExplanation || "-"}</p>
+                    </div>
+                  </details>
                 </div>
               )}
             </div>
@@ -895,6 +983,9 @@ export default function MedicineCabinet() {
                             {medicine.notes}
                           </p>
                         )}
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Instruction images: {Array.isArray(medicine.instruction_images) ? medicine.instruction_images.length : 0}
+                        </p>
                       </div>
                     </motion.div>
                   );

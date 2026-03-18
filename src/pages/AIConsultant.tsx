@@ -593,7 +593,7 @@ export default function AIConsultant() {
       <Navbar />
       
       <main className="flex-1 pt-20 pb-4">
-        <div className="container mx-auto px-4 h-full flex flex-col" style={{ height: "calc(100vh - 6rem)" }}>
+        <div className="container mx-auto px-4 h-full min-h-0 flex flex-col" style={{ height: "calc(100vh - 6rem)" }}>
           {/* Header */}
           <div className="py-4 border-b border-border mb-4">
             <div className="flex items-center justify-between">
@@ -714,7 +714,7 @@ export default function AIConsultant() {
           </div>
 
           {user && (
-            <div className="mb-4 rounded-xl border border-border bg-card p-3">
+            <div className="mb-4 shrink-0 rounded-xl border border-border bg-card p-3">
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <History className="w-4 h-4" />
@@ -767,12 +767,12 @@ export default function AIConsultant() {
           )}
 
           {/* Disclaimer */}
-          <div className="mb-4">
+          <div className="mb-4 shrink-0">
             <DisclaimerBanner compact />
           </div>
 
           {/* Chat Area */}
-          <div className="flex-1 overflow-y-auto space-y-4 pb-4 scrollbar-hide">
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pb-4 pr-1 scrollbar-hide">
             <AnimatePresence>
               {messages.map((message) => (
                 <motion.div
@@ -788,12 +788,12 @@ export default function AIConsultant() {
                     </div>
                   )}
                   
-                  <div className={`max-w-2xl ${message.role === "user" ? "order-first" : ""}`}>
+                  <div className={`max-w-3xl ${message.role === "user" ? "order-first" : ""}`}>
                     <div
                       className={`rounded-2xl p-4 ${
                         message.role === "user"
-                          ? "bg-primary text-primary-foreground rounded-tr-none"
-                          : "bg-muted rounded-tl-none"
+                          ? "bg-primary text-primary-foreground rounded-tr-none shadow-sm"
+                          : "bg-card border border-border rounded-tl-none shadow-sm"
                       }`}
                     >
                       {message.image && (
@@ -803,7 +803,7 @@ export default function AIConsultant() {
                           className="max-w-xs rounded-lg mb-2"
                         />
                       )}
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground">{message.content}</p>
                     </div>
                     
                     {/* AI Report Card */}
@@ -948,35 +948,35 @@ export default function AIConsultant() {
                 </div>
               </motion.div>
             )}
+
+            {finalSummary && (
+              <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">Final Structured Summary</h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => exportSummaryAsPdf(undefined, finalSummary, finalReviewMaker)}
+                  >
+                    Save as PDF
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">{finalSummary.summaryText}</p>
+                <p className="text-xs"><span className="font-medium">Why it may be dangerous:</span> {finalSummary.dangerExplanation || "-"}</p>
+                <p className="text-xs"><span className="font-medium">Risk factors:</span> {finalSummary.riskFactors?.join(", ") || "-"}</p>
+                <p className="text-xs"><span className="font-medium">Recommendations:</span> {finalSummary.recommendations.join("; ") || "-"}</p>
+                <p className="text-xs"><span className="font-medium">Doctor advice:</span> {finalSummary.whenToSeeDoctor || "-"}</p>
+                {finalSummary.severityScore ? (
+                  <p className="text-xs"><span className="font-medium">Severity:</span> {finalSummary.severityScore}/5</p>
+                ) : null}
+                {finalSummary.humanReviewFlag ? (
+                  <p className="text-xs text-destructive">Human Review Flag is active.</p>
+                ) : null}
+              </div>
+            )}
             
             <div ref={messagesEndRef} />
           </div>
-
-          {finalSummary && (
-            <div className="mb-3 bg-card border border-border rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold">Final Structured Summary</h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => exportSummaryAsPdf(undefined, finalSummary, finalReviewMaker)}
-                >
-                  Save as PDF
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">{finalSummary.summaryText}</p>
-              <p className="text-xs"><span className="font-medium">Why it may be dangerous:</span> {finalSummary.dangerExplanation || "-"}</p>
-              <p className="text-xs"><span className="font-medium">Risk factors:</span> {finalSummary.riskFactors?.join(", ") || "-"}</p>
-              <p className="text-xs"><span className="font-medium">Recommendations:</span> {finalSummary.recommendations.join("; ") || "-"}</p>
-              <p className="text-xs"><span className="font-medium">Doctor advice:</span> {finalSummary.whenToSeeDoctor || "-"}</p>
-              {finalSummary.severityScore ? (
-                <p className="text-xs"><span className="font-medium">Severity:</span> {finalSummary.severityScore}/5</p>
-              ) : null}
-              {finalSummary.humanReviewFlag ? (
-                <p className="text-xs text-destructive">Human Review Flag is active.</p>
-              ) : null}
-            </div>
-          )}
 
           {/* Selected Image Preview */}
           {selectedImage && (

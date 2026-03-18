@@ -25,6 +25,7 @@ const DB_PATH = path.join(__dirname, "data", "db.json");
 const JWT = "qamqorS";
 const PORT = 4000;
 const SUPABASE_FUNCTION_URL = process.env.SUPABASE_FUNCTION_URL;
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || "";
 let db = null;
 
 const emptyDb = {
@@ -44,6 +45,7 @@ const emptyDb = {
   ai_chat_histories: [],
   doctor_reply_training_samples: [],
   two_factor_challenges: [],
+  email_verification_challenges: [],
   user_profiles: [],
   bookmarks: [],
   tutorial_status: [],
@@ -237,6 +239,7 @@ const SYMPTOM_KEYWORDS = [
 const POST_PENDING_STATUS = "pending";
 const POST_VISIBLE_STATUS = "open";
 const POST_REJECTED_STATUS = "rejected";
+const FORUM_POST_COOLDOWN_MS = 10 * 60 * 1000;
 const HIDDEN_FORUM_STATUSES = new Set([POST_PENDING_STATUS, "flagged", POST_REJECTED_STATUS]);
 const REPLY_PENDING_STATUS = "pending";
 const REPLY_VISIBLE_STATUS = "open";
@@ -836,6 +839,159 @@ function parseJsonSafe(value) {
   }
 }
 
+function normalizeInstructionText(value, maxLength = 5000) {
+  const text = sanitizeText(String(value || ""))
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.slice(0, maxLength);
+}
+
+function normalizeInstructionList(items, maxItems = 12, maxLength = 220) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => normalizeInstructionText(item, maxLength))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function normalizeInstructionStructured(raw) {
+  const src = raw && typeof raw === "object" ? raw : {};
+  return {
+    indications: normalizeInstructionList(src.indications),
+    dosage: normalizeInstructionList(src.dosage),
+    contraindications: normalizeInstructionList(src.contraindications),
+    side_effects: normalizeInstructionList(src.side_effects),
+    interactions: normalizeInstructionList(src.interactions),
+    warnings: normalizeInstructionList(src.warnings),
+    storage: normalizeInstructionList(src.storage),
+    pregnancy: normalizeInstructionList(src.pregnancy),
+    children: normalizeInstructionList(src.children),
+    overdose: normalizeInstructionList(src.overdose),
+    missed_dose: normalizeInstructionList(src.missed_dose),
+  };
+}
+
+function buildInstructionContext(medicine) {
+  const entries = Array.isArray(medicine?.instruction_images) ? medicine.instruction_images : [];
+  const sections = {
+    indications: new Set(),
+    dosage: new Set(),
+    contraindications: new Set(),
+    side_effects: new Set(),
+    interactions: new Set(),
+    warnings: new Set(),
+    storage: new Set(),
+    pregnancy: new Set(),
+    children: new Set(),
+    overdose: new Set(),
+    missed_dose: new Set(),
+  };
+
+  entries.forEach((entry) => {
+    const structured = normalizeInstructionStructured(entry?.structured || {});
+    Object.keys(sections).forEach((key) => {
+      structured[key].forEach((item) => sections[key].add(item));
+    });
+  });
+
+  const toLine = (label, key) => {
+    const values = [...sections[key]].slice(0, 8);
+    return values.length > 0 ? `${label}: ${values.join("; ")}` : null;
+  };
+
+  return [
+    toLine("Indications", "indications"),
+    toLine("Dosage", "dosage"),
+    toLine("Contraindications", "contraindications"),
+    toLine("Side effects", "side_effects"),
+    toLine("Interactions", "interactions"),
+    toLine("Warnings", "warnings"),
+    toLine("Storage", "storage"),
+    toLine("Pregnancy", "pregnancy"),
+    toLine("Children", "children"),
+    toLine("Overdose", "overdose"),
+    toLine("Missed dose", "missed_dose"),
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function extractCriticalWarnings(warnings) {
+  const criticalKeywords = [
+    "stop",
+    "emergency",
+    "urgent",
+    "severe",
+    "allergic",
+    "anaphyl",
+    "bleeding",
+    "chest pain",
+    "shortness of breath",
+    "pregnan",
+    "do not",
+    "contraind",
+    "overdose",
+    "child",
+    "danger",
+    "critical",
+  ];
+  return normalizeInstructionList(warnings, 10, 220).filter((warning) => {
+    const lower = warning.toLowerCase();
+    return criticalKeywords.some((key) => lower.includes(key));
+  });
+}
+
+function enforceConciseSafeAnswer(rawAnswer, warnings) {
+  const normalized = normalizeInstructionText(rawAnswer || "", 1200);
+  const sentences = normalized
+    .split(/(?<=[.!?])\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const compact = (sentences.length > 0 ? sentences : [normalized]).slice(0, 4);
+  let answer = compact.join(" ");
+  const criticalWarnings = extractCriticalWarnings(warnings);
+
+  if (criticalWarnings.length > 0) {
+    const warningSentence = `Critical warning: ${criticalWarnings[0]}.`;
+    const alreadyIncluded = answer.toLowerCase().includes(criticalWarnings[0].toLowerCase());
+    if (!alreadyIncluded) {
+      const current = answer
+        .split(/(?<=[.!?])\s+/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+      const limited = [...current, warningSentence].slice(-4);
+      answer = limited.join(" ");
+    }
+  }
+
+  if (!answer) {
+    return criticalWarnings.length > 0
+      ? `Critical warning: ${criticalWarnings[0]}.`
+      : "No instruction details available. Ask a pharmacist or doctor before use.";
+  }
+  return answer.slice(0, 1000);
+}
+
+function enforceVerySimpleAnswer(rawAnswer, warnings, language = "en") {
+  const base = enforceConciseSafeAnswer(rawAnswer, warnings)
+    .split(/(?<=[.!?])\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" ");
+
+  const maxLen = 260;
+  let answer = base.slice(0, maxLen);
+  const critical = extractCriticalWarnings(warnings);
+  if (critical.length > 0 && !answer.toLowerCase().includes("critical warning")) {
+    const prefix = String(language || "").toLowerCase().startsWith("ru")
+      ? "Важно: "
+      : "Important: ";
+    answer = `${answer} ${prefix}${critical[0]}`.trim().slice(0, maxLen);
+  }
+  return answer;
+}
+
 function getUserMedicineNotificationPrefs(userId) {
   const existing = db.medicine_notification_prefs.find((entry) => entry.user_id === userId);
   if (existing) return existing;
@@ -1175,6 +1331,7 @@ async function loadDb() {
     parsed.ai_chat_histories = Array.isArray(parsed.ai_chat_histories) ? parsed.ai_chat_histories : [];
     parsed.doctor_reply_training_samples = Array.isArray(parsed.doctor_reply_training_samples) ? parsed.doctor_reply_training_samples : [];
     parsed.two_factor_challenges = Array.isArray(parsed.two_factor_challenges) ? parsed.two_factor_challenges : [];
+    parsed.email_verification_challenges = Array.isArray(parsed.email_verification_challenges) ? parsed.email_verification_challenges : [];
     parsed.user_profiles = Array.isArray(parsed.user_profiles) ? parsed.user_profiles : [];
     parsed.bookmarks = Array.isArray(parsed.bookmarks) ? parsed.bookmarks : [];
     parsed.tutorial_status = Array.isArray(parsed.tutorial_status) ? parsed.tutorial_status : [];
@@ -1184,6 +1341,29 @@ async function loadDb() {
     parsed.medicine_history = Array.isArray(parsed.medicine_history) ? parsed.medicine_history : [];
     parsed.medicine_notifications = Array.isArray(parsed.medicine_notifications) ? parsed.medicine_notifications : [];
     parsed.medicine_notification_prefs = Array.isArray(parsed.medicine_notification_prefs) ? parsed.medicine_notification_prefs : [];
+    parsed.medicines = Array.isArray(parsed.medicines)
+      ? parsed.medicines.map((medicine) => ({
+          ...medicine,
+          instruction_images: Array.isArray(medicine.instruction_images)
+            ? medicine.instruction_images.map((entry) => ({
+                id: String(entry?.id || nanoid()),
+                created_at: entry?.created_at || new Date().toISOString(),
+                image_data_url: String(entry?.image_data_url || "").slice(0, 4_000_000),
+                extracted_text: normalizeInstructionText(entry?.extracted_text || ""),
+                structured: normalizeInstructionStructured(entry?.structured || {}),
+              }))
+            : [],
+        }))
+      : [];
+    parsed.users = Array.isArray(parsed.users)
+      ? parsed.users.map((user) => ({
+          ...user,
+          email_verified:
+            typeof user.email_verified === "boolean"
+              ? user.email_verified
+              : true,
+        }))
+      : [];
     return parsed;
   } catch (error) {
     if (error && error.code === "ENOENT") {
@@ -1210,6 +1390,7 @@ function sanitizeUser(user) {
   return {
     ...rest,
     banned: Boolean(user.banned),
+    email_verified: Boolean(user.email_verified),
     two_factor_enabled: Boolean(user.two_factor_enabled),
     doctor_application_status: doctorApplicationStatus,
     doctor_verified: Boolean(doctorVerified),
@@ -1234,6 +1415,44 @@ function issueTwoFactorCode() {
   return String(randomInt(100000, 999999));
 }
 
+function issueEmailVerificationCode() {
+  return String(randomInt(100000, 999999));
+}
+
+async function verifyGoogleIdToken(idToken) {
+  const token = String(idToken || "").trim();
+  if (!token) {
+    throw new Error("Google id token is required");
+  }
+
+  const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`);
+  if (!response.ok) {
+    throw new Error("Invalid Google token");
+  }
+  const payload = await response.json();
+
+  const issuer = String(payload.iss || "");
+  if (issuer !== "accounts.google.com" && issuer !== "https://accounts.google.com") {
+    throw new Error("Invalid Google issuer");
+  }
+
+  if (GOOGLE_CLIENT_ID && String(payload.aud || "") !== GOOGLE_CLIENT_ID) {
+    throw new Error("Google client mismatch");
+  }
+
+  const emailVerified = String(payload.email_verified || "").toLowerCase() === "true";
+  const email = String(payload.email || "").toLowerCase().trim();
+  if (!email || !emailVerified) {
+    throw new Error("Google account email is not verified");
+  }
+
+  return {
+    email,
+    name: String(payload.name || payload.given_name || "").trim(),
+    sub: String(payload.sub || "").trim(),
+  };
+}
+
 async function sendTwoFactorCode(user, code, purpose = "login") {
   const webhook = process.env.TWO_FACTOR_EMAIL_WEBHOOK_URL;
   if (!webhook) {
@@ -1254,6 +1473,50 @@ async function sendTwoFactorCode(user, code, purpose = "login") {
     return { delivery: "sent" };
   } catch (error) {
     console.error("2FA email webhook failed", error);
+    return { delivery: "failed" };
+  }
+}
+
+function createEmailVerificationChallenge(user) {
+  const code = issueEmailVerificationCode();
+  const challenge = {
+    id: nanoid(),
+    user_id: user.id,
+    code,
+    purpose: "email-verification",
+    expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    used: false,
+  };
+  db.email_verification_challenges = (db.email_verification_challenges || []).filter(
+    (item) =>
+      item.user_id !== user.id &&
+      Number(new Date(item.expires_at || 0)) > Date.now() - 60 * 1000 &&
+      !item.used,
+  );
+  db.email_verification_challenges.push(challenge);
+  return { challenge, code };
+}
+
+async function sendEmailVerificationCode(user, code, purpose = "verify-email") {
+  const webhook = process.env.EMAIL_VERIFICATION_WEBHOOK_URL || process.env.TWO_FACTOR_EMAIL_WEBHOOK_URL;
+  if (!webhook) {
+    return { delivery: "configured-off" };
+  }
+  try {
+    await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: user.email,
+        type: "email_verification_code",
+        purpose,
+        code,
+        expires_in_minutes: 10,
+      }),
+    });
+    return { delivery: "sent" };
+  } catch (error) {
+    console.error("Email verification webhook failed", error);
     return { delivery: "failed" };
   }
 }
@@ -1413,6 +1676,7 @@ async function ensureAdminUser() {
       app_metadata: { provider: "email", roles: ["admin", "doctor", "user", "moderator"] },
       created_at: new Date().toISOString(),
       banned: false,
+      email_verified: true,
     };
     db.users.push(adminUser);
     await persistDb();
@@ -1467,6 +1731,7 @@ function createRouter() {
       app_metadata: { provider: "email", roles },
       created_at: new Date().toISOString(),
       banned: false,
+      email_verified: false,
       two_factor_enabled: false,
       requested_role: role === "doctor" ? "doctor" : "user",
     };
@@ -1498,9 +1763,15 @@ function createRouter() {
       notes: null,
       updated_at: new Date().toISOString(),
     });
+    const { challenge, code } = createEmailVerificationChallenge(newUser);
+    const delivery = await sendEmailVerificationCode(newUser, code, "signup");
     await persistDb();
-    const token = createToken(newUser);
-    return res.status(201).json({ user: sanitizeUser(newUser), token });
+    return res.status(201).json({
+      email_verification_required: true,
+      challenge_id: challenge.id,
+      delivery: delivery.delivery,
+      ...(delivery.delivery !== "sent" ? { debug_code: code } : {}),
+    });
   });
 
   app.post("/api/auth/login", async (req, res) => {
@@ -1519,6 +1790,18 @@ function createRouter() {
     }
     if (user.banned) {
       return res.status(403).json({ message: "Account is banned" });
+    }
+    if (!user.email_verified) {
+      const { challenge, code } = createEmailVerificationChallenge(user);
+      const delivery = await sendEmailVerificationCode(user, code, "login");
+      await persistDb();
+      return res.status(403).json({
+        message: "Email is not verified",
+        email_verification_required: true,
+        challenge_id: challenge.id,
+        delivery: delivery.delivery,
+        ...(delivery.delivery !== "sent" ? { debug_code: code } : {}),
+      });
     }
     ensureRoles(user);
     if (user.two_factor_enabled) {
@@ -1541,12 +1824,187 @@ function createRouter() {
         two_factor_required: true,
         challenge_id: challenge.id,
         delivery: delivery.delivery,
-        ...(delivery.delivery === "configured-off" ? { debug_code: code } : {}),
+        ...(delivery.delivery !== "sent" ? { debug_code: code } : {}),
       });
     }
     await persistDb();
     const token = createToken(user);
     return res.json({ user: sanitizeUser(user), token });
+  });
+
+  app.post("/api/auth/google", async (req, res) => {
+    const idToken = sanitizeText(String(req.body?.id_token || "")).trim();
+    if (!idToken) {
+      return res.status(400).json({ message: "id_token is required" });
+    }
+
+    let googleUser;
+    try {
+      googleUser = await verifyGoogleIdToken(idToken);
+    } catch (error) {
+      return res.status(401).json({
+        message: error instanceof Error ? error.message : "Google authentication failed",
+      });
+    }
+
+    let user = db.users.find((u) => u.email === googleUser.email);
+    if (!user) {
+      const generatedPasswordHash = await bcrypt.hash(`${googleUser.sub}:${Date.now()}:${nanoid()}`, 10);
+      const roles = ["user"];
+      user = {
+        id: nanoid(),
+        email: googleUser.email,
+        displayName: googleUser.name || googleUser.email.split("@")[0],
+        passwordHash: generatedPasswordHash,
+        roles,
+        user_metadata: { display_name: googleUser.name || googleUser.email.split("@")[0] },
+        app_metadata: { provider: "google", roles },
+        created_at: new Date().toISOString(),
+        banned: false,
+        email_verified: true,
+        two_factor_enabled: false,
+        oauth_provider: "google",
+        oauth_sub: googleUser.sub || null,
+      };
+      db.users.push(user);
+    } else {
+      ensureRoles(user);
+      user.user_metadata = user.user_metadata || { display_name: user.displayName };
+      if (!user.user_metadata.display_name && googleUser.name) {
+        user.user_metadata.display_name = googleUser.name;
+      }
+      user.app_metadata = {
+        ...(user.app_metadata || {}),
+        provider: user.app_metadata?.provider || "google",
+        roles: user.roles,
+      };
+      if (googleUser.sub && !user.oauth_sub) {
+        user.oauth_sub = googleUser.sub;
+      }
+      user.email_verified = true;
+    }
+
+    if (user.banned) {
+      return res.status(403).json({ message: "Account is banned" });
+    }
+
+    ensureRoles(user);
+    if (user.two_factor_enabled) {
+      const code = issueTwoFactorCode();
+      const challenge = {
+        id: nanoid(),
+        user_id: user.id,
+        code,
+        purpose: "login",
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+        used: false,
+      };
+      db.two_factor_challenges = (db.two_factor_challenges || []).filter(
+        (item) => Number(new Date(item.expires_at || 0)) > Date.now() - 60 * 1000 && !item.used,
+      );
+      db.two_factor_challenges.push(challenge);
+      const delivery = await sendTwoFactorCode(user, code, "login");
+      await persistDb();
+      return res.status(202).json({
+        two_factor_required: true,
+        challenge_id: challenge.id,
+        delivery: delivery.delivery,
+        ...(delivery.delivery !== "sent" ? { debug_code: code } : {}),
+      });
+    }
+
+    await persistDb();
+    const token = createToken(user);
+    return res.json({ user: sanitizeUser(user), token });
+  });
+
+  app.post("/api/auth/email-verification/verify", async (req, res) => {
+    const challengeId = sanitizeText(String(req.body?.challenge_id || "")).trim();
+    const email = sanitizeText(String(req.body?.email || "")).trim().toLowerCase();
+    const code = sanitizeText(String(req.body?.code || "")).trim();
+    if (!code || (!challengeId && !email)) {
+      return res.status(400).json({ message: "code and (challenge_id or email) are required" });
+    }
+    let challenge = null;
+    if (challengeId) {
+      challenge = (db.email_verification_challenges || []).find(
+        (item) => item.id === challengeId && item.purpose === "email-verification",
+      );
+    } else {
+      const userByEmail = db.users.find((entry) => entry.email === email);
+      if (!userByEmail) {
+        return res.status(404).json({ message: "User no longer exists" });
+      }
+      challenge = (db.email_verification_challenges || [])
+        .filter(
+          (item) =>
+            item.user_id === userByEmail.id &&
+            item.purpose === "email-verification" &&
+            !item.used &&
+            Number(new Date(item.expires_at || 0)) >= Date.now(),
+        )
+        .sort((a, b) => Number(new Date(b.expires_at || 0)) - Number(new Date(a.expires_at || 0)))[0] || null;
+    }
+    if (!challenge || challenge.used) {
+      return res.status(400).json({ message: "Invalid or expired email verification challenge" });
+    }
+    if (Number(new Date(challenge.expires_at || 0)) < Date.now()) {
+      return res.status(400).json({ message: "Verification code expired" });
+    }
+    if (String(challenge.code) !== code) {
+      return res.status(401).json({ message: "Invalid verification code" });
+    }
+    const user = db.users.find((entry) => entry.id === challenge.user_id);
+    if (!user) {
+      return res.status(404).json({ message: "User no longer exists" });
+    }
+    if (user.banned) {
+      return res.status(403).json({ message: "Account is banned" });
+    }
+    challenge.used = true;
+    user.email_verified = true;
+    ensureRoles(user);
+    const token = createToken(user);
+    await persistDb();
+    return res.json({ user: sanitizeUser(user), token });
+  });
+
+  app.post("/api/auth/email-verification/resend", async (req, res) => {
+    const challengeId = sanitizeText(String(req.body?.challenge_id || "")).trim();
+    const email = sanitizeText(String(req.body?.email || "")).trim().toLowerCase();
+    if (!challengeId && !email) {
+      return res.status(400).json({ message: "challenge_id or email is required" });
+    }
+    let user = null;
+    if (challengeId) {
+      const activeChallenge = (db.email_verification_challenges || []).find(
+        (item) => item.id === challengeId && item.purpose === "email-verification",
+      );
+      if (!activeChallenge) {
+        return res.status(400).json({ message: "Invalid or expired email verification challenge" });
+      }
+      user = db.users.find((entry) => entry.id === activeChallenge.user_id);
+    } else {
+      user = db.users.find((entry) => entry.email === email);
+    }
+    if (!user) {
+      return res.status(404).json({ message: "User no longer exists" });
+    }
+    if (user.banned) {
+      return res.status(403).json({ message: "Account is banned" });
+    }
+    if (user.email_verified) {
+      return res.status(400).json({ message: "Email is already verified" });
+    }
+
+    const { challenge, code } = createEmailVerificationChallenge(user);
+    const delivery = await sendEmailVerificationCode(user, code, "resend");
+    await persistDb();
+    return res.json({
+      challenge_id: challenge.id,
+      delivery: delivery.delivery,
+      ...(delivery.delivery !== "sent" ? { debug_code: code } : {}),
+    });
   });
 
   app.post("/api/auth/2fa/verify-login", async (req, res) => {
@@ -1602,7 +2060,7 @@ function createRouter() {
     return res.json({
       challenge_id: challenge.id,
       delivery: delivery.delivery,
-      ...(delivery.delivery === "configured-off" ? { debug_code: code } : {}),
+      ...(delivery.delivery !== "sent" ? { debug_code: code } : {}),
     });
   });
 
@@ -1635,7 +2093,7 @@ function createRouter() {
       data: {
         challenge_id: challenge.id,
         delivery: delivery.delivery,
-        ...(delivery.delivery === "configured-off" ? { debug_code: code } : {}),
+        ...(delivery.delivery !== "sent" ? { debug_code: code } : {}),
       },
     });
   });
@@ -1945,7 +2403,12 @@ function createRouter() {
   });
 
   app.get("/api/medicines", requireAuth, (req, res) => {
-    const medicines = db.medicines.filter((med) => med.user_id === req.user.id);
+    const medicines = db.medicines
+      .filter((med) => med.user_id === req.user.id)
+      .map((med) => ({
+        ...med,
+        instruction_images: Array.isArray(med.instruction_images) ? med.instruction_images : [],
+      }));
     return res.json({ data: medicines });
   });
 
@@ -1999,6 +2462,7 @@ function createRouter() {
         : [],
       expiration_date: payload.expiration_date ? String(payload.expiration_date).slice(0, 20) : null,
       notes: payload.notes ? sanitizeText(String(payload.notes)).slice(0, 1200) : null,
+      instruction_images: [],
     };
     if (!medicine.name || !medicine.expiration_date) {
       return res.status(400).json({ message: "name and expiration_date are required" });
@@ -2027,6 +2491,19 @@ function createRouter() {
       ...(payload.tags != null ? { tags: Array.isArray(payload.tags) ? payload.tags.map((tag) => sanitizeText(String(tag)).slice(0, 40)).slice(0, 12) : [] } : {}),
       ...(payload.expiration_date != null ? { expiration_date: String(payload.expiration_date).slice(0, 20) } : {}),
       ...(payload.notes != null ? { notes: payload.notes ? sanitizeText(String(payload.notes)).slice(0, 1200) : null } : {}),
+      ...(payload.instruction_images != null
+        ? {
+            instruction_images: Array.isArray(payload.instruction_images)
+              ? payload.instruction_images.map((entry) => ({
+                  id: String(entry?.id || nanoid()),
+                  created_at: entry?.created_at || new Date().toISOString(),
+                  image_data_url: String(entry?.image_data_url || "").slice(0, 4_000_000),
+                  extracted_text: normalizeInstructionText(entry?.extracted_text || ""),
+                  structured: normalizeInstructionStructured(entry?.structured || {}),
+                }))
+              : [],
+          }
+        : {}),
     });
     trackMedicineHistory("updated", medicine, req.user.id, {
       previous_expiration_date: before.expiration_date || null,
@@ -2230,6 +2707,23 @@ Keep it factual. No diagnosis. Language: ${language}.`,
   });
 
   app.post("/api/forum/posts", requireAuth, async (req, res) => {
+    const latestUserPost = [...db.forum_posts]
+      .filter((post) => post.user_id === req.user.id)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+    if (latestUserPost?.created_at) {
+      const elapsedMs = Date.now() - new Date(latestUserPost.created_at).getTime();
+      if (elapsedMs < FORUM_POST_COOLDOWN_MS) {
+        const retryAfterMs = FORUM_POST_COOLDOWN_MS - elapsedMs;
+        const retryAfterSeconds = Math.ceil(retryAfterMs / 1000);
+        const retryAfterMinutes = Math.ceil(retryAfterMs / 60000);
+        return res.status(429).json({
+          message: `You can create the next forum question in ${retryAfterMinutes} minute(s).`,
+          retry_after_seconds: retryAfterSeconds,
+          next_allowed_at: new Date(Date.now() + retryAfterMs).toISOString(),
+        });
+      }
+    }
+
     const cleaned = sanitizeRequestBody(req.body);
     const problemCategory = sanitizeText(String(cleaned.problem_category || "")).toLowerCase().trim().slice(0, 80);
     const ageGroup = sanitizeText(String(cleaned.age_group || "")).toLowerCase().trim().slice(0, 80);
@@ -2910,47 +3404,160 @@ Never include personal data. Never invent user identities.`,
     if (!SUPABASE_FUNCTION_URL) {
       return res.status(503).json({ message: "AI assistant is unavailable." });
     }
-    const { image, question = "", language = "en" } = req.body || {};
-    if (!image || typeof image !== "string") {
-      return res.status(400).json({ message: "Instruction image is required." });
+    const { image, question = "", language = "en", medicine_id: medicineIdRaw } = req.body || {};
+    const medicineId = sanitizeText(String(medicineIdRaw || "")).trim();
+    const medicine = medicineId
+      ? db.medicines.find((med) => med.id === medicineId && med.user_id === req.user.id)
+      : null;
+    if (medicineId && !medicine) {
+      return res.status(404).json({ message: "Medicine not found" });
+    }
+    if (image != null && typeof image !== "string") {
+      return res.status(400).json({ message: "Instruction image must be a base64 data URL string." });
     }
     const safeQuestion = sanitizeText(String(question || "")).slice(0, 800);
-    const truncatedImage = image.slice(0, 25000);
+    const safeImage = typeof image === "string" ? image.slice(0, 4_000_000) : "";
+    if (!safeImage && !safeQuestion) {
+      return res.status(400).json({ message: "Provide instruction image or question." });
+    }
+    const existingContext = medicine ? buildInstructionContext(medicine).slice(0, 6000) : "";
+
+    let extractedText = "";
+    let plainExplanation = "";
+    let warnings = [];
+    let structured = normalizeInstructionStructured({});
+    let directAnswer = "";
 
     try {
-      const { parsed, text } = await makeSupabaseChatRequest({
-        model: "google/gemini-3-flash-preview",
-        stream: false,
-        messages: [
-          {
-            role: "system",
-            content: `You extract medicine instruction text from an uploaded image and explain it safely.
+      if (safeImage) {
+        const truncatedImage = safeImage.slice(0, 25000);
+        const { parsed, text } = await makeSupabaseChatRequest({
+          model: "google/gemini-3-flash-preview",
+          stream: false,
+          messages: [
+            {
+              role: "system",
+              content: `You extract medicine instruction text from uploaded medicine leaflet images.
 Return ONLY JSON:
 {
-  "extractedText": "short extracted instruction text",
-  "plainExplanation": "very short, direct explanation for user",
+  "extractedText": "clean concise extracted instruction text",
+  "plainExplanation": "short plain-language explanation",
+  "structured": {
+    "indications": ["..."],
+    "dosage": ["..."],
+    "contraindications": ["..."],
+    "side_effects": ["..."],
+    "interactions": ["..."],
+    "warnings": ["..."],
+    "storage": ["..."],
+    "pregnancy": ["..."],
+    "children": ["..."],
+    "overdose": ["..."],
+    "missed_dose": ["..."]
+  },
   "warnings": ["warning 1", "warning 2"],
-  "answer": "short, direct answer to user question if provided"
+  "answer": "2-4 short sentences max; include critical warnings if relevant"
 }
-Never diagnose. Encourage doctor/pharmacist consultation for uncertainty.
-Be concise and strictly to the point. Prefer 1-3 short sentences for "answer".
+Never diagnose.
+Keep text clean and compact.
+If a critical safety warning appears, include it clearly.
 Language: ${language}`,
-          },
-          {
-            role: "user",
-            content: `Instruction image (base64 data URL, truncated): ${truncatedImage}\n\nUser question: ${safeQuestion || "No specific question. Summarize instruction."}`,
-          },
-        ],
-      });
+            },
+            {
+              role: "user",
+              content: `Instruction image (base64 data URL, truncated): ${truncatedImage}\n\nUser question: ${safeQuestion || "No specific question. Summarize instruction."}`,
+            },
+          ],
+        });
 
-      const data = parsed || parseJsonSafe(text) || {};
+        const data = parsed || parseJsonSafe(text) || {};
+        extractedText = normalizeInstructionText(data.extractedText || text || "", 2500);
+        plainExplanation = normalizeInstructionText(data.plainExplanation || "", 600);
+        structured = normalizeInstructionStructured(data.structured || {});
+        warnings = normalizeInstructionList(
+          Array.isArray(data.warnings) ? data.warnings : structured.warnings,
+          10,
+          220,
+        );
+        directAnswer = normalizeInstructionText(data.answer || "", 700);
+
+        if (medicine) {
+          medicine.instruction_images = Array.isArray(medicine.instruction_images)
+            ? medicine.instruction_images
+            : [];
+          medicine.instruction_images.push({
+            id: nanoid(),
+            created_at: new Date().toISOString(),
+            image_data_url: safeImage,
+            extracted_text: extractedText,
+            structured,
+          });
+          medicine.instruction_images = medicine.instruction_images.slice(-20);
+        }
+      }
+
+      const latestFromStorage =
+        medicine && Array.isArray(medicine.instruction_images) && medicine.instruction_images.length > 0
+          ? medicine.instruction_images[medicine.instruction_images.length - 1]
+          : null;
+
+      if (!extractedText && latestFromStorage) {
+        extractedText = normalizeInstructionText(latestFromStorage.extracted_text || "");
+      }
+      if (!plainExplanation && latestFromStorage) {
+        plainExplanation = normalizeInstructionText(latestFromStorage.extracted_text || "", 500);
+      }
+      if (warnings.length === 0 && latestFromStorage) {
+        warnings = normalizeInstructionList(latestFromStorage.structured?.warnings || [], 10, 220);
+      }
+
+      let answer = directAnswer;
+      if (safeQuestion || !answer) {
+        const contextBlock = [
+          existingContext ? `Stored instruction context:\n${existingContext}` : "",
+          extractedText ? `Latest extracted text:\n${extractedText.slice(0, 3000)}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+        const { parsed: answerParsed, text: answerText } = await makeSupabaseChatRequest({
+          model: "google/gemini-3-flash-preview",
+          stream: false,
+          messages: [
+            {
+              role: "system",
+              content: `You are a strict medicine instruction assistant.
+Answer in 1-2 very short sentences maximum.
+Use very simple words so a 5-year-old can understand.
+Be concise and safety-first.
+If there are critical warnings in context relevant to the question, include them explicitly.
+Return ONLY JSON: {"answer":"...","criticalWarnings":["..."]}.
+Never diagnose.`,
+            },
+            {
+              role: "user",
+              content: `Question: ${safeQuestion || "Summarize key safe usage points."}\n\n${contextBlock || "No instruction context available."}`,
+            },
+          ],
+        });
+        const answerData = answerParsed || parseJsonSafe(answerText) || {};
+        answer = normalizeInstructionText(answerData.answer || answerText || "", 700);
+        const criticalWarnings = normalizeInstructionList(answerData.criticalWarnings || [], 3, 220);
+        warnings = [...new Set([...warnings, ...criticalWarnings])].slice(0, 3);
+      }
+      answer = enforceVerySimpleAnswer(answer, warnings, language);
+      plainExplanation = enforceVerySimpleAnswer(plainExplanation, warnings, language);
+
+      if (medicine && safeImage) {
+        await persistDb();
+      }
+
       return res.json({
-        extractedText: sanitizeText(String(data.extractedText || text || "")).slice(0, 5000),
-        plainExplanation: sanitizeText(String(data.plainExplanation || "")).slice(0, 2000),
-        warnings: Array.isArray(data.warnings)
-          ? data.warnings.map((item) => sanitizeText(String(item)).slice(0, 220)).slice(0, 8)
-          : [],
-        answer: sanitizeText(String(data.answer || "")).slice(0, 500),
+        extractedText,
+        plainExplanation,
+        structured,
+        warnings,
+        answer,
+        imagesStored: medicine ? (medicine.instruction_images || []).length : 0,
       });
     } catch (error) {
       console.error("Medicine instruction scan failed", error);

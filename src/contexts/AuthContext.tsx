@@ -4,9 +4,10 @@ import { AuthContext, type AuthUser } from "./auth-context";
 import type { RegistrationProfileInput } from "./auth-context";
 
 interface SignResponse {
-  user: AuthUser;
-  token: string;
+  user?: AuthUser;
+  token?: string;
   two_factor_required?: boolean;
+  email_verification_required?: boolean;
   challenge_id?: string;
   debug_code?: string;
 }
@@ -53,10 +54,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: { email, password, displayName, role, profile },
         skipAuth: true,
       });
-      storeToken(payload.token);
-      setToken(payload.token);
-      setUser(payload.user);
-      return { error: null };
+      if (payload.email_verification_required) {
+        return {
+          error: null,
+          emailVerificationRequired: true,
+          challengeId: payload.challenge_id || null,
+          debugCode: payload.debug_code || null,
+        };
+      }
+      if (payload.user && payload.token) {
+        storeToken(payload.token);
+        setToken(payload.token);
+        setUser(payload.user);
+        return { error: null };
+      }
+      return { error: "Registration response is invalid" };
     } catch (error) {
       return { error: error instanceof Error ? error.message : "Registration failed" };
     }
@@ -73,16 +85,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return {
           error: null,
           twoFactorRequired: true,
+          emailVerificationRequired: false,
           challengeId: payload.challenge_id || null,
           debugCode: payload.debug_code || null,
         };
+      }
+      if (payload.email_verification_required) {
+        return {
+          error: null,
+          twoFactorRequired: false,
+          emailVerificationRequired: true,
+          challengeId: payload.challenge_id || null,
+          debugCode: payload.debug_code || null,
+        };
+      }
+      if (payload.user && payload.token) {
+        storeToken(payload.token);
+        setToken(payload.token);
+        setUser(payload.user);
+        return { error: null, twoFactorRequired: false, emailVerificationRequired: false, challengeId: null, debugCode: null };
+      }
+      return { error: "Login response is invalid", twoFactorRequired: false, emailVerificationRequired: false, challengeId: null, debugCode: null };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : "Sign in failed", twoFactorRequired: false, emailVerificationRequired: false, challengeId: null, debugCode: null };
+    }
+  };
+
+  const signInWithGoogle = async (idToken: string) => {
+    try {
+      const payload = await apiFetch<SignResponse>("/auth/google", {
+        method: "POST",
+        body: { id_token: idToken },
+        skipAuth: true,
+      });
+      if (payload.two_factor_required) {
+        return {
+          error: null,
+          twoFactorRequired: true,
+          challengeId: payload.challenge_id || null,
+          debugCode: payload.debug_code || null,
+        };
+      }
+      if (!payload.user || !payload.token) {
+        return { error: "Google sign in response is invalid", twoFactorRequired: false, challengeId: null, debugCode: null };
       }
       storeToken(payload.token);
       setToken(payload.token);
       setUser(payload.user);
       return { error: null, twoFactorRequired: false, challengeId: null, debugCode: null };
     } catch (error) {
-      return { error: error instanceof Error ? error.message : "Sign in failed", twoFactorRequired: false, challengeId: null, debugCode: null };
+      return { error: error instanceof Error ? error.message : "Google sign in failed", twoFactorRequired: false, challengeId: null, debugCode: null };
     }
   };
 
@@ -93,6 +145,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: { challenge_id: challengeId, code },
         skipAuth: true,
       });
+      if (!payload.user || !payload.token) {
+        return { error: "2FA verification response is invalid" };
+      }
       storeToken(payload.token);
       setToken(payload.token);
       setUser(payload.user);
@@ -112,6 +167,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null, debugCode: payload.debug_code || null };
     } catch (error) {
       return { error: error instanceof Error ? error.message : "Failed to resend 2FA code", debugCode: null };
+    }
+  };
+
+  const verifyEmailVerificationCode = async (
+    code: string,
+    options?: { challengeId?: string | null; email?: string | null },
+  ) => {
+    try {
+      const payload = await apiFetch<SignResponse>("/auth/email-verification/verify", {
+        method: "POST",
+        body: {
+          challenge_id: options?.challengeId || undefined,
+          email: options?.email || undefined,
+          code,
+        },
+        skipAuth: true,
+      });
+      if (!payload.user || !payload.token) {
+        return { error: "Verification response is invalid" };
+      }
+      storeToken(payload.token);
+      setToken(payload.token);
+      setUser(payload.user);
+      return { error: null };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : "Email verification failed" };
+    }
+  };
+
+  const resendEmailVerificationCode = async (options?: { challengeId?: string | null; email?: string | null }) => {
+    try {
+      const payload = await apiFetch<{ challenge_id?: string; debug_code?: string }>("/auth/email-verification/resend", {
+        method: "POST",
+        body: {
+          challenge_id: options?.challengeId || undefined,
+          email: options?.email || undefined,
+        },
+        skipAuth: true,
+      });
+      return {
+        error: null,
+        challengeId: payload.challenge_id || null,
+        debugCode: payload.debug_code || null,
+      };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : "Failed to resend verification code", challengeId: null, debugCode: null };
     }
   };
 
@@ -164,7 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, verifyTwoFactor, resendTwoFactorLoginCode, requestTwoFactorEnable, confirmTwoFactorEnable, disableTwoFactor, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signUp, signIn, signInWithGoogle, verifyTwoFactor, resendTwoFactorLoginCode, verifyEmailVerificationCode, resendEmailVerificationCode, requestTwoFactorEnable, confirmTwoFactorEnable, disableTwoFactor, signOut }}>
       {children}
     </AuthContext.Provider>
   );

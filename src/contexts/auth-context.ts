@@ -27,6 +27,7 @@ export type AuthUser = {
   doctor_application_status?: "pending" | "approved" | "rejected" | null;
   doctor_verified?: boolean;
   two_factor_enabled?: boolean;
+  email_verified?: boolean;
 };
 
 export interface AuthContextType {
@@ -38,8 +39,20 @@ export interface AuthContextType {
     displayName?: string,
     role?: "user" | "doctor",
     profile?: RegistrationProfileInput,
-  ) => Promise<{ error: string | null }>;
+  ) => Promise<{
+    error: string | null;
+    emailVerificationRequired?: boolean;
+    challengeId?: string | null;
+    debugCode?: string | null;
+  }>;
   signIn: (email: string, password: string) => Promise<{
+    error: string | null;
+    twoFactorRequired?: boolean;
+    emailVerificationRequired?: boolean;
+    challengeId?: string | null;
+    debugCode?: string | null;
+  }>;
+  signInWithGoogle: (idToken: string) => Promise<{
     error: string | null;
     twoFactorRequired?: boolean;
     challengeId?: string | null;
@@ -47,6 +60,13 @@ export interface AuthContextType {
   }>;
   verifyTwoFactor: (challengeId: string, code: string) => Promise<{ error: string | null }>;
   resendTwoFactorLoginCode: (challengeId: string) => Promise<{ error: string | null; debugCode?: string | null }>;
+  verifyEmailVerificationCode: (
+    code: string,
+    options?: { challengeId?: string | null; email?: string | null }
+  ) => Promise<{ error: string | null }>;
+  resendEmailVerificationCode: (
+    options?: { challengeId?: string | null; email?: string | null }
+  ) => Promise<{ error: string | null; challengeId?: string | null; debugCode?: string | null }>;
   requestTwoFactorEnable: () => Promise<{ error: string | null; challengeId?: string | null; debugCode?: string | null }>;
   confirmTwoFactorEnable: (challengeId: string, code: string) => Promise<{ error: string | null }>;
   disableTwoFactor: () => Promise<{ error: string | null }>;

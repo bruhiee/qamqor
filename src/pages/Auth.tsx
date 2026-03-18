@@ -1,4 +1,5 @@
 ﻿import { useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,12 @@ export default function Auth() {
   const [pendingChallengeId, setPendingChallengeId] = useState<string | null>(null);
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [debugTwoFactorCode, setDebugTwoFactorCode] = useState<string | null>(null);
+  const [pendingEmailChallengeId, setPendingEmailChallengeId] = useState<string | null>(null);
+  const [emailVerificationCode, setEmailVerificationCode] = useState('');
+  const [debugEmailVerificationCode, setDebugEmailVerificationCode] = useState<string | null>(null);
+  const [emailForVerification, setEmailForVerification] = useState('');
+  const [manualEmailVerificationMode, setManualEmailVerificationMode] = useState(false);
+  const [pendingDoctorApplication, setPendingDoctorApplication] = useState<Record<string, unknown> | null>(null);
   
   // Registration flow
   const [registrationStep, setRegistrationStep] = useState<RegistrationStep>('credentials');
@@ -63,10 +70,13 @@ export default function Auth() {
     lifestyle_factors: [],
   });
   
-  const { signUp, signIn, verifyTwoFactor, resendTwoFactorLoginCode } = useAuth();
+  const { signUp, signIn, signInWithGoogle, verifyTwoFactor, resendTwoFactorLoginCode, verifyEmailVerificationCode, resendEmailVerificationCode } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
+  const EMAIL_VERIFICATION_STORAGE_KEY = "qamqor_pending_email_verification";
 
   const specializations = [
     { value: 'general', label: t.generalPractitioner },
@@ -100,6 +110,43 @@ export default function Auth() {
     }));
   };
 
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(EMAIL_VERIFICATION_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { challengeId?: string; email?: string };
+      if (parsed?.challengeId) {
+        setPendingEmailChallengeId(parsed.challengeId);
+      }
+      if (parsed?.email) {
+        setEmailForVerification(parsed.email);
+      }
+      if (parsed?.challengeId || parsed?.email) {
+        setManualEmailVerificationMode(true);
+      }
+    } catch {
+      // Ignore broken localStorage payloads.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (!pendingEmailChallengeId && !emailForVerification) {
+        window.localStorage.removeItem(EMAIL_VERIFICATION_STORAGE_KEY);
+        return;
+      }
+      window.localStorage.setItem(
+        EMAIL_VERIFICATION_STORAGE_KEY,
+        JSON.stringify({
+          challengeId: pendingEmailChallengeId,
+          email: emailForVerification || email,
+        }),
+      );
+    } catch {
+      // Ignore localStorage write errors.
+    }
+  }, [pendingEmailChallengeId, emailForVerification, email]);
+
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -125,14 +172,30 @@ export default function Auth() {
       // Sign in directly
       setLoading(true);
       try {
-        const { error, twoFactorRequired, challengeId, debugCode } = await signIn(email, password);
+        const { error, twoFactorRequired, emailVerificationRequired, challengeId, debugCode } = await signIn(email, password);
         if (error) {
           toast({
             variant: 'destructive',
             title: t.error,
             description: error,
           });
+        } else if (emailVerificationRequired && challengeId) {
+          setPendingChallengeId(null);
+          setTwoFactorCode('');
+          setDebugTwoFactorCode(null);
+          setPendingEmailChallengeId(challengeId);
+          setEmailForVerification(email);
+          setManualEmailVerificationMode(true);
+          setDebugEmailVerificationCode(debugCode || null);
+          toast({
+            title: 'Email Verification',
+            description: 'Enter the verification code sent to your email.',
+          });
         } else if (twoFactorRequired && challengeId) {
+          setPendingEmailChallengeId(null);
+          setEmailVerificationCode('');
+          setDebugEmailVerificationCode(null);
+          setManualEmailVerificationMode(false);
           setPendingChallengeId(challengeId);
           setDebugTwoFactorCode(debugCode || null);
           toast({
@@ -210,10 +273,43 @@ export default function Auth() {
     }
   };
 
+  const buildDoctorApplicationPayload = () => ({
+    fullName: doctorForm.fullName || displayName,
+    specialization: doctorForm.specialization,
+    licenseNumber: doctorForm.licenseNumber || null,
+    bio: doctorForm.bio || null,
+    country: doctorForm.country,
+    region: doctorForm.region || null,
+    yearsOfExperience: doctorForm.yearsOfExperience
+      ? parseInt(doctorForm.yearsOfExperience, 10)
+      : null,
+    workplace: doctorForm.workplace || null,
+  });
+
+  const submitDoctorApplication = async (payload: Record<string, unknown>) => {
+    try {
+      await apiFetch("/doctor-applications", {
+        method: "POST",
+        body: payload,
+      });
+      toast({
+        title: t.success,
+        description: t.applicationSubmitted,
+      });
+    } catch (applicationError) {
+      console.error("Doctor application error:", applicationError);
+      toast({
+        variant: "destructive",
+        title: t.error,
+        description: (applicationError as Error).message || t.errorOccurred,
+      });
+    }
+  };
+
   const completeRegistration = async (role: 'user' | 'doctor') => {
     setLoading(true);
     try {
-      const { error } = await signUp(email, password, displayName, role, {
+      const { error, emailVerificationRequired, challengeId, debugCode } = await signUp(email, password, displayName, role, {
         age: registrationProfile.age ? Number(registrationProfile.age) : null,
         gender: registrationProfile.gender || null,
         city: registrationProfile.city || null,
@@ -236,42 +332,31 @@ export default function Auth() {
         return;
       }
 
-      // If doctor, submit application after signup
-      if (role === 'doctor') {
-        try {
-          await apiFetch("/doctor-applications", {
-            method: "POST",
-            body: {
-              fullName: doctorForm.fullName || displayName,
-              specialization: doctorForm.specialization,
-              licenseNumber: doctorForm.licenseNumber || null,
-              bio: doctorForm.bio || null,
-              country: doctorForm.country,
-              region: doctorForm.region || null,
-              yearsOfExperience: doctorForm.yearsOfExperience
-                ? parseInt(doctorForm.yearsOfExperience, 10)
-                : null,
-              workplace: doctorForm.workplace || null,
-            },
-          });
-        } catch (applicationError) {
-          console.error("Doctor application error:", applicationError);
-          toast({
-            variant: "destructive",
-            title: t.error,
-            description: (applicationError as Error).message || t.errorOccurred,
-          });
+      if (emailVerificationRequired && challengeId) {
+        setPendingChallengeId(null);
+        setTwoFactorCode('');
+        setDebugTwoFactorCode(null);
+        if (role === "doctor") {
+          setPendingDoctorApplication(buildDoctorApplicationPayload());
+        } else {
+          setPendingDoctorApplication(null);
         }
+        setPendingEmailChallengeId(challengeId);
+        setEmailForVerification(email);
+        setManualEmailVerificationMode(true);
+        setDebugEmailVerificationCode(debugCode || null);
+        setRegistrationStep('credentials');
+        setSelectedRole('user');
+        setIsSignUp(false);
+        toast({
+          title: "Verify your email",
+          description: "Enter the verification code sent to your email to complete registration.",
+        });
+        return;
+      }
 
-        toast({
-          title: t.success,
-          description: t.applicationSubmitted + ' ' + t.checkEmailVerification,
-        });
-      } else {
-        toast({
-          title: t.success,
-          description: t.checkEmailVerification,
-        });
+      if (role === 'doctor') {
+        await submitDoctorApplication(buildDoctorApplicationPayload());
       }
 
       // Reset form
@@ -288,6 +373,7 @@ export default function Auth() {
         allergiesRaw: "",
         lifestyle_factors: [],
       });
+      setPendingDoctorApplication(null);
     } catch {
       toast({
         variant: 'destructive',
@@ -303,6 +389,183 @@ export default function Auth() {
     e.preventDefault();
     completeRegistration('doctor');
   };
+
+  const handleVerifyEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailVerificationCode.trim()) return;
+    setLoading(true);
+    try {
+      const { error } = await verifyEmailVerificationCode(emailVerificationCode.trim(), {
+        challengeId: pendingEmailChallengeId,
+        email: emailForVerification || email,
+      });
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: t.error,
+          description: error,
+        });
+        return;
+      }
+      if (pendingDoctorApplication) {
+        await submitDoctorApplication(pendingDoctorApplication);
+      }
+      setPendingEmailChallengeId(null);
+      setEmailVerificationCode('');
+      setDebugEmailVerificationCode(null);
+      setManualEmailVerificationMode(false);
+      setEmailForVerification('');
+      setPendingDoctorApplication(null);
+      setDisplayName('');
+      setEmail('');
+      setPassword('');
+      setDoctorForm({
+        fullName: '',
+        specialization: '',
+        licenseNumber: '',
+        bio: '',
+        country: '',
+        region: '',
+        yearsOfExperience: '',
+        workplace: '',
+      });
+      setRegistrationProfile({
+        age: "",
+        gender: "",
+        city: "",
+        height_cm: "",
+        weight_kg: "",
+        additional_info: "",
+        allergiesRaw: "",
+        lifestyle_factors: [],
+      });
+      navigate('/');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendEmailVerification = async () => {
+    if (!pendingEmailChallengeId && !(emailForVerification || email)) return;
+    setLoading(true);
+    try {
+      const { error, challengeId, debugCode } = await resendEmailVerificationCode({
+        challengeId: pendingEmailChallengeId,
+        email: emailForVerification || email,
+      });
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: t.error,
+          description: error,
+        });
+        return;
+      }
+      if (challengeId) {
+        setPendingEmailChallengeId(challengeId);
+      }
+      setDebugEmailVerificationCode(debugCode || null);
+      toast({
+        title: 'Code resent',
+        description: 'A new verification code has been sent to your email.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const shouldShowGoogle =
+      registrationStep === 'credentials' &&
+      !pendingChallengeId &&
+      !pendingEmailChallengeId &&
+      !manualEmailVerificationMode &&
+      !isSignUp &&
+      Boolean(googleClientId);
+    if (!shouldShowGoogle || !googleButtonRef.current) return;
+
+    let cancelled = false;
+
+    const onGoogleCredential = async (response: { credential?: string }) => {
+      const credential = response?.credential;
+      if (!credential) {
+        toast({
+          variant: 'destructive',
+          title: t.error,
+          description: 'Google credential is missing.',
+        });
+        return;
+      }
+      setLoading(true);
+      const result = await signInWithGoogle(credential);
+      setLoading(false);
+      if (result.error) {
+        toast({
+          variant: 'destructive',
+          title: t.error,
+          description: result.error,
+        });
+        return;
+      }
+      if (result.twoFactorRequired && result.challengeId) {
+        setPendingChallengeId(result.challengeId);
+        setDebugTwoFactorCode(result.debugCode || null);
+        toast({
+          title: 'Two-Factor Authentication',
+          description: 'Enter the verification code sent to your email.',
+        });
+        return;
+      }
+      navigate('/');
+    };
+
+    const renderGoogleButton = () => {
+      if (cancelled || !googleButtonRef.current) return;
+      const google = (window as Window & { google?: any }).google;
+      if (!google?.accounts?.id) return;
+      google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: onGoogleCredential,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+      googleButtonRef.current.innerHTML = '';
+      google.accounts.id.renderButton(googleButtonRef.current, {
+        type: 'standard',
+        theme: 'outline',
+        size: 'large',
+        shape: 'pill',
+        text: 'continue_with',
+        width: 320,
+      });
+    };
+
+    const existingScript = document.querySelector('script[data-google-identity="true"]') as HTMLScriptElement | null;
+    if (existingScript) {
+      if ((window as Window & { google?: any }).google?.accounts?.id) {
+        renderGoogleButton();
+      } else {
+        existingScript.addEventListener('load', renderGoogleButton, { once: true });
+      }
+      return () => {
+        cancelled = true;
+        existingScript.removeEventListener('load', renderGoogleButton);
+      };
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.setAttribute('data-google-identity', 'true');
+    script.onload = renderGoogleButton;
+    document.head.appendChild(script);
+
+    return () => {
+      cancelled = true;
+      script.onload = null;
+    };
+  }, [registrationStep, pendingChallengeId, pendingEmailChallengeId, manualEmailVerificationMode, isSignUp, googleClientId, signInWithGoogle, navigate, t.error, toast]);
 
   const renderCredentialsForm = () => (
     <form onSubmit={handleCredentialsSubmit} className="space-y-4">
@@ -479,6 +742,41 @@ export default function Auth() {
         {loading ? t.loading : isSignUp ? t.next : t.signIn}
         {isSignUp && <ChevronRight className="w-4 h-4 ml-2" />}
       </Button>
+
+      {!isSignUp && (
+        <div className="space-y-3">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
+          {googleClientId ? (
+            <div className="flex justify-center">
+              <div ref={googleButtonRef} />
+            </div>
+          ) : (
+            <p className="text-center text-xs text-muted-foreground">
+              Google sign-in is not configured (`VITE_GOOGLE_CLIENT_ID` missing).
+            </p>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={() => {
+              setManualEmailVerificationMode(true);
+              setPendingEmailChallengeId(null);
+              setPendingChallengeId(null);
+              setEmailForVerification((prev) => prev || email);
+            }}
+          >
+            I already have a verification code
+          </Button>
+        </div>
+      )}
     </form>
   );
 
@@ -519,6 +817,64 @@ export default function Auth() {
           setPendingChallengeId(null);
           setTwoFactorCode('');
           setDebugTwoFactorCode(null);
+        }}
+      >
+        Back to Sign In
+      </Button>
+    </form>
+  );
+
+  const renderEmailVerificationForm = () => (
+    <form onSubmit={handleVerifyEmail} className="space-y-4">
+      <div>
+        <Label htmlFor="emailForVerification">Email</Label>
+        <Input
+          id="emailForVerification"
+          type="email"
+          value={emailForVerification}
+          onChange={(e) => setEmailForVerification(e.target.value)}
+          placeholder="you@example.com"
+          required
+        />
+      </div>
+      <div>
+        <Label htmlFor="emailVerificationCode">Email verification code</Label>
+        <Input
+          id="emailVerificationCode"
+          type="text"
+          value={emailVerificationCode}
+          onChange={(e) => setEmailVerificationCode(e.target.value)}
+          placeholder="6-digit code"
+          maxLength={6}
+          required
+        />
+        {debugEmailVerificationCode && (
+          <p className="text-xs text-warning mt-2">Debug code: {debugEmailVerificationCode}</p>
+        )}
+      </div>
+      <Button type="submit" className="w-full medical-gradient" disabled={loading}>
+        {loading ? t.loading : 'Verify email'}
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full"
+        onClick={handleResendEmailVerification}
+        disabled={loading}
+      >
+        Resend code
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        className="w-full"
+        onClick={() => {
+          setPendingEmailChallengeId(null);
+          setEmailVerificationCode('');
+          setDebugEmailVerificationCode(null);
+          setEmailForVerification('');
+          setManualEmailVerificationMode(false);
+          setPendingDoctorApplication(null);
         }}
       >
         Back to Sign In
@@ -751,6 +1107,8 @@ export default function Auth() {
             <h1 className="font-display text-2xl font-bold">
               {registrationStep === 'doctor-form' 
                 ? t.doctorApplication 
+                : (pendingEmailChallengeId || manualEmailVerificationMode)
+                  ? 'Verify Email'
                 : isSignUp 
                   ? t.signUp 
                   : t.signIn}
@@ -768,14 +1126,15 @@ export default function Auth() {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
             >
-              {registrationStep === 'credentials' && !pendingChallengeId && renderCredentialsForm()}
+              {registrationStep === 'credentials' && !pendingChallengeId && !pendingEmailChallengeId && !manualEmailVerificationMode && renderCredentialsForm()}
+              {registrationStep === 'credentials' && (pendingEmailChallengeId || manualEmailVerificationMode) && renderEmailVerificationForm()}
               {registrationStep === 'credentials' && pendingChallengeId && renderTwoFactorForm()}
               {registrationStep === 'role-selection' && renderRoleSelection()}
               {registrationStep === 'doctor-form' && renderDoctorForm()}
             </motion.div>
           </AnimatePresence>
 
-          {registrationStep === 'credentials' && !pendingChallengeId && (
+          {registrationStep === 'credentials' && !pendingChallengeId && !pendingEmailChallengeId && !manualEmailVerificationMode && (
             <div className="mt-6 text-center">
               <button
                 type="button"
@@ -783,6 +1142,14 @@ export default function Auth() {
                   setIsSignUp(!isSignUp);
                   setRegistrationStep('credentials');
                   setPendingChallengeId(null);
+                  setTwoFactorCode('');
+                  setDebugTwoFactorCode(null);
+                  setPendingEmailChallengeId(null);
+                  setEmailVerificationCode('');
+                  setDebugEmailVerificationCode(null);
+                  setEmailForVerification('');
+                  setManualEmailVerificationMode(false);
+                  setPendingDoctorApplication(null);
                 }}
                 className="text-sm text-primary hover:underline"
               >

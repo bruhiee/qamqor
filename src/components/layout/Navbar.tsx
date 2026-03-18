@@ -17,7 +17,6 @@ import {
   Users,
   Shield,
   Bookmark,
-  GraduationCap,
   Sun,
   Moon,
 } from "lucide-react";
@@ -153,10 +152,6 @@ export function Navbar() {
                   <DropdownMenuItem onClick={() => navigate('/bookmarks')}>
                     <Bookmark className="w-4 h-4 mr-2" />
                     Bookmarks
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/tutorial')}>
-                    <GraduationCap className="w-4 h-4 mr-2" />
-                    Tutorial
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {isAdmin() && (
