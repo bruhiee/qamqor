@@ -130,6 +130,28 @@
       "banned": false,
       "two_factor_enabled": false,
       "requested_role": "user"
+    },
+    {
+      "id": "qiqGLhTfGTlM35uYK94H0",
+      "email": "ljojoj@jhiuh.com",
+      "displayName": "kk,jbjkhb",
+      "passwordHash": "$2a$10$8duAv3E2kM4Nuz/e4m0mZuJkQ9SM2p52V/M5r.moiQjC.m9BhqWze",
+      "roles": [
+        "user"
+      ],
+      "user_metadata": {
+        "display_name": "kk,jbjkhb"
+      },
+      "app_metadata": {
+        "provider": "email",
+        "roles": [
+          "user"
+        ]
+      },
+      "created_at": "2026-03-18T06:50:57.947Z",
+      "banned": false,
+      "two_factor_enabled": false,
+      "requested_role": "doctor"
     }
   ],
   "doctor_applications": [
@@ -180,6 +202,23 @@
       "workplace": "fsdf",
       "status": "pending",
       "submitted_at": "2026-03-12T09:12:17.910Z",
+      "reviewed_at": null,
+      "reviewed_by": null,
+      "review_note": null
+    },
+    {
+      "id": "cpOvCmJSTxqWAZ8tjod6h",
+      "user_id": "qiqGLhTfGTlM35uYK94H0",
+      "full_name": ",knkj",
+      "specialization": "cardiologist",
+      "license_number": "99-995567",
+      "bio": "oiyu",
+      "country": "lkj",
+      "region": "kih",
+      "years_of_experience": 9,
+      "workplace": "kugh",
+      "status": "pending",
+      "submitted_at": "2026-03-18T06:50:57.974Z",
       "reviewed_at": null,
       "reviewed_by": null,
       "review_note": null
@@ -238,7 +277,7 @@
       "user_id": "wE3IwfanCIXIiGScmeRHV",
       "created_at": "2026-02-12T14:33:59.611Z",
       "status": "answered",
-      "views_count": 10,
+      "views_count": 11,
       "replies_count": 1,
       "title": "i have headache doctors help me",
       "content": "ive been ill for like 40 days by now ",
@@ -886,6 +925,29 @@
       "medications": [],
       "notes": null,
       "updated_at": "2026-03-16T06:51:28.001Z"
+    },
+    {
+      "id": "s1IUdThcMLwikBBz29-LR",
+      "user_id": "qiqGLhTfGTlM35uYK94H0",
+      "age": 24,
+      "gender": "male",
+      "city": "lih",
+      "height_cm": 259,
+      "weight_kg": 99,
+      "additional_info": "kuig",
+      "emergency_contact_name": null,
+      "emergency_contact_phone": null,
+      "blood_type": null,
+      "allergies": [
+        "khg"
+      ],
+      "lifestyle_factors": [
+        "Alcohol"
+      ],
+      "chronic_conditions": [],
+      "medications": [],
+      "notes": null,
+      "updated_at": "2026-03-18T06:50:57.947Z"
     }
   ],
   "bookmarks": [],
