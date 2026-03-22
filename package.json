@@ -17,7 +17,7 @@
     "server:webhook": "node server/email-webhook.js",
     "server": "node server/run-server.js",
     "webhook:email": "npm run server:webhook",
-    "dev:all": "npm run server && npm run dev:client",
+    "dev:all": "concurrently -k -n server,client \"npm run server\" \"npm run dev:client\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "prebuild": "node -e \"const v=require('esbuild/package.json').version; require('child_process').execSync('npm i --no-save --include=optional @esbuild/linux-x64@'+v,{stdio:'inherit'})\""

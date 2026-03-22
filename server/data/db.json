@@ -85,7 +85,24 @@
   "clinical_cases": [],
   "case_collections": [],
   "ai_chat_evaluations": [],
-  "ai_chat_sessions": [],
+  "ai_chat_sessions": [
+    {
+      "id": "5crxoFD-NqeBE0rPdG8pH",
+      "question": "привет",
+      "keywords": [
+        "привет"
+      ],
+      "language": "en",
+      "mode": "triage",
+      "response_summary": "Hello! I am your Qamqor health assistant. How are you feeling today? Please describe any symptoms or health concerns you have so I can provide you with a structured safety report.",
+      "triage_score": 1,
+      "human_review_flag": true,
+      "anonymized_symptoms": [
+        "привет"
+      ],
+      "created_at": "2026-03-22T10:00:48.965Z"
+    }
+  ],
   "ai_chat_histories": [],
   "doctor_reply_training_samples": [],
   "two_factor_challenges": [],

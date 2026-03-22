@@ -130,7 +130,7 @@ export function NavigationAssistant() {
   const { language, t } = useLanguage();
   const ui = textByLanguage[language];
   const navItems = useMemo(() => buildNavItems(t), [t]);
-  const hiddenOnRoutes = ["/auth"];
+  const hiddenOnRoutes = ["/auth", "/consultant", "/doctor-workplace"];
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -298,4 +298,3 @@ export function NavigationAssistant() {
     </div>
   );
 }
-

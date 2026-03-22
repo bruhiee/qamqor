@@ -239,7 +239,8 @@ const SYMPTOM_KEYWORDS = [
 const POST_PENDING_STATUS = "pending";
 const POST_VISIBLE_STATUS = "open";
 const POST_REJECTED_STATUS = "rejected";
-const FORUM_POST_COOLDOWN_MS = 10 * 60 * 1000;
+const FORUM_POST_COOLDOWN_MS = 5 * 60 * 1000;
+const forumPostCreationLocks = new Set();
 const HIDDEN_FORUM_STATUSES = new Set([POST_PENDING_STATUS, "flagged", POST_REJECTED_STATUS]);
 const REPLY_PENDING_STATUS = "pending";
 const REPLY_VISIBLE_STATUS = "open";
@@ -2722,111 +2723,122 @@ Keep it factual. No diagnosis. Language: ${language}.`,
   });
 
   app.post("/api/forum/posts", requireAuth, async (req, res) => {
-    const latestUserPost = [...db.forum_posts]
-      .filter((post) => post.user_id === req.user.id)
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
-    if (latestUserPost?.created_at) {
-      const elapsedMs = Date.now() - new Date(latestUserPost.created_at).getTime();
-      if (elapsedMs < FORUM_POST_COOLDOWN_MS) {
-        const retryAfterMs = FORUM_POST_COOLDOWN_MS - elapsedMs;
-        const retryAfterSeconds = Math.ceil(retryAfterMs / 1000);
-        const retryAfterMinutes = Math.ceil(retryAfterMs / 60000);
-        return res.status(429).json({
-          message: `You can create the next forum question in ${retryAfterMinutes} minute(s).`,
-          retry_after_seconds: retryAfterSeconds,
-          next_allowed_at: new Date(Date.now() + retryAfterMs).toISOString(),
-        });
-      }
-    }
-
-    const cleaned = sanitizeRequestBody(req.body);
-    const problemCategory = sanitizeText(String(cleaned.problem_category || "")).toLowerCase().trim().slice(0, 80);
-    const ageGroup = sanitizeText(String(cleaned.age_group || "")).toLowerCase().trim().slice(0, 80);
-    const symptomDescription = sanitizeText(String(cleaned.symptom_description || "")).trim().slice(0, 2000);
-    const symptomDuration = sanitizeText(String(cleaned.symptom_duration || "")).trim().slice(0, 400);
-    const additionalDetails = sanitizeText(String(cleaned.additional_details || "")).trim().slice(0, 2500);
-    const symptomTags = Array.isArray(cleaned.symptom_tags)
-      ? cleaned.symptom_tags.map((tag) => sanitizeText(String(tag || "")).toLowerCase().trim().slice(0, 40)).filter(Boolean).slice(0, 12)
-      : [];
-    const photoDataUrl = typeof cleaned.photo_data_url === "string"
-      ? String(cleaned.photo_data_url).slice(0, 1_500_000)
-      : null;
-    const photoLooksValid = !photoDataUrl || /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(photoDataUrl);
-    if (!photoLooksValid) {
-      return res.status(400).json({ message: "Invalid photo format. Use image upload." });
-    }
-    if (!problemCategory) {
-      return res.status(400).json({ message: "Problem category is required" });
-    }
-    if (!ageGroup) {
-      return res.status(400).json({ message: "Age group is required" });
-    }
-
-    const contentFromStructured = [
-      `Category: ${problemCategory}`,
-      symptomDescription ? `Symptoms: ${symptomDescription}` : null,
-      symptomDuration ? `Duration: ${symptomDuration}` : null,
-      `Age group: ${ageGroup}`,
-      symptomTags.length ? `Symptom tags: ${symptomTags.join(", ")}` : null,
-      additionalDetails ? `Additional details: ${additionalDetails}` : null,
-    ].filter(Boolean).join("\n");
-    const normalizedContent = sanitizeText(String(cleaned.content || contentFromStructured)).slice(0, 6000);
-    if (!normalizedContent) {
-      return res.status(400).json({ message: "Content is required" });
-    }
-
-    const topicModeration = await moderateForumTopicWithAI(`${cleaned.title || ""}\n${normalizedContent}`);
-    if (!topicModeration.healthRelated) {
-      return res.status(422).json({
-        message: HEALTH_ONLY_FORUM_MESSAGE,
-        topicModeration,
+    const userId = req.user.id;
+    if (forumPostCreationLocks.has(userId)) {
+      return res.status(429).json({
+        message: "Your previous forum question is still being processed. Please wait a few seconds.",
       });
     }
-    const keywordFlagged = isBodyFlagged({
-      title: cleaned.title || "",
-      content: normalizedContent,
-      symptom_description: symptomDescription,
-      symptom_duration: symptomDuration,
-      additional_details: additionalDetails,
-    });
-    const aiModeration = await moderateForumContentWithAI(`${cleaned.title || ""}\n${normalizedContent}`);
-    const flagged = keywordFlagged || Boolean(aiModeration?.flagged);
-    const postStatus = flagged ? POST_PENDING_STATUS : POST_VISIBLE_STATUS;
-    const post = {
-      id: nanoid(),
-      user_id: req.user.id,
-      created_at: new Date().toISOString(),
-      status: postStatus,
-      ...(flagged ? { statusBeforeModeration: POST_VISIBLE_STATUS } : {}),
-      views_count: 0,
-      replies_count: 0,
-      title: sanitizeText(String(cleaned.title || "Medical question")).slice(0, 160),
-      content: normalizedContent,
-      tags: Array.isArray(cleaned.tags)
-        ? cleaned.tags.map((tag) => sanitizeText(String(tag || "")).toLowerCase().trim().slice(0, 40)).filter(Boolean).slice(0, 12)
-        : [],
-      problem_category: problemCategory,
-      age_group: ageGroup,
-      symptom_tags: symptomTags,
-      photo_data_url: photoDataUrl,
-      is_urgent: Boolean(cleaned.is_urgent),
-      symptom_description: symptomDescription,
-      symptom_duration: symptomDuration || null,
-      additional_details: additionalDetails || null,
-      flagged,
-      moderation: aiModeration
-        ? { source: "ai", ...aiModeration }
-        : keywordFlagged
-          ? { source: "keyword", severity: "low", reasons: ["keyword-match"] }
-          : null,
-    };
-    db.forum_posts.push(post);
-    await persistDb();
-    const responsePayload = { data: post };
-    if (flagged) {
-      responsePayload.warning = MODERATION_WARNING_MESSAGE;
+    forumPostCreationLocks.add(userId);
+    try {
+      const latestUserPost = [...db.forum_posts]
+        .filter((post) => post.user_id === userId)
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+      if (latestUserPost?.created_at) {
+        const elapsedMs = Date.now() - new Date(latestUserPost.created_at).getTime();
+        if (elapsedMs < FORUM_POST_COOLDOWN_MS) {
+          const retryAfterMs = FORUM_POST_COOLDOWN_MS - elapsedMs;
+          const retryAfterSeconds = Math.ceil(retryAfterMs / 1000);
+          const retryAfterMinutes = Math.ceil(retryAfterMs / 60000);
+          return res.status(429).json({
+            message: `You can create the next forum question in ${retryAfterMinutes} minute(s).`,
+            retry_after_seconds: retryAfterSeconds,
+            next_allowed_at: new Date(Date.now() + retryAfterMs).toISOString(),
+          });
+        }
+      }
+
+      const cleaned = sanitizeRequestBody(req.body);
+      const problemCategory = sanitizeText(String(cleaned.problem_category || "")).toLowerCase().trim().slice(0, 80);
+      const ageGroup = sanitizeText(String(cleaned.age_group || "")).toLowerCase().trim().slice(0, 80);
+      const symptomDescription = sanitizeText(String(cleaned.symptom_description || "")).trim().slice(0, 2000);
+      const symptomDuration = sanitizeText(String(cleaned.symptom_duration || "")).trim().slice(0, 400);
+      const additionalDetails = sanitizeText(String(cleaned.additional_details || "")).trim().slice(0, 2500);
+      const symptomTags = Array.isArray(cleaned.symptom_tags)
+        ? cleaned.symptom_tags.map((tag) => sanitizeText(String(tag || "")).toLowerCase().trim().slice(0, 40)).filter(Boolean).slice(0, 12)
+        : [];
+      const photoDataUrl = typeof cleaned.photo_data_url === "string"
+        ? String(cleaned.photo_data_url).slice(0, 1_500_000)
+        : null;
+      const photoLooksValid = !photoDataUrl || /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(photoDataUrl);
+      if (!photoLooksValid) {
+        return res.status(400).json({ message: "Invalid photo format. Use image upload." });
+      }
+      if (!problemCategory) {
+        return res.status(400).json({ message: "Problem category is required" });
+      }
+      if (!ageGroup) {
+        return res.status(400).json({ message: "Age group is required" });
+      }
+
+      const contentFromStructured = [
+        `Category: ${problemCategory}`,
+        symptomDescription ? `Symptoms: ${symptomDescription}` : null,
+        symptomDuration ? `Duration: ${symptomDuration}` : null,
+        `Age group: ${ageGroup}`,
+        symptomTags.length ? `Symptom tags: ${symptomTags.join(", ")}` : null,
+        additionalDetails ? `Additional details: ${additionalDetails}` : null,
+      ].filter(Boolean).join("\n");
+      const normalizedContent = sanitizeText(String(cleaned.content || contentFromStructured)).slice(0, 6000);
+      if (!normalizedContent) {
+        return res.status(400).json({ message: "Content is required" });
+      }
+
+      const topicModeration = await moderateForumTopicWithAI(`${cleaned.title || ""}\n${normalizedContent}`);
+      if (!topicModeration.healthRelated) {
+        return res.status(422).json({
+          message: HEALTH_ONLY_FORUM_MESSAGE,
+          topicModeration,
+        });
+      }
+      const keywordFlagged = isBodyFlagged({
+        title: cleaned.title || "",
+        content: normalizedContent,
+        symptom_description: symptomDescription,
+        symptom_duration: symptomDuration,
+        additional_details: additionalDetails,
+      });
+      const aiModeration = await moderateForumContentWithAI(`${cleaned.title || ""}\n${normalizedContent}`);
+      const flagged = keywordFlagged || Boolean(aiModeration?.flagged);
+      const postStatus = flagged ? POST_PENDING_STATUS : POST_VISIBLE_STATUS;
+      const post = {
+        id: nanoid(),
+        user_id: userId,
+        created_at: new Date().toISOString(),
+        status: postStatus,
+        ...(flagged ? { statusBeforeModeration: POST_VISIBLE_STATUS } : {}),
+        views_count: 0,
+        replies_count: 0,
+        title: sanitizeText(String(cleaned.title || "Medical question")).slice(0, 160),
+        content: normalizedContent,
+        tags: Array.isArray(cleaned.tags)
+          ? cleaned.tags.map((tag) => sanitizeText(String(tag || "")).toLowerCase().trim().slice(0, 40)).filter(Boolean).slice(0, 12)
+          : [],
+        problem_category: problemCategory,
+        age_group: ageGroup,
+        symptom_tags: symptomTags,
+        photo_data_url: photoDataUrl,
+        is_urgent: Boolean(cleaned.is_urgent),
+        symptom_description: symptomDescription,
+        symptom_duration: symptomDuration || null,
+        additional_details: additionalDetails || null,
+        flagged,
+        moderation: aiModeration
+          ? { source: "ai", ...aiModeration }
+          : keywordFlagged
+            ? { source: "keyword", severity: "low", reasons: ["keyword-match"] }
+            : null,
+      };
+      db.forum_posts.push(post);
+      await persistDb();
+      const responsePayload = { data: post };
+      if (flagged) {
+        responsePayload.warning = MODERATION_WARNING_MESSAGE;
+      }
+      return res.status(201).json(responsePayload);
+    } finally {
+      forumPostCreationLocks.delete(userId);
     }
-    return res.status(201).json(responsePayload);
   });
 
   app.post("/api/forum/posts/:postId/replies", requireAuth, async (req, res) => {
@@ -3635,10 +3647,10 @@ Never diagnose.`,
         .find((message) => message.role === "user")?.content || "";
     const sanitizedQuestion = sanitizeText(String(userMessage || "")).trim().slice(0, 400);
     const keywords = extractSignificantWords(userMessage).slice(0, 6);
-    const triage = deriveTriageFromReport(assistantReport, responseText);
+    const triage = isReviewMode ? null : deriveTriageFromReport(assistantReport, responseText);
     const doctorAdvice = assistantReport?.doctorAdvice
       || assistantReport?.whenToSeeDoctor
-      || (triage.triageScore >= 4
+      || (triage?.triageScore >= 4
         ? "Seek urgent medical care and contact emergency services if symptoms worsen."
         : "Consult a doctor if symptoms persist, worsen, or new warning signs appear.");
     const dangerExplanation = assistantReport?.dangerExplanation
@@ -3651,20 +3663,22 @@ Never diagnose.`,
       : Array.isArray(assistantReport?.possibleConditions)
         ? assistantReport.possibleConditions.slice(0, 6)
         : [];
-    const normalizedReport = {
-      riskLevel: assistantReport?.riskLevel || (triage.triageScore >= 4 ? "high" : triage.triageScore >= 3 ? "medium" : "low"),
-      severityScore: triage.triageScore,
-      dangerExplanation: sanitizeText(String(dangerExplanation)).slice(0, 400),
-      assessmentExplanation: sanitizeText(String(dangerExplanation)).slice(0, 400),
-      riskFactors: riskFactors.map((item) => sanitizeText(String(item)).slice(0, 120)),
-      possibleCauses: [],
-      recommendations: Array.isArray(assistantReport?.recommendations)
-        ? assistantReport.recommendations.map((item) => sanitizeText(String(item)).slice(0, 160)).slice(0, 8)
-        : [],
-      doctorAdvice: sanitizeText(String(doctorAdvice)).slice(0, 500),
-      possibleConditions: [],
-      whenToSeeDoctor: sanitizeText(String(assistantReport?.whenToSeeDoctor || doctorAdvice)).slice(0, 500),
-    };
+    const normalizedReport = isReviewMode
+      ? null
+      : {
+          riskLevel: assistantReport?.riskLevel || (triage?.triageScore >= 4 ? "high" : triage?.triageScore >= 3 ? "medium" : "low"),
+          severityScore: triage?.triageScore || 1,
+          dangerExplanation: sanitizeText(String(dangerExplanation)).slice(0, 400),
+          assessmentExplanation: sanitizeText(String(dangerExplanation)).slice(0, 400),
+          riskFactors: riskFactors.map((item) => sanitizeText(String(item)).slice(0, 120)),
+          possibleCauses: [],
+          recommendations: Array.isArray(assistantReport?.recommendations)
+            ? assistantReport.recommendations.map((item) => sanitizeText(String(item)).slice(0, 160)).slice(0, 8)
+            : [],
+          doctorAdvice: sanitizeText(String(doctorAdvice)).slice(0, 500),
+          possibleConditions: [],
+          whenToSeeDoctor: sanitizeText(String(assistantReport?.whenToSeeDoctor || doctorAdvice)).slice(0, 500),
+        };
 
     const normalizedReviewMaker = assistantReviewMaker
       ? {
@@ -3689,19 +3703,19 @@ Never diagnose.`,
         String(assistantSummary?.summaryText || responseText || "Structured consultation summary"),
       ).slice(0, 700),
       dangerExplanation: sanitizeText(
-        String(assistantSummary?.dangerExplanation || normalizedReport.dangerExplanation || ""),
+        String(assistantSummary?.dangerExplanation || normalizedReport?.dangerExplanation || ""),
       ).slice(0, 400),
       riskFactors: Array.isArray(assistantSummary?.riskFactors)
         ? assistantSummary.riskFactors.map((item) => sanitizeText(String(item)).slice(0, 120)).slice(0, 8)
-        : normalizedReport.riskFactors,
+        : (normalizedReport?.riskFactors || []),
       possibleConditions: [],
       recommendations: Array.isArray(assistantSummary?.recommendations)
         ? assistantSummary.recommendations.map((item) => sanitizeText(String(item)).slice(0, 160)).slice(0, 8)
-        : normalizedReport.recommendations,
-      whenToSeeDoctor: sanitizeText(String(assistantSummary?.whenToSeeDoctor || normalizedReport.whenToSeeDoctor)).slice(0, 400),
+        : (normalizedReport?.recommendations || []),
+      whenToSeeDoctor: sanitizeText(String(assistantSummary?.whenToSeeDoctor || normalizedReport?.whenToSeeDoctor || "")).slice(0, 400),
       keywords,
-      severityScore: triage.triageScore,
-      humanReviewFlag: triage.humanReviewFlag,
+      severityScore: triage?.triageScore,
+      humanReviewFlag: triage?.humanReviewFlag,
     };
 
     if (!Array.isArray(db.ai_chat_sessions)) {
@@ -3714,8 +3728,8 @@ Never diagnose.`,
       language,
       mode: isReviewMode ? "review-maker" : "triage",
       response_summary: sanitizeText(responseText).slice(0, 400),
-      triage_score: triage.triageScore,
-      human_review_flag: triage.humanReviewFlag,
+      triage_score: triage?.triageScore || null,
+      human_review_flag: triage?.humanReviewFlag || false,
       anonymized_symptoms: keywords,
       created_at: new Date().toISOString(),
     });
@@ -3786,8 +3800,8 @@ Never diagnose.`,
     const safeResponse = responseText || "AI assistant did not return a response.";
     return res.json({
       response: safeResponse,
-      report: normalizedReport,
-      triage,
+      report: normalizedReport || undefined,
+      triage: triage || undefined,
       summary: structuredSummary,
       reviewMaker: normalizedReviewMaker,
       mode: isReviewMode ? "review-maker" : "triage",

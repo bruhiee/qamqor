@@ -28,7 +28,8 @@ import {
   History,
   Plus,
   Trash2,
-} from "lucide-react";
+  BookmarkPlus,
+  } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { DisclaimerBanner } from "@/components/layout/DisclaimerBanner";
 import { VoiceInputButton } from "@/components/chat/VoiceInputButton";
@@ -37,7 +38,7 @@ import { useLanguage } from "@/contexts/useLanguage";
 import { useAuth } from "@/contexts/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 interface AIReport {
   riskLevel: "low" | "medium" | "high";
@@ -150,6 +151,9 @@ export default function AIConsultant() {
   const [finalSummary, setFinalSummary] = useState<AISummary | null>(null);
   const [finalReviewMaker, setFinalReviewMaker] = useState<AIReviewMaker | null>(null);
   const [isEvaluationOpen, setIsEvaluationOpen] = useState(false);
+  const [savingSessionId, setSavingSessionId] = useState<string | null>(null);
+  const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
   const [doctorEvaluation, setDoctorEvaluation] = useState({
     urgencyAssessmentCorrectness: "",
     safetyOfRecommendations: "",
@@ -235,6 +239,57 @@ export default function AIConsultant() {
     loadChatHistory();
   }, [user?.id]);
 
+  useEffect(() => {
+    const sessionId = searchParams.get("session");
+    if (!sessionId || !user) return;
+    if (activeSessionId === sessionId) return;
+    if (openingSessionId === sessionId) return;
+    setOpeningSessionId(sessionId);
+    handleOpenHistorySession(sessionId).finally(() => {
+      setOpeningSessionId((prev) => (prev === sessionId ? null : prev));
+    });
+  }, [searchParams, user?.id, activeSessionId, openingSessionId]);
+
+  const saveChatToBookmarks = async (item: ChatHistoryItem) => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: t.error,
+        description: "Please sign in to save chats.",
+      });
+      return;
+    }
+    setSavingSessionId(item.id);
+    try {
+      await apiFetch("/bookmarks", {
+        method: "POST",
+        body: {
+          target_type: "ai_chat",
+          target_id: item.id,
+          title: item.title || "AI consultation",
+          url: `/consultant?session=${item.id}`,
+          metadata: {
+            mode: item.mode || "triage",
+            language: item.language || language,
+            last_message: item.last_message || "",
+          },
+        },
+      });
+      toast({
+        title: t.success,
+        description: "Chat saved to Bookmarks.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: t.error,
+        description: error instanceof Error ? error.message : t.errorOccurred,
+      });
+    } finally {
+      setSavingSessionId(null);
+    }
+  };
+
   const handleNewChat = () => {
     setActiveSessionId(null);
     setMessages([
@@ -304,7 +359,10 @@ export default function AIConsultant() {
   const exportSummaryAsPdf = (message?: Message, summaryOverride?: AISummary | null, reviewOverride?: AIReviewMaker | null) => {
     const win = window.open("", "_blank", "width=900,height=700");
     if (!win) return;
-    const triageLine = message?.triage
+    const isReviewMessage = message?.mode === "review-maker";
+    const triageLine = isReviewMessage
+      ? ""
+      : message?.triage
       ? `Triage: ${message.triage.triageScore}/5 (${message.triage.triageLevelLabel})`
       : summaryOverride?.severityScore
         ? `Triage: ${summaryOverride.severityScore}/5`
@@ -759,6 +817,16 @@ export default function AIConsultant() {
                       >
                         <Trash2 className="w-3 h-3" />
                       </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 mt-1"
+                        onClick={() => saveChatToBookmarks(item)}
+                        disabled={savingSessionId === item.id}
+                        title="Save chat"
+                      >
+                        <BookmarkPlus className="w-3 h-3" />
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -807,7 +875,7 @@ export default function AIConsultant() {
                     </div>
                     
                     {/* AI Report Card */}
-                    {message.report && (
+                    {message.mode !== "review-maker" && message.report && (
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}

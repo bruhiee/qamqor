@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,13 +10,17 @@ import {
   ChevronRight,
   Sparkles,
   RefreshCw,
-  Globe,
   AlertTriangle,
   FileDown,
-  Brain
+  Brain,
+  BookmarkPlus
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { useAuth } from "@/contexts/useAuth";
+import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
+import { useSearchParams } from "react-router-dom";
 
 interface Article {
   id: string;
@@ -47,25 +51,25 @@ const articles: Article[] = [
   {
     id: "1",
     title: "Understanding Heart Health: A Comprehensive Guide",
-    titleRu: "Понимание здоровья сердца: Полное руководство",
-    titleKz: "Жүрек денсаулығын түсіну: Толық нұсқаулық",
+    titleRu: "РџРѕРЅРёРјР°РЅРёРµ Р·РґРѕСЂРѕРІСЊСЏ СЃРµСЂРґС†Р°: РџРѕР»РЅРѕРµ СЂСѓРєРѕРІРѕРґСЃС‚РІРѕ",
+    titleKz: "Р–ТЇСЂРµРє РґРµРЅСЃР°СѓР»С‹Т“С‹РЅ С‚ТЇСЃС–РЅСѓ: РўРѕР»С‹Т› РЅТ±СЃТ›Р°СѓР»С‹Т›",
     summary: "Learn about the key factors that contribute to heart health and how to maintain a healthy cardiovascular system through diet, exercise, and lifestyle choices.",
-    summaryRu: "Узнайте о ключевых факторах, способствующих здоровью сердца, и о том, как поддерживать здоровую сердечно-сосудистую систему с помощью диеты, упражнений и образа жизни.",
-    summaryKz: "Жүрек денсаулығына ықпал ететін негізгі факторлар және тамақтану, жаттығулар мен өмір салты арқылы жүрек-қан тамырлары жүйесін сау сақтау туралы біліңіз.",
+    summaryRu: "РЈР·РЅР°Р№С‚Рµ Рѕ РєР»СЋС‡РµРІС‹С… С„Р°РєС‚РѕСЂР°С…, СЃРїРѕСЃРѕР±СЃС‚РІСѓСЋС‰РёС… Р·РґРѕСЂРѕРІСЊСЋ СЃРµСЂРґС†Р°, Рё Рѕ С‚РѕРј, РєР°Рє РїРѕРґРґРµСЂР¶РёРІР°С‚СЊ Р·РґРѕСЂРѕРІСѓСЋ СЃРµСЂРґРµС‡РЅРѕ-СЃРѕСЃСѓРґРёСЃС‚СѓСЋ СЃРёСЃС‚РµРјСѓ СЃ РїРѕРјРѕС‰СЊСЋ РґРёРµС‚С‹, СѓРїСЂР°Р¶РЅРµРЅРёР№ Рё РѕР±СЂР°Р·Р° Р¶РёР·РЅРё.",
+    summaryKz: "Р–ТЇСЂРµРє РґРµРЅСЃР°СѓР»С‹Т“С‹РЅР° С‹Т›РїР°Р» РµС‚РµС‚С–РЅ РЅРµРіС–Р·РіС– С„Р°РєС‚РѕСЂР»Р°СЂ Р¶У™РЅРµ С‚Р°РјР°Т›С‚Р°РЅСѓ, Р¶Р°С‚С‚С‹Т“СѓР»Р°СЂ РјРµРЅ У©РјС–СЂ СЃР°Р»С‚С‹ Р°СЂТ›С‹Р»С‹ Р¶ТЇСЂРµРє-Т›Р°РЅ С‚Р°РјС‹СЂР»Р°СЂС‹ Р¶ТЇР№РµСЃС–РЅ СЃР°Сѓ СЃР°Т›С‚Р°Сѓ С‚СѓСЂР°Р»С‹ Р±С–Р»С–ТЈС–Р·.",
     keyTakeaways: [
       "Regular exercise reduces heart disease risk by 30-40%",
       "Mediterranean diet is linked to lower cardiovascular mortality",
       "Managing stress is crucial for heart health"
     ],
     keyTakeawaysRu: [
-      "Регулярные упражнения снижают риск сердечных заболеваний на 30-40%",
-      "Средиземноморская диета связана с более низкой смертностью от сердечно-сосудистых заболеваний",
-      "Управление стрессом имеет решающее значение для здоровья сердца"
+      "Р РµРіСѓР»СЏСЂРЅС‹Рµ СѓРїСЂР°Р¶РЅРµРЅРёСЏ СЃРЅРёР¶Р°СЋС‚ СЂРёСЃРє СЃРµСЂРґРµС‡РЅС‹С… Р·Р°Р±РѕР»РµРІР°РЅРёР№ РЅР° 30-40%",
+      "РЎСЂРµРґРёР·РµРјРЅРѕРјРѕСЂСЃРєР°СЏ РґРёРµС‚Р° СЃРІСЏР·Р°РЅР° СЃ Р±РѕР»РµРµ РЅРёР·РєРѕР№ СЃРјРµСЂС‚РЅРѕСЃС‚СЊСЋ РѕС‚ СЃРµСЂРґРµС‡РЅРѕ-СЃРѕСЃСѓРґРёСЃС‚С‹С… Р·Р°Р±РѕР»РµРІР°РЅРёР№",
+      "РЈРїСЂР°РІР»РµРЅРёРµ СЃС‚СЂРµСЃСЃРѕРј РёРјРµРµС‚ СЂРµС€Р°СЋС‰РµРµ Р·РЅР°С‡РµРЅРёРµ РґР»СЏ Р·РґРѕСЂРѕРІСЊСЏ СЃРµСЂРґС†Р°"
     ],
     keyTakeawaysKz: [
-      "Тұрақты жаттығулар жүрек ауруларының қаупін 30-40% төмендетеді",
-      "Жерорта теңізі диетасы жүрек-қан тамырлары ауруларынан өлім-жітімнің төмендеуімен байланысты",
-      "Стрессті басқару жүрек денсаулығы үшін өте маңызды"
+      "РўТ±СЂР°Т›С‚С‹ Р¶Р°С‚С‚С‹Т“СѓР»Р°СЂ Р¶ТЇСЂРµРє Р°СѓСЂСѓР»Р°СЂС‹РЅС‹ТЈ Т›Р°СѓРїС–РЅ 30-40% С‚У©РјРµРЅРґРµС‚РµРґС–",
+      "Р–РµСЂРѕСЂС‚Р° С‚РµТЈС–Р·С– РґРёРµС‚Р°СЃС‹ Р¶ТЇСЂРµРє-Т›Р°РЅ С‚Р°РјС‹СЂР»Р°СЂС‹ Р°СѓСЂСѓР»Р°СЂС‹РЅР°РЅ У©Р»С–Рј-Р¶С–С‚С–РјРЅС–ТЈ С‚У©РјРµРЅРґРµСѓС–РјРµРЅ Р±Р°Р№Р»Р°РЅС‹СЃС‚С‹",
+      "РЎС‚СЂРµСЃСЃС‚С– Р±Р°СЃТ›Р°СЂСѓ Р¶ТЇСЂРµРє РґРµРЅСЃР°СѓР»С‹Т“С‹ ТЇС€С–РЅ У©С‚Рµ РјР°ТЈС‹Р·РґС‹"
     ],
     author: "Dr. Maria Johnson",
     date: "2024-01-15",
@@ -79,34 +83,34 @@ const articles: Article[] = [
       "Keep track of blood pressure, cholesterol, and blood sugar with regular checkups and discuss medication adjustments with your doctor."
     ],
     contentRu: [
-      "Сердце — это мышца, работающая круглосуточно, а основные факторы риска — высокое давление, холестерин, курение, диабет и малоподвижный образ жизни.",
-      "Регулярные упражнения, средиземноморская диета с овощами, нежирным белком и цельными зернами, а также поддержание здорового веса снижают кровяное давление и воспаление.",
-      "Контролируйте давление, холестерин и уровень сахара, регулярно проходя обследования и обсуждая лекарства с врачом."
+      "РЎРµСЂРґС†Рµ вЂ” СЌС‚Рѕ РјС‹С€С†Р°, СЂР°Р±РѕС‚Р°СЋС‰Р°СЏ РєСЂСѓРіР»РѕСЃСѓС‚РѕС‡РЅРѕ, Р° РѕСЃРЅРѕРІРЅС‹Рµ С„Р°РєС‚РѕСЂС‹ СЂРёСЃРєР° вЂ” РІС‹СЃРѕРєРѕРµ РґР°РІР»РµРЅРёРµ, С…РѕР»РµСЃС‚РµСЂРёРЅ, РєСѓСЂРµРЅРёРµ, РґРёР°Р±РµС‚ Рё РјР°Р»РѕРїРѕРґРІРёР¶РЅС‹Р№ РѕР±СЂР°Р· Р¶РёР·РЅРё.",
+      "Р РµРіСѓР»СЏСЂРЅС‹Рµ СѓРїСЂР°Р¶РЅРµРЅРёСЏ, СЃСЂРµРґРёР·РµРјРЅРѕРјРѕСЂСЃРєР°СЏ РґРёРµС‚Р° СЃ РѕРІРѕС‰Р°РјРё, РЅРµР¶РёСЂРЅС‹Рј Р±РµР»РєРѕРј Рё С†РµР»СЊРЅС‹РјРё Р·РµСЂРЅР°РјРё, Р° С‚Р°РєР¶Рµ РїРѕРґРґРµСЂР¶Р°РЅРёРµ Р·РґРѕСЂРѕРІРѕРіРѕ РІРµСЃР° СЃРЅРёР¶Р°СЋС‚ РєСЂРѕРІСЏРЅРѕРµ РґР°РІР»РµРЅРёРµ Рё РІРѕСЃРїР°Р»РµРЅРёРµ.",
+      "РљРѕРЅС‚СЂРѕР»РёСЂСѓР№С‚Рµ РґР°РІР»РµРЅРёРµ, С…РѕР»РµСЃС‚РµСЂРёРЅ Рё СѓСЂРѕРІРµРЅСЊ СЃР°С…Р°СЂР°, СЂРµРіСѓР»СЏСЂРЅРѕ РїСЂРѕС…РѕРґСЏ РѕР±СЃР»РµРґРѕРІР°РЅРёСЏ Рё РѕР±СЃСѓР¶РґР°СЏ Р»РµРєР°СЂСЃС‚РІР° СЃ РІСЂР°С‡РѕРј."
     ],
     image: "https://images.unsplash.com/photo-1559757175-5700dde675bc?w=400"
   },
   {
     id: "2",
     title: "The Science of Sleep: Why Rest Matters",
-    titleRu: "Наука сна: Почему отдых важен",
-    titleKz: "Ұйқы ғылымы: Демалыстың маңыздылығы",
+    titleRu: "РќР°СѓРєР° СЃРЅР°: РџРѕС‡РµРјСѓ РѕС‚РґС‹С… РІР°Р¶РµРЅ",
+    titleKz: "Т°Р№Т›С‹ Т“С‹Р»С‹РјС‹: Р”РµРјР°Р»С‹СЃС‚С‹ТЈ РјР°ТЈС‹Р·РґС‹Р»С‹Т“С‹",
     summary: "Discover the importance of quality sleep for physical and mental health, and learn practical tips for improving your sleep habits.",
-    summaryRu: "Откройте для себя важность качественного сна для физического и психического здоровья и узнайте практические советы по улучшению привычек сна.",
-    summaryKz: "Физикалық және психикалық денсаулық үшін сапалы ұйқының маңыздылығын біліңіз және ұйқы әдеттерін жақсартудың практикалық кеңестерін алыңыз.",
+    summaryRu: "РћС‚РєСЂРѕР№С‚Рµ РґР»СЏ СЃРµР±СЏ РІР°Р¶РЅРѕСЃС‚СЊ РєР°С‡РµСЃС‚РІРµРЅРЅРѕРіРѕ СЃРЅР° РґР»СЏ С„РёР·РёС‡РµСЃРєРѕРіРѕ Рё РїСЃРёС…РёС‡РµСЃРєРѕРіРѕ Р·РґРѕСЂРѕРІСЊСЏ Рё СѓР·РЅР°Р№С‚Рµ РїСЂР°РєС‚РёС‡РµСЃРєРёРµ СЃРѕРІРµС‚С‹ РїРѕ СѓР»СѓС‡С€РµРЅРёСЋ РїСЂРёРІС‹С‡РµРє СЃРЅР°.",
+    summaryKz: "Р¤РёР·РёРєР°Р»С‹Т› Р¶У™РЅРµ РїСЃРёС…РёРєР°Р»С‹Т› РґРµРЅСЃР°СѓР»С‹Т› ТЇС€С–РЅ СЃР°РїР°Р»С‹ Т±Р№Т›С‹РЅС‹ТЈ РјР°ТЈС‹Р·РґС‹Р»С‹Т“С‹РЅ Р±С–Р»С–ТЈС–Р· Р¶У™РЅРµ Т±Р№Т›С‹ У™РґРµС‚С‚РµСЂС–РЅ Р¶Р°Т›СЃР°СЂС‚СѓРґС‹ТЈ РїСЂР°РєС‚РёРєР°Р»С‹Т› РєРµТЈРµСЃС‚РµСЂС–РЅ Р°Р»С‹ТЈС‹Р·.",
     keyTakeaways: [
       "Adults need 7-9 hours of sleep per night",
       "Poor sleep is linked to increased inflammation",
       "Consistent sleep schedule improves sleep quality"
     ],
     keyTakeawaysRu: [
-      "Взрослым нужно 7-9 часов сна в сутки",
-      "Плохой сон связан с повышенным воспалением",
-      "Постоянный режим сна улучшает качество сна"
+      "Р’Р·СЂРѕСЃР»С‹Рј РЅСѓР¶РЅРѕ 7-9 С‡Р°СЃРѕРІ СЃРЅР° РІ СЃСѓС‚РєРё",
+      "РџР»РѕС…РѕР№ СЃРѕРЅ СЃРІСЏР·Р°РЅ СЃ РїРѕРІС‹С€РµРЅРЅС‹Рј РІРѕСЃРїР°Р»РµРЅРёРµРј",
+      "РџРѕСЃС‚РѕСЏРЅРЅС‹Р№ СЂРµР¶РёРј СЃРЅР° СѓР»СѓС‡С€Р°РµС‚ РєР°С‡РµСЃС‚РІРѕ СЃРЅР°"
     ],
     keyTakeawaysKz: [
-      "Ересектерге түнде 7-9 сағат ұйқы қажет",
-      "Нашар ұйқы қабынудың жоғарылауымен байланысты",
-      "Тұрақты ұйқы режимі ұйқы сапасын жақсартады"
+      "Р•СЂРµСЃРµРєС‚РµСЂРіРµ С‚ТЇРЅРґРµ 7-9 СЃР°Т“Р°С‚ Т±Р№Т›С‹ Т›Р°Р¶РµС‚",
+      "РќР°С€Р°СЂ Т±Р№Т›С‹ Т›Р°Р±С‹РЅСѓРґС‹ТЈ Р¶РѕТ“Р°СЂС‹Р»Р°СѓС‹РјРµРЅ Р±Р°Р№Р»Р°РЅС‹СЃС‚С‹",
+      "РўТ±СЂР°Т›С‚С‹ Т±Р№Т›С‹ СЂРµР¶РёРјС– Т±Р№Т›С‹ СЃР°РїР°СЃС‹РЅ Р¶Р°Т›СЃР°СЂС‚Р°РґС‹"
     ],
     author: "Dr. Alex Chen",
     date: "2024-01-10",
@@ -120,34 +124,34 @@ const articles: Article[] = [
       "If problems persist, track your habits and talk to a provider about sleep apnea, restless legs, or stress-related insomnia."
     ],
     contentRu: [
-      "Сон помогает очищать мозг, регулировать гормоны и поддерживать иммунитет; хронические нарушения сна повышают воспаление и ухудшают самочувствие.",
-      "Соблюдайте постоянный режим, отключайте экраны за час до сна и обеспечьте прохладу, темноту и тишину в спальне.",
-      "Если трудности не проходят, фиксируйте привычки и обсудите их с врачом — возможно, это апноэ, синдром беспокойных ног или стресс."
+      "РЎРѕРЅ РїРѕРјРѕРіР°РµС‚ РѕС‡РёС‰Р°С‚СЊ РјРѕР·Рі, СЂРµРіСѓР»РёСЂРѕРІР°С‚СЊ РіРѕСЂРјРѕРЅС‹ Рё РїРѕРґРґРµСЂР¶РёРІР°С‚СЊ РёРјРјСѓРЅРёС‚РµС‚; С…СЂРѕРЅРёС‡РµСЃРєРёРµ РЅР°СЂСѓС€РµРЅРёСЏ СЃРЅР° РїРѕРІС‹С€Р°СЋС‚ РІРѕСЃРїР°Р»РµРЅРёРµ Рё СѓС…СѓРґС€Р°СЋС‚ СЃР°РјРѕС‡СѓРІСЃС‚РІРёРµ.",
+      "РЎРѕР±Р»СЋРґР°Р№С‚Рµ РїРѕСЃС‚РѕСЏРЅРЅС‹Р№ СЂРµР¶РёРј, РѕС‚РєР»СЋС‡Р°Р№С‚Рµ СЌРєСЂР°РЅС‹ Р·Р° С‡Р°СЃ РґРѕ СЃРЅР° Рё РѕР±РµСЃРїРµС‡СЊС‚Рµ РїСЂРѕС…Р»Р°РґСѓ, С‚РµРјРЅРѕС‚Сѓ Рё С‚РёС€РёРЅСѓ РІ СЃРїР°Р»СЊРЅРµ.",
+      "Р•СЃР»Рё С‚СЂСѓРґРЅРѕСЃС‚Рё РЅРµ РїСЂРѕС…РѕРґСЏС‚, С„РёРєСЃРёСЂСѓР№С‚Рµ РїСЂРёРІС‹С‡РєРё Рё РѕР±СЃСѓРґРёС‚Рµ РёС… СЃ РІСЂР°С‡РѕРј вЂ” РІРѕР·РјРѕР¶РЅРѕ, СЌС‚Рѕ Р°РїРЅРѕСЌ, СЃРёРЅРґСЂРѕРј Р±РµСЃРїРѕРєРѕР№РЅС‹С… РЅРѕРі РёР»Рё СЃС‚СЂРµСЃСЃ."
     ],
     image: "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=400"
   },
   {
     id: "3",
     title: "Nutrition Basics: Building a Balanced Diet",
-    titleRu: "Основы питания: Сбалансированная диета",
-    titleKz: "Тамақтану негіздері: Теңдестірілген тамақтану",
+    titleRu: "РћСЃРЅРѕРІС‹ РїРёС‚Р°РЅРёСЏ: РЎР±Р°Р»Р°РЅСЃРёСЂРѕРІР°РЅРЅР°СЏ РґРёРµС‚Р°",
+    titleKz: "РўР°РјР°Т›С‚Р°РЅСѓ РЅРµРіС–Р·РґРµСЂС–: РўРµТЈРґРµСЃС‚С–СЂС–Р»РіРµРЅ С‚Р°РјР°Т›С‚Р°РЅСѓ",
     summary: "A guide to understanding macronutrients, micronutrients, and how to create a balanced diet that supports your health goals.",
-    summaryRu: "Руководство по пониманию макронутриентов, микронутриентов и созданию сбалансированной диеты, поддерживающей ваши цели здоровья.",
-    summaryKz: "Макроэлементтерді, микроэлементтерді түсіну және денсаулық мақсаттарыңызды қолдайтын теңдестірілген тамақтану жүйесін құру нұсқаулығы.",
+    summaryRu: "Р СѓРєРѕРІРѕРґСЃС‚РІРѕ РїРѕ РїРѕРЅРёРјР°РЅРёСЋ РјР°РєСЂРѕРЅСѓС‚СЂРёРµРЅС‚РѕРІ, РјРёРєСЂРѕРЅСѓС‚СЂРёРµРЅС‚РѕРІ Рё СЃРѕР·РґР°РЅРёСЋ СЃР±Р°Р»Р°РЅСЃРёСЂРѕРІР°РЅРЅРѕР№ РґРёРµС‚С‹, РїРѕРґРґРµСЂР¶РёРІР°СЋС‰РµР№ РІР°С€Рё С†РµР»Рё Р·РґРѕСЂРѕРІСЊСЏ.",
+    summaryKz: "РњР°РєСЂРѕСЌР»РµРјРµРЅС‚С‚РµСЂРґС–, РјРёРєСЂРѕСЌР»РµРјРµРЅС‚С‚РµСЂРґС– С‚ТЇСЃС–РЅСѓ Р¶У™РЅРµ РґРµРЅСЃР°СѓР»С‹Т› РјР°Т›СЃР°С‚С‚Р°СЂС‹ТЈС‹Р·РґС‹ Т›РѕР»РґР°Р№С‚С‹РЅ С‚РµТЈРґРµСЃС‚С–СЂС–Р»РіРµРЅ С‚Р°РјР°Т›С‚Р°РЅСѓ Р¶ТЇР№РµСЃС–РЅ Т›Т±СЂСѓ РЅТ±СЃТ›Р°СѓР»С‹Т“С‹.",
     keyTakeaways: [
       "Include all food groups in daily meals",
       "Hydration is as important as nutrition",
       "Processed foods should be limited"
     ],
     keyTakeawaysRu: [
-      "Включайте все группы продуктов в ежедневный рацион",
-      "Гидратация так же важна, как и питание",
-      "Обработанные продукты следует ограничить"
+      "Р’РєР»СЋС‡Р°Р№С‚Рµ РІСЃРµ РіСЂСѓРїРїС‹ РїСЂРѕРґСѓРєС‚РѕРІ РІ РµР¶РµРґРЅРµРІРЅС‹Р№ СЂР°С†РёРѕРЅ",
+      "Р“РёРґСЂР°С‚Р°С†РёСЏ С‚Р°Рє Р¶Рµ РІР°Р¶РЅР°, РєР°Рє Рё РїРёС‚Р°РЅРёРµ",
+      "РћР±СЂР°Р±РѕС‚Р°РЅРЅС‹Рµ РїСЂРѕРґСѓРєС‚С‹ СЃР»РµРґСѓРµС‚ РѕРіСЂР°РЅРёС‡РёС‚СЊ"
     ],
     keyTakeawaysKz: [
-      "Күнделікті тамаққа барлық тағам топтарын қосыңыз",
-      "Гидратация тамақтану сияқты маңызды",
-      "Өңделген тағамдарды шектеу керек"
+      "РљТЇРЅРґРµР»С–РєС‚С– С‚Р°РјР°Т›Т›Р° Р±Р°СЂР»С‹Т› С‚Р°Т“Р°Рј С‚РѕРїС‚Р°СЂС‹РЅ Т›РѕСЃС‹ТЈС‹Р·",
+      "Р“РёРґСЂР°С‚Р°С†РёСЏ С‚Р°РјР°Т›С‚Р°РЅСѓ СЃРёСЏТ›С‚С‹ РјР°ТЈС‹Р·РґС‹",
+      "УЁТЈРґРµР»РіРµРЅ С‚Р°Т“Р°РјРґР°СЂРґС‹ С€РµРєС‚РµСѓ РєРµСЂРµРє"
     ],
     author: "Dr. Sarah Williams",
     date: "2024-01-05",
@@ -156,14 +160,14 @@ const articles: Article[] = [
     libraryType: "symptom-guide",
     tags: ["nutrition", "diet", "hydration", "activity"],
     content: [
-      "Understanding macronutrients — carbohydrates, proteins, and fats — helps you build meals that support steady energy and satiety.",
+      "Understanding macronutrients вЂ” carbohydrates, proteins, and fats вЂ” helps you build meals that support steady energy and satiety.",
       "Hydration matters as much as nutrition; choose mostly water, limit sugary beverages, and respond to your body's thirst cues.",
       "Swap highly processed foods for whole ingredients, check labels for sodium and added sugar, and practice portion control."
     ],
     contentRu: [
-      "Понимание макроэлементов — углеводов, белков и жиров — помогает составить рацион, поддерживающий стабильную энергию и сытость.",
-      "Гидратация важна, как и питание; выбирайте в основном воду, сократите сладкие напитки и прислушивайтесь к жажде.",
-      "Заменяйте обработанные продукты цельными ингредиентами, изучайте этикетки на соль и сахар и контролируйте размеры порций."
+      "РџРѕРЅРёРјР°РЅРёРµ РјР°РєСЂРѕСЌР»РµРјРµРЅС‚РѕРІ вЂ” СѓРіР»РµРІРѕРґРѕРІ, Р±РµР»РєРѕРІ Рё Р¶РёСЂРѕРІ вЂ” РїРѕРјРѕРіР°РµС‚ СЃРѕСЃС‚Р°РІРёС‚СЊ СЂР°С†РёРѕРЅ, РїРѕРґРґРµСЂР¶РёРІР°СЋС‰РёР№ СЃС‚Р°Р±РёР»СЊРЅСѓСЋ СЌРЅРµСЂРіРёСЋ Рё СЃС‹С‚РѕСЃС‚СЊ.",
+      "Р“РёРґСЂР°С‚Р°С†РёСЏ РІР°Р¶РЅР°, РєР°Рє Рё РїРёС‚Р°РЅРёРµ; РІС‹Р±РёСЂР°Р№С‚Рµ РІ РѕСЃРЅРѕРІРЅРѕРј РІРѕРґСѓ, СЃРѕРєСЂР°С‚РёС‚Рµ СЃР»Р°РґРєРёРµ РЅР°РїРёС‚РєРё Рё РїСЂРёСЃР»СѓС€РёРІР°Р№С‚РµСЃСЊ Рє Р¶Р°Р¶РґРµ.",
+      "Р—Р°РјРµРЅСЏР№С‚Рµ РѕР±СЂР°Р±РѕС‚Р°РЅРЅС‹Рµ РїСЂРѕРґСѓРєС‚С‹ С†РµР»СЊРЅС‹РјРё РёРЅРіСЂРµРґРёРµРЅС‚Р°РјРё, РёР·СѓС‡Р°Р№С‚Рµ СЌС‚РёРєРµС‚РєРё РЅР° СЃРѕР»СЊ Рё СЃР°С…Р°СЂ Рё РєРѕРЅС‚СЂРѕР»РёСЂСѓР№С‚Рµ СЂР°Р·РјРµСЂС‹ РїРѕСЂС†РёР№."
     ],
     image: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400"
   },
@@ -816,26 +820,26 @@ const healthFacts = [
   {
     type: "fact",
     content: "Laughing 100 times is equivalent to 15 minutes of exercise on a stationary bicycle.",
-    contentRu: "Смех 100 раз эквивалентен 15 минутам упражнений на велотренажере.",
-    contentKz: "100 рет күлу велотренажерде 15 минут жаттығу жасауға тең."
+    contentRu: "РЎРјРµС… 100 СЂР°Р· СЌРєРІРёРІР°Р»РµРЅС‚РµРЅ 15 РјРёРЅСѓС‚Р°Рј СѓРїСЂР°Р¶РЅРµРЅРёР№ РЅР° РІРµР»РѕС‚СЂРµРЅР°Р¶РµСЂРµ.",
+    contentKz: "100 СЂРµС‚ РєТЇР»Сѓ РІРµР»РѕС‚СЂРµРЅР°Р¶РµСЂРґРµ 15 РјРёРЅСѓС‚ Р¶Р°С‚С‚С‹Т“Сѓ Р¶Р°СЃР°СѓТ“Р° С‚РµТЈ."
   },
   {
     type: "myth",
     content: "MYTH: You need 8 glasses of water daily. FACT: Water needs vary by person, activity, and climate.",
-    contentRu: "МИФ: Вам нужно 8 стаканов воды в день. ФАКТ: Потребность в воде зависит от человека, активности и климата.",
-    contentKz: "МИФ: Күніне 8 стақан су ішу керек. ФАКТ: Су қажеттілігі адамға, белсенділікке және климатқа байланысты."
+    contentRu: "РњРР¤: Р’Р°Рј РЅСѓР¶РЅРѕ 8 СЃС‚Р°РєР°РЅРѕРІ РІРѕРґС‹ РІ РґРµРЅСЊ. Р¤РђРљРў: РџРѕС‚СЂРµР±РЅРѕСЃС‚СЊ РІ РІРѕРґРµ Р·Р°РІРёСЃРёС‚ РѕС‚ С‡РµР»РѕРІРµРєР°, Р°РєС‚РёРІРЅРѕСЃС‚Рё Рё РєР»РёРјР°С‚Р°.",
+    contentKz: "РњРР¤: РљТЇРЅС–РЅРµ 8 СЃС‚Р°Т›Р°РЅ СЃСѓ С–С€Сѓ РєРµСЂРµРє. Р¤РђРљРў: РЎСѓ Т›Р°Р¶РµС‚С‚С–Р»С–РіС– Р°РґР°РјТ“Р°, Р±РµР»СЃРµРЅРґС–Р»С–РєРєРµ Р¶У™РЅРµ РєР»РёРјР°С‚Т›Р° Р±Р°Р№Р»Р°РЅС‹СЃС‚С‹."
   },
   {
     type: "fact",
     content: "The human brain uses about 20% of the body's total energy despite being only 2% of body weight.",
-    contentRu: "Человеческий мозг использует около 20% общей энергии тела, составляя всего 2% массы тела.",
-    contentKz: "Адам миы дене салмағының тек 2% құрағанымен, жалпы энергияның шамамен 20% пайдаланады."
+    contentRu: "Р§РµР»РѕРІРµС‡РµСЃРєРёР№ РјРѕР·Рі РёСЃРїРѕР»СЊР·СѓРµС‚ РѕРєРѕР»Рѕ 20% РѕР±С‰РµР№ СЌРЅРµСЂРіРёРё С‚РµР»Р°, СЃРѕСЃС‚Р°РІР»СЏСЏ РІСЃРµРіРѕ 2% РјР°СЃСЃС‹ С‚РµР»Р°.",
+    contentKz: "РђРґР°Рј РјРёС‹ РґРµРЅРµ СЃР°Р»РјР°Т“С‹РЅС‹ТЈ С‚РµРє 2% Т›Т±СЂР°Т“Р°РЅС‹РјРµРЅ, Р¶Р°Р»РїС‹ СЌРЅРµСЂРіРёСЏРЅС‹ТЈ С€Р°РјР°РјРµРЅ 20% РїР°Р№РґР°Р»Р°РЅР°РґС‹."
   },
   {
     type: "myth",
     content: "MYTH: Cracking knuckles causes arthritis. FACT: Studies show no link between knuckle cracking and arthritis.",
-    contentRu: "МИФ: Хруст пальцами вызывает артрит. ФАКТ: Исследования не показывают связи между хрустом пальцами и артритом.",
-    contentKz: "МИФ: Саусақтарды сытырлату артритке әкеледі. ФАКТ: Зерттеулер саусақтарды сытырлату мен артрит арасында байланыс жоқ екенін көрсетеді."
+    contentRu: "РњРР¤: РҐСЂСѓСЃС‚ РїР°Р»СЊС†Р°РјРё РІС‹Р·С‹РІР°РµС‚ Р°СЂС‚СЂРёС‚. Р¤РђРљРў: РСЃСЃР»РµРґРѕРІР°РЅРёСЏ РЅРµ РїРѕРєР°Р·С‹РІР°СЋС‚ СЃРІСЏР·Рё РјРµР¶РґСѓ С…СЂСѓСЃС‚РѕРј РїР°Р»СЊС†Р°РјРё Рё Р°СЂС‚СЂРёС‚РѕРј.",
+    contentKz: "РњРР¤: РЎР°СѓСЃР°Т›С‚Р°СЂРґС‹ СЃС‹С‚С‹СЂР»Р°С‚Сѓ Р°СЂС‚СЂРёС‚РєРµ У™РєРµР»РµРґС–. Р¤РђРљРў: Р—РµСЂС‚С‚РµСѓР»РµСЂ СЃР°СѓСЃР°Т›С‚Р°СЂРґС‹ СЃС‹С‚С‹СЂР»Р°С‚Сѓ РјРµРЅ Р°СЂС‚СЂРёС‚ Р°СЂР°СЃС‹РЅРґР° Р±Р°Р№Р»Р°РЅС‹СЃ Р¶РѕТ› РµРєРµРЅС–РЅ РєУ©СЂСЃРµС‚РµРґС–."
   }
 ];
 
@@ -855,62 +859,74 @@ const articlePageCopy = {
     close: "Close",
   },
   ru: {
-    title: "Статьи о здоровье",
-    subtitle: "Информация, основанная на доказательствах",
-    mythTitle: "Миф о здоровье развенчан!",
-    factTitle: "Знаете ли вы?",
-    searchPlaceholder: "Поиск статей...",
-    noArticles: "Статьи не найдены",
-    keyTakeaways: "Основные выводы",
-    medicalDisclaimerTitle: "Медицинская оговорка",
+    title: "РЎС‚Р°С‚СЊРё Рѕ Р·РґРѕСЂРѕРІСЊРµ",
+    subtitle: "РРЅС„РѕСЂРјР°С†РёСЏ, РѕСЃРЅРѕРІР°РЅРЅР°СЏ РЅР° РґРѕРєР°Р·Р°С‚РµР»СЊСЃС‚РІР°С…",
+    mythTitle: "РњРёС„ Рѕ Р·РґРѕСЂРѕРІСЊРµ СЂР°Р·РІРµРЅС‡Р°РЅ!",
+    factTitle: "Р—РЅР°РµС‚Рµ Р»Рё РІС‹?",
+    searchPlaceholder: "РџРѕРёСЃРє СЃС‚Р°С‚РµР№...",
+    noArticles: "РЎС‚Р°С‚СЊРё РЅРµ РЅР°Р№РґРµРЅС‹",
+    keyTakeaways: "РћСЃРЅРѕРІРЅС‹Рµ РІС‹РІРѕРґС‹",
+    medicalDisclaimerTitle: "РњРµРґРёС†РёРЅСЃРєР°СЏ РѕРіРѕРІРѕСЂРєР°",
     medicalDisclaimerText:
-      "Эта статья предназначена только для информации и не заменяет консультацию врача. Обратитесь к квалифицированному специалисту по медицинским вопросам.",
-    nextFact: "Далее",
-    close: "Закрыть",
+      "Р­С‚Р° СЃС‚Р°С‚СЊСЏ РїСЂРµРґРЅР°Р·РЅР°С‡РµРЅР° С‚РѕР»СЊРєРѕ РґР»СЏ РёРЅС„РѕСЂРјР°С†РёРё Рё РЅРµ Р·Р°РјРµРЅСЏРµС‚ РєРѕРЅСЃСѓР»СЊС‚Р°С†РёСЋ РІСЂР°С‡Р°. РћР±СЂР°С‚РёС‚РµСЃСЊ Рє РєРІР°Р»РёС„РёС†РёСЂРѕРІР°РЅРЅРѕРјСѓ СЃРїРµС†РёР°Р»РёСЃС‚Сѓ РїРѕ РјРµРґРёС†РёРЅСЃРєРёРј РІРѕРїСЂРѕСЃР°Рј.",
+    nextFact: "Р”Р°Р»РµРµ",
+    close: "Р—Р°РєСЂС‹С‚СЊ",
   },
   kz: {
-    title: "Денсаулық мақалалары",
-    subtitle: "Дәлелді денсаулық ақпараты",
-    mythTitle: "Денсаулық мифы жоққа шығарылды!",
-    factTitle: "Сіз білдіңіз бе?",
-    searchPlaceholder: "Мақалаларды іздеу...",
-    noArticles: "Мақалалар табылмады",
-    keyTakeaways: "Негізгі тұжырымдар",
-    medicalDisclaimerTitle: "Медициналық ескерту",
+    title: "Р”РµРЅСЃР°СѓР»С‹Т› РјР°Т›Р°Р»Р°Р»Р°СЂС‹",
+    subtitle: "Р”У™Р»РµР»РґС– РґРµРЅСЃР°СѓР»С‹Т› Р°Т›РїР°СЂР°С‚С‹",
+    mythTitle: "Р”РµРЅСЃР°СѓР»С‹Т› РјРёС„С‹ Р¶РѕТ›Т›Р° С€С‹Т“Р°СЂС‹Р»РґС‹!",
+    factTitle: "РЎС–Р· Р±С–Р»РґС–ТЈС–Р· Р±Рµ?",
+    searchPlaceholder: "РњР°Т›Р°Р»Р°Р»Р°СЂРґС‹ С–Р·РґРµСѓ...",
+    noArticles: "РњР°Т›Р°Р»Р°Р»Р°СЂ С‚Р°Р±С‹Р»РјР°РґС‹",
+    keyTakeaways: "РќРµРіС–Р·РіС– С‚Т±Р¶С‹СЂС‹РјРґР°СЂ",
+    medicalDisclaimerTitle: "РњРµРґРёС†РёРЅР°Р»С‹Т› РµСЃРєРµСЂС‚Сѓ",
     medicalDisclaimerText:
-      "Бұл мақала ақпараттық сипатта және дәрігерлік кеңес орнына шықпайды. Денсаулық мәселелері бойынша білікті маманға жүгініңіз.",
-    nextFact: "Келесі",
-    close: "Жабу",
+      "Р‘Т±Р» РјР°Т›Р°Р»Р° Р°Т›РїР°СЂР°С‚С‚С‹Т› СЃРёРїР°С‚С‚Р° Р¶У™РЅРµ РґУ™СЂС–РіРµСЂР»С–Рє РєРµТЈРµСЃ РѕСЂРЅС‹РЅР° С€С‹Т›РїР°Р№РґС‹. Р”РµРЅСЃР°СѓР»С‹Т› РјУ™СЃРµР»РµР»РµСЂС– Р±РѕР№С‹РЅС€Р° Р±С–Р»С–РєС‚С– РјР°РјР°РЅТ“Р° Р¶ТЇРіС–РЅС–ТЈС–Р·.",
+    nextFact: "РљРµР»РµСЃС–",
+    close: "Р–Р°Р±Сѓ",
   },
 };
 
 export default function HealthArticles() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [language, setLanguage] = useState<"en" | "ru" | "kz">("en");
+  const [language] = useState<"en" | "ru" | "kz">("en");
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [savingArticleId, setSavingArticleId] = useState<string | null>(null);
   const [currentFactIndex, setCurrentFactIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<"all" | Article["libraryType"]>("all");
   const [activeTag, setActiveTag] = useState<string>("all");
   const [sortBy, setSortBy] = useState<SortOption>("relevance");
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const copy = articlePageCopy[language];
   const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  useEffect(() => {
+    const articleId = searchParams.get("article");
+    if (!articleId) return;
+    const match = articles.find((article) => article.id === articleId);
+    if (match) {
+      setSelectedArticle(match);
+    }
+  }, [searchParams]);
 
   const categoryLabels =
     language === "ru"
       ? {
-          all: "Все",
-          "health-blog": "Блог о здоровье",
-          "symptom-guide": "Руководство по симптомам",
-          "knowledge-base": "База медицинских знаний",
-          "medical-dictionary": "Словарь медицинских терминов",
+          all: "Р’СЃРµ",
+          "health-blog": "Р‘Р»РѕРі Рѕ Р·РґРѕСЂРѕРІСЊРµ",
+          "symptom-guide": "Р СѓРєРѕРІРѕРґСЃС‚РІРѕ РїРѕ СЃРёРјРїС‚РѕРјР°Рј",
+          "knowledge-base": "Р‘Р°Р·Р° РјРµРґРёС†РёРЅСЃРєРёС… Р·РЅР°РЅРёР№",
+          "medical-dictionary": "РЎР»РѕРІР°СЂСЊ РјРµРґРёС†РёРЅСЃРєРёС… С‚РµСЂРјРёРЅРѕРІ",
         }
       : language === "kz"
         ? {
-            all: "Барлығы",
-            "health-blog": "Денсаулық блогы",
-            "symptom-guide": "Симптом нұсқаулығы",
-            "knowledge-base": "Медициналық білім базасы",
-            "medical-dictionary": "Медициналық терминдер сөздігі",
+            all: "Р‘Р°СЂР»С‹Т“С‹",
+            "health-blog": "Р”РµРЅСЃР°СѓР»С‹Т› Р±Р»РѕРіС‹",
+            "symptom-guide": "РЎРёРјРїС‚РѕРј РЅТ±СЃТ›Р°СѓР»С‹Т“С‹",
+            "knowledge-base": "РњРµРґРёС†РёРЅР°Р»С‹Т› Р±С–Р»С–Рј Р±Р°Р·Р°СЃС‹",
+            "medical-dictionary": "РњРµРґРёС†РёРЅР°Р»С‹Т› С‚РµСЂРјРёРЅРґРµСЂ СЃУ©Р·РґС–РіС–",
           }
         : {
             all: "All",
@@ -1021,6 +1037,35 @@ export default function HealthArticles() {
     return fact.content;
   };
 
+  const saveArticleToBookmarks = async (article: Article) => {
+    if (!user) {
+      toast.error("Please sign in to save articles.");
+      return;
+    }
+    setSavingArticleId(article.id);
+    try {
+      await apiFetch("/bookmarks", {
+        method: "POST",
+        body: {
+          target_type: "article",
+          target_id: article.id,
+          title: getTitle(article),
+          url: `/articles?article=${article.id}`,
+          metadata: {
+            author: article.author,
+            category: article.category,
+            read_time: article.readTime,
+          },
+        },
+      });
+      toast.success("Article saved to Bookmarks.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save article.");
+    } finally {
+      setSavingArticleId(null);
+    }
+  };
+
   const nextFact = () => {
     setCurrentFactIndex((prev) => (prev + 1) % healthFacts.length);
   };
@@ -1050,12 +1095,6 @@ export default function HealthArticles() {
     win.print();
   };
 
-  const languageLabels = {
-    en: "English",
-    ru: "Русский",
-    kz: "Қазақша"
-  };
-
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
@@ -1074,24 +1113,6 @@ export default function HealthArticles() {
                     {copy.title}
                   </h1>
                   <p className="text-muted-foreground">{copy.subtitle}</p>
-                </div>
-              </div>
-
-              {/* Language Selector */}
-              <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4 text-muted-foreground" />
-                <div className="flex bg-muted rounded-lg p-1">
-                  {(["en", "ru", "kz"] as const).map((lang) => (
-                    <Button
-                      key={lang}
-                      variant={language === lang ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setLanguage(lang)}
-                      className="text-xs"
-                    >
-                      {languageLabels[lang]}
-                    </Button>
-                  ))}
                 </div>
               </div>
             </div>
@@ -1142,14 +1163,14 @@ export default function HealthArticles() {
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
               <p className="text-sm text-muted-foreground">
                 {language === "ru"
-                  ? `Найдено: ${filteredArticles.length}`
+                  ? `РќР°Р№РґРµРЅРѕ: ${filteredArticles.length}`
                   : language === "kz"
-                    ? `Табылды: ${filteredArticles.length}`
+                    ? `РўР°Р±С‹Р»РґС‹: ${filteredArticles.length}`
                     : `Showing: ${filteredArticles.length}`}
               </p>
               {hasActiveFilters && (
                 <Button variant="outline" size="sm" onClick={resetFilters}>
-                  {language === "ru" ? "Сбросить фильтры" : language === "kz" ? "Сүзгілерді тазарту" : "Clear filters"}
+                  {language === "ru" ? "РЎР±СЂРѕСЃРёС‚СЊ С„РёР»СЊС‚СЂС‹" : language === "kz" ? "РЎТЇР·РіС–Р»РµСЂРґС– С‚Р°Р·Р°СЂС‚Сѓ" : "Clear filters"}
                 </Button>
               )}
             </div>
@@ -1164,10 +1185,10 @@ export default function HealthArticles() {
             </div>
             <div className="flex flex-wrap gap-2 mt-4">
               {([
-                { key: "relevance", label: language === "ru" ? "По релевантности" : language === "kz" ? "Өзектілігі бойынша" : "Relevance" },
-                { key: "newest", label: language === "ru" ? "Сначала новые" : language === "kz" ? "Жаңалары алдымен" : "Newest" },
-                { key: "oldest", label: language === "ru" ? "Сначала старые" : language === "kz" ? "Ескілері алдымен" : "Oldest" },
-                { key: "short-read", label: language === "ru" ? "Короткое чтение" : language === "kz" ? "Қысқа оқу" : "Short reads" },
+                { key: "relevance", label: language === "ru" ? "РџРѕ СЂРµР»РµРІР°РЅС‚РЅРѕСЃС‚Рё" : language === "kz" ? "УЁР·РµРєС‚С–Р»С–РіС– Р±РѕР№С‹РЅС€Р°" : "Relevance" },
+                { key: "newest", label: language === "ru" ? "РЎРЅР°С‡Р°Р»Р° РЅРѕРІС‹Рµ" : language === "kz" ? "Р–Р°ТЈР°Р»Р°СЂС‹ Р°Р»РґС‹РјРµРЅ" : "Newest" },
+                { key: "oldest", label: language === "ru" ? "РЎРЅР°С‡Р°Р»Р° СЃС‚Р°СЂС‹Рµ" : language === "kz" ? "Р•СЃРєС–Р»РµСЂС– Р°Р»РґС‹РјРµРЅ" : "Oldest" },
+                { key: "short-read", label: language === "ru" ? "РљРѕСЂРѕС‚РєРѕРµ С‡С‚РµРЅРёРµ" : language === "kz" ? "ТљС‹СЃТ›Р° РѕТ›Сѓ" : "Short reads" },
               ] as Array<{ key: SortOption; label: string }>).map((option) => (
                 <Button
                   key={option.key}
@@ -1195,7 +1216,7 @@ export default function HealthArticles() {
             </div>
             <div className="mt-4">
               <p className="text-xs text-muted-foreground mb-2">
-                {language === "ru" ? "Популярные теги" : language === "kz" ? "Танымал тегтер" : "Popular tags"}
+                {language === "ru" ? "РџРѕРїСѓР»СЏСЂРЅС‹Рµ С‚РµРіРё" : language === "kz" ? "РўР°РЅС‹РјР°Р» С‚РµРіС‚РµСЂ" : "Popular tags"}
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -1266,6 +1287,22 @@ export default function HealthArticles() {
                       </span>
                     ))}
                   </div>
+                  <div className="mt-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        saveArticleToBookmarks(article);
+                      }}
+                      disabled={savingArticleId === article.id}
+                    >
+                      {savingArticleId === article.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
+                      Save article
+                    </Button>
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -1282,14 +1319,14 @@ export default function HealthArticles() {
             <div className="flex items-center gap-3 mb-2">
               <Brain className="w-5 h-5 text-primary" />
               <h3 className="font-display text-xl font-semibold">
-                {language === "ru" ? "Медицинские викторины (планируется)" : language === "kz" ? "Медициналық викториналар (жоспарлануда)" : "Medical Quizzes (Planned)"}
+                {language === "ru" ? "РњРµРґРёС†РёРЅСЃРєРёРµ РІРёРєС‚РѕСЂРёРЅС‹ (РїР»Р°РЅРёСЂСѓРµС‚СЃСЏ)" : language === "kz" ? "РњРµРґРёС†РёРЅР°Р»С‹Т› РІРёРєС‚РѕСЂРёРЅР°Р»Р°СЂ (Р¶РѕСЃРїР°СЂР»Р°РЅСѓРґР°)" : "Medical Quizzes (Planned)"}
               </h3>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
               {language === "ru"
-                ? "Скоро пользователи смогут проверять знания о здоровье и распространённых медицинских мифах."
+                ? "РЎРєРѕСЂРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»Рё СЃРјРѕРіСѓС‚ РїСЂРѕРІРµСЂСЏС‚СЊ Р·РЅР°РЅРёСЏ Рѕ Р·РґРѕСЂРѕРІСЊРµ Рё СЂР°СЃРїСЂРѕСЃС‚СЂР°РЅС‘РЅРЅС‹С… РјРµРґРёС†РёРЅСЃРєРёС… РјРёС„Р°С…."
                 : language === "kz"
-                  ? "Жақында пайдаланушылар денсаулық және кең таралған медициналық мифтер бойынша білімін тексере алады."
+                  ? "Р–Р°Т›С‹РЅРґР° РїР°Р№РґР°Р»Р°РЅСѓС€С‹Р»Р°СЂ РґРµРЅСЃР°СѓР»С‹Т› Р¶У™РЅРµ РєРµТЈ С‚Р°СЂР°Р»Т“Р°РЅ РјРµРґРёС†РёРЅР°Р»С‹Т› РјРёС„С‚РµСЂ Р±РѕР№С‹РЅС€Р° Р±С–Р»С–РјС–РЅ С‚РµРєСЃРµСЂРµ Р°Р»Р°РґС‹."
                   : "Soon users will be able to test their knowledge about health and common medical myths."}
             </p>
             <div className="grid md:grid-cols-3 gap-3 text-sm">
@@ -1385,7 +1422,16 @@ export default function HealthArticles() {
                           onClick={() => downloadArticleAsPdf(selectedArticle)}
                         >
                           <FileDown className="w-4 h-4" />
-                          {language === "ru" ? "Скачать PDF" : language === "kz" ? "PDF жүктеу" : "Download PDF"}
+                          {language === "ru" ? "РЎРєР°С‡Р°С‚СЊ PDF" : language === "kz" ? "PDF Р¶ТЇРєС‚РµСѓ" : "Download PDF"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="gap-2"
+                          onClick={() => saveArticleToBookmarks(selectedArticle)}
+                          disabled={savingArticleId === selectedArticle.id}
+                        >
+                          {savingArticleId === selectedArticle.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <BookmarkPlus className="w-4 h-4" />}
+                          Save
                         </Button>
                         <Button onClick={() => setSelectedArticle(null)}>
                           {copy.close}
@@ -1404,3 +1450,5 @@ export default function HealthArticles() {
     </div>
   );
 }
+
+

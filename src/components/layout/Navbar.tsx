@@ -151,7 +151,7 @@ export function Navbar() {
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/bookmarks')}>
                     <Bookmark className="w-4 h-4 mr-2" />
-                    Bookmarks
+                    Saved
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {isAdmin() && (

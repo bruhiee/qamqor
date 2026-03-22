@@ -771,19 +771,19 @@ export default function MapPage() {
       el.className = "custom-marker";
       el.innerHTML = `
         <div style="
-          width: 54px;
-          height: 54px;
+          width: 42px;
+          height: 42px;
           background: ${config.color};
           clip-path: polygon(25% 6%, 75% 6%, 94% 50%, 75% 94%, 25% 94%, 6% 50%);
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 8px 22px ${config.color}55;
+          box-shadow: 0 4px 12px ${config.color}45;
           cursor: pointer;
           border: 2px solid #ffffff;
           transition: transform 0.25s ease, filter 0.25s ease;
         ">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             ${facility.type === "pharmacy" ? '<path d="M10.5 20H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2v2.5"/><circle cx="16.5" cy="17.5" r="2.5"/><path d="M18.5 15.5v4"/><path d="M16.5 17.5h4"/>' : ''}
             ${facility.type === "hospital" ? '<path d="M12 6v4"/><path d="M14 14h-4"/><path d="M14 18h-4"/><path d="M14 8h-4"/><path d="M18 12h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2"/><path d="M18 22V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v18"/>' : ''}
             ${facility.type === "clinic" ? '<path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/>' : ''}
@@ -798,7 +798,7 @@ export default function MapPage() {
           innerDot.style.filter = scale === "scale(1)" ? "brightness(1)" : "brightness(1.1)";
         }
       };
-      el.addEventListener("mouseenter", () => scaleMarker("scale(1.16)"));
+      el.addEventListener("mouseenter", () => scaleMarker("scale(1.1)"));
       el.addEventListener("mouseleave", () => scaleMarker("scale(1)"));
       el.addEventListener("click", () => {
         setSelectedFacility(facility);
@@ -1001,7 +1001,7 @@ export default function MapPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-sm truncate">{facility.name}</h3>
-                        <p className="text-xs text-muted-foreground truncate">{facility.address}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2 break-words">{facility.address}</p>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span
                             className="text-xs px-2 py-0.5 rounded-full"
@@ -1040,7 +1040,7 @@ export default function MapPage() {
           </div>
 
           {/* Map */}
-          <div className="block flex-1 relative min-h-[44vh] md:min-h-0">
+          <div className="block flex-1 relative min-h-[44vh] md:min-h-0 overflow-hidden">
             {USE_MAPBOX && (
               <div
                 ref={mapContainer}
@@ -1078,7 +1078,7 @@ export default function MapPage() {
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="absolute top-4 right-4 w-[26rem] bg-card rounded-xl shadow-xl border border-border overflow-hidden"
+                className="absolute top-2 left-2 right-2 md:top-4 md:left-auto md:right-4 md:w-[24rem] max-h-[calc(100%-1rem)] md:max-h-[calc(100%-2rem)] bg-card rounded-xl shadow-xl border border-border overflow-y-auto z-40"
               >
                 <div className="p-4">
                   <div className="flex items-start justify-between mb-3">
@@ -1116,13 +1116,13 @@ export default function MapPage() {
                   </div>
 
                   <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                    <div className="flex items-start gap-2 text-muted-foreground break-words">
                       <MapPin className="w-4 h-4" />
                       {selectedFacility.address}
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Phone className="w-4 h-4" />
-                      <a href={`tel:${selectedFacility.phone}`} className="hover:text-primary">
+                      <a href={`tel:${selectedFacility.phone}`} className="hover:text-primary break-all">
                         {selectedFacility.phone}
                       </a>
                     </div>
@@ -1169,7 +1169,7 @@ export default function MapPage() {
                       <p className="text-xs font-medium mb-2">Department numbers</p>
                       <div className="space-y-1">
                         {Object.entries(selectedFacility.departments).map(([dep, phone]) => (
-                          <p key={dep} className="text-xs text-muted-foreground">
+                          <p key={dep} className="text-xs text-muted-foreground break-all">
                             {dep}: {phone}
                           </p>
                         ))}

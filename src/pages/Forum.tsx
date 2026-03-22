@@ -97,6 +97,7 @@ export default function Forum() {
   const [photoFileName, setPhotoFileName] = useState("");
   const [newTags, setNewTags] = useState<string[]>([]);
   const [isUrgent, setIsUrgent] = useState(false);
+  const [isPostingQuestion, setIsPostingQuestion] = useState(false);
   const [improvingQuestion, setImprovingQuestion] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<{
     title: string;
@@ -180,8 +181,9 @@ export default function Forum() {
   };
 
   const handleCreatePost = async () => {
-    if (!user || !newTitle.trim() || !newContent.trim() || !problemCategory || !ageGroup) return;
+    if (!user || !newTitle.trim() || !newContent.trim() || !problemCategory || !ageGroup || isPostingQuestion) return;
 
+    setIsPostingQuestion(true);
     try {
       await apiFetch("/forum/posts", {
         method: "POST",
@@ -217,6 +219,8 @@ export default function Forum() {
         description: error instanceof Error ? error.message : t.error,
         variant: "destructive",
       });
+    } finally {
+      setIsPostingQuestion(false);
     }
   };
 
@@ -494,7 +498,8 @@ export default function Forum() {
                         {t.markAsUrgent}
                       </Label>
                     </div>
-                    <Button onClick={handleCreatePost} className="w-full" disabled={!newTitle.trim() || !newContent.trim() || !problemCategory || !ageGroup}>
+                    <Button onClick={handleCreatePost} className="w-full" disabled={!newTitle.trim() || !newContent.trim() || !problemCategory || !ageGroup || isPostingQuestion}>
+                      {isPostingQuestion ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                       {t.postQuestion}
                     </Button>
                   </div>

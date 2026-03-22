@@ -74,11 +74,6 @@ export function Footer() {
                   {t.about}
                 </Link>
               </li>
-              <li>
-                <span className="text-background/60">
-                  {t.medicalDisclaimer}
-                </span>
-              </li>
             </ul>
           </div>
 
